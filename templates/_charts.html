@@ -1,0 +1,58 @@
+{# Hand-rolled, dependency-free chart building blocks (CSS conic-gradient / flexbox
+   only - no JS charting library, matching the app's offline-first design).
+   items passed to these macros must already have zero-count entries filtered out. #}
+
+{% macro donut(items, total, center_value, center_label) %}
+{% set ns = namespace(acc=0) %}
+<div class="donut-row">
+  <div class="donut" style="background: conic-gradient({% for m in items %}{{ m.color }} {{ (ns.acc / total * 100)|round(2) }}% {{ ((ns.acc + m.count) / total * 100)|round(2) }}%{% if not loop.last %}, {% endif %}{% set ns.acc = ns.acc + m.count %}{% endfor %});">
+    <div class="donut-center">
+      <div class="donut-center-value">{{ center_value }}</div>
+      <div class="donut-center-label">{{ center_label }}</div>
+    </div>
+  </div>
+  <div class="donut-legend">
+    {% for m in items %}
+    <div class="donut-legend-row">
+      <span class="donut-legend-dot" style="background:{{ m.color }};"></span>
+      <span class="donut-legend-label">{{ m.label }}</span>
+      <span class="donut-legend-value">{{ m.count }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endmacro %}
+
+{% macro segbar(items, total) %}
+<div class="segbar">
+  {% for m in items %}
+  <div class="segbar-seg" style="width:{{ (m.count / total * 100)|round(2) }}%; background:{{ m.color }};" title="{{ m.label }}: {{ m.count }}"></div>
+  {% endfor %}
+</div>
+<div class="segbar-legend">
+  {% for m in items %}
+  <div class="segbar-legend-row"><span class="segbar-legend-dot" style="background:{{ m.color }};"></span>{{ m.label }} ({{ m.count }})</div>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{% macro col_chart(items, maxv, value_key='total') %}
+<div class="col-chart">
+  {% for it in items %}
+  <div class="col-chart-bar">
+    <div class="col-chart-value">{{ it[value_key]|round(0)|int if it[value_key] else '' }}</div>
+    <div class="col-chart-fill" style="height: {{ ((it[value_key] / maxv * 100) if maxv else 0)|round(1) }}%;"></div>
+    <div class="col-chart-label">{{ it.label }}</div>
+  </div>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{% macro progress_bars(items, unit='') %}
+{% for it in items %}
+<div class="progress-row">
+  <div class="progress-row-head"><span>{{ it.label }}</span><span class="pct">{{ it.value }}{{ unit }}</span></div>
+  <div class="progress-track"><div class="progress-fill" style="width: {{ it.value }}%;"></div></div>
+</div>
+{% endfor %}
+{% endmacro %}

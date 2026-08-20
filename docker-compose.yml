@@ -1,0 +1,28 @@
+# Start DHARANI 360 with:   docker compose up -d
+# Stop it with:             docker compose down
+# Records survive both - they live in the named volume below.
+
+services:
+  dharani360:
+    build: .
+    container_name: dharani360
+    restart: unless-stopped
+    ports:
+      # Only listens on this machine. Cloudflare Tunnel (see DEPLOY.md)
+      # is what publishes it, so no port is ever open to the internet.
+      - "127.0.0.1:5000:5000"
+    environment:
+      # Signs session cookies. Generate one and put it in a .env file:
+      #   python -c "import secrets; print(secrets.token_urlsafe(48))"
+      SECRET_KEY: ${SECRET_KEY:-}
+      # Leave empty to use the SQLite file in the volume.
+      # Set to a Supabase connection string to share one database.
+      DATABASE_URL: ${DATABASE_URL:-}
+    volumes:
+      - dharani-data:/app/instance
+      # The live Supabase keys for this installation, if you use them.
+      # Read-only, and never baked into the image.
+      - ./supabase_config.json:/app/supabase_config.json:ro
+
+volumes:
+  dharani-data:

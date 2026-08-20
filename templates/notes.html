@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Notes · DHARANI 360{% endblock %}
+{% block content %}
+
+<div class="topbar">
+  <div>
+    <h1 class="dept-title">{{ icon('file-text') }}Notes</h1>
+    <div class="breadcrumb">
+      <a href="{{ url_for('dashboard') }}">Home</a>{{ icon('chevron') }}
+      <span>Applications</span>{{ icon('chevron') }}
+      <span class="current">Notes</span>
+    </div>
+    <div class="crumbs">Quick private sticky notes — reminders, ideas, anything you want to jot down.</div>
+  </div>
+</div>
+
+<div class="card" style="max-width:640px; margin-bottom:20px;">
+  <form method="post" action="{{ url_for('note_add') }}" class="todo-add-row">
+    <input type="text" name="text" placeholder="Write a note..." required>
+    <select name="color">
+      <option value="blue">Blue</option>
+      <option value="green">Green</option>
+      <option value="amber">Amber</option>
+      <option value="red">Red</option>
+    </select>
+    <button type="submit" class="btn btn-sm">Add Note</button>
+  </form>
+</div>
+
+<div class="notes-grid">
+  {% for n in notes %}
+  <div class="note-card tint-{{ n.color or 'blue' }}">
+    <form method="post" action="{{ url_for('note_delete', note_id=n.id) }}" class="note-del-form"><button type="submit" class="todo-del" title="Delete">&times;</button></form>
+    <div class="note-text">{{ n.text }}</div>
+    <div class="note-meta">{{ n.created_at[:16].replace("T", " ") if n.created_at else "" }}</div>
+  </div>
+  {% else %}
+  <div class="empty-state">No notes yet — add one above.</div>
+  {% endfor %}
+</div>
+
+{% endblock %}

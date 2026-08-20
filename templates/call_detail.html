@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}{{ call.contact_name }} · Calls · DHARANI 360{% endblock %}
+{% block content %}
+
+{% set dir = call.call_direction or 'Incoming' %}
+{% set is_video = call.call_type == 'Video Call' %}
+
+<div class="topbar">
+  <div>
+    <div class="crumbs">
+      <a href="{{ url_for('calls') }}">Calls</a> /
+      <a href="{{ url_for('calls', view=dir|lower) }}">{{ dir }}</a> / {{ call.doc_no }}
+    </div>
+  </div>
+  <div class="btn-row no-print" style="margin:0;">
+    <a class="btn btn-secondary" href="{{ url_for('calls') }}">&larr; Back to calls</a>
+  </div>
+</div>
+
+<div class="call-stage call-stage-{{ dir|lower }}">
+  <div class="call-stage-top">
+    <span class="call-chip call-chip-{{ dir|lower }}">{{ dir }}</span>
+    <span class="call-chip {{ 'call-chip-video' if is_video else 'call-chip-voice' }}">
+      {{ 'Video Call' if is_video else 'Voice Call' }}
+    </span>
+    {% if call.status %}<span class="call-chip call-chip-status">{{ call.status }}</span>{% endif %}
+  </div>
+
+  <div class="call-avatar">{{ initials }}</div>
+  <h1 class="call-stage-name">{{ call.contact_name or 'Unknown caller' }}</h1>
+
+  <div class="call-stage-clock">{{ duration_clock }}</div>
+  <div class="call-stage-sub">
+    {% if total_seconds %}Call duration{% else %}No duration recorded{% endif %}
+    {% if call.call_date %} &middot; {{ call.call_date }}{% if call.call_time %} at {{ call.call_time }}{% endif %}{% endif %}
+  </div>
+
+  <div class="call-controls no-print">
+    {% if call.contact_number %}
+    {# tel: hands the number to whatever the computer uses for calls (phone link,
+       Teams, Skype). The app itself has no phone line - it never pretends to dial. #}
+    <a class="call-btn call-btn-go" href="tel:{{ call.contact_number|replace(' ','') }}" title="Call {{ call.contact_number }}">
+      {{ icon('phone') }}
+    </a>
+    <button type="button" class="call-btn" data-copy-number="{{ call.contact_number }}" title="Copy number">
+      {{ icon('copy') }}
+    </button>
+    {% endif %}
+    <a class="call-btn" href="{{ url_for('record_edit', form_code='SAL-009', record_id=call.id) }}" title="Edit this call">
+      {{ icon('edit') }}
+    </a>
+    <a class="call-btn" href="{{ url_for('record_view', form_code='SAL-009', record_id=call.id) }}" title="Full record">
+      {{ icon('eye') }}
+    </a>
+    <a class="call-btn" href="{{ url_for('record_download', form_code='SAL-009', record_id=call.id, fmt='csv') }}" title="Download">
+      {{ icon('download') }}
+    </a>
+    <form method="post" action="{{ url_for('record_delete', form_code='SAL-009', record_id=call.id) }}"
+          data-confirm="Delete the call record for {{ call.contact_name }} permanently?">
+      <button type="submit" class="call-btn call-btn-end" title="Delete this call">{{ icon('trash') }}</button>
+    </form>
+  </div>
+
+  {% if call.contact_number %}
+  <div class="call-stage-number">{{ call.contact_number }}</div>
+  {% endif %}
+</div>
+
+<div class="grid grid-cards">
+  <div class="card">
+    <div class="section-title" style="margin:0 0 var(--sp-3);">{{ icon('clipboard-list') }}<span>Call details</span></div>
+    <div class="view-grid">
+      <div class="view-field"><div class="view-label">Outcome</div><div class="view-value">{{ call.outcome or '—' }}</div></div>
+      <div class="view-field"><div class="view-label">Handled by</div><div class="view-value">{{ call.agent_name or '—' }}</div></div>
+      <div class="view-field"><div class="view-label">Related lead / client</div><div class="view-value">{{ call.related_lead or '—' }}</div></div>
+      <div class="view-field"><div class="view-label">Property reference</div><div class="view-value">{{ call.property_ref or '—' }}</div></div>
+      <div class="view-field">
+        <div class="view-label">Follow-up</div>
+        <div class="view-value {% if call.follow_up_date and call.follow_up_date <= today and call.status != 'Closed' %}call-overdue{% endif %}">
+          {{ call.follow_up_date or '—' }}
+          {% if call.follow_up_date and call.follow_up_date <= today and call.status != 'Closed' %} &middot; due{% endif %}
+        </div>
+      </div>
+      <div class="view-field"><div class="view-label">Logged</div><div class="view-value">{{ call.created_at[:16] if call.created_at else '—' }}</div></div>
+    </div>
+    {% if call.summary %}
+    <div class="form-section" style="margin:var(--sp-4) 0 0;">
+      <div class="form-section-title">What was discussed</div>
+      <div class="view-value" style="white-space:pre-wrap;">{{ call.summary }}</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="section-title" style="margin:0 0 var(--sp-3);">{{ icon('history') }}<span>Earlier calls with this contact</span></div>
+    {% if same_contact %}
+      {% for c in same_contact %}
+      <div class="rag-row">
+        <span class="call-chip call-chip-{{ (c.call_direction or 'Incoming')|lower }}">{{ c.call_direction or '—' }}</span>
+        <a href="{{ url_for('call_detail', record_id=c.id) }}">{{ c.call_date or c.doc_no }}</a>
+        <span class="rag-meta">{{ c.outcome or 'No outcome recorded' }}</span>
+        <span class="rag-days">{% if c.duration_minutes %}{{ c.duration_minutes|tidy }} min{% endif %}</span>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">This is the only call logged with {{ call.contact_name or 'this contact' }}.</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="copy-toast" id="copyToast" role="status" aria-live="polite">Copied</div>
+
+<script>
+(function () {
+  var btn = document.querySelector('[data-copy-number]');
+  if (!btn) return;
+  var toast = document.getElementById('copyToast');
+  btn.addEventListener('click', function () {
+    var text = btn.getAttribute('data-copy-number');
+    function done() {
+      toast.classList.add('show');
+      setTimeout(function () { toast.classList.remove('show'); }, 1800);
+    }
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(done, fallback);
+    } else { fallback(); }
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch (e) {}
+      document.body.removeChild(ta);
+    }
+  });
+})();
+</script>
+
+{% endblock %}

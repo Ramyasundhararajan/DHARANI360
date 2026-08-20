@@ -1,0 +1,90 @@
+{# ============================================================================
+   Shared SmartHR-style building blocks.
+
+   Every dashboard and section page composes itself out of these macros so the
+   whole app reads as one system: the same page header, the same card chrome,
+   the same stat tile, the same ranked list row. Change a macro here and every
+   screen follows.
+   ========================================================================== #}
+
+{# --- page header: big title, breadcrumb trail, right-hand action slot ----- #}
+{% macro page_header(title, crumbs, icon_svg=None, tint=None, tag=None) %}
+<div class="topbar">
+  <div>
+    <h1 class="dept-title">
+      {% if icon_svg %}<span class="dept-title-icon" {% if tint %}style="color:{{ tint }};"{% endif %}>{{ icon_svg }}</span>{% endif %}
+      {{ title }}
+      {% if tag %}<span class="badge-tag badge-tag-new" style="margin-left:0;">{{ tag }}</span>{% endif %}
+    </h1>
+    {% if crumbs %}<div class="breadcrumb">{{ crumbs }}</div>{% endif %}
+  </div>
+  <div class="topbar-actions">{{ caller() if caller is defined else '' }}</div>
+</div>
+{% endmacro %}
+
+{# --- card header inside a .card: title left, small action on the right ---- #}
+{% macro card_head(title, icon_svg=None, action_url=None, action_label='View all') %}
+<div class="widget-card-title">
+  {% if icon_svg %}{{ icon_svg }}{% endif %}<span>{{ title }}</span>
+  {% if action_url %}<a class="btn btn-xs btn-secondary section-title-action" href="{{ action_url }}">{{ action_label }}</a>{% endif %}
+</div>
+{% endmacro %}
+
+{# --- the SmartHR stat tile: coloured icon badge, value, label, footer link - #}
+{% macro stat_tile(value, label, icon_svg, tone='primary', href=None, foot=None, pct=None) %}
+<div class="stat-tile">
+  <div class="stat-tile-top">
+    <span class="icon-stat-badge tone-{{ tone }}">{{ icon_svg }}</span>
+    <div class="stat-tile-body">
+      <div class="icon-stat-label">{{ label }}</div>
+      <div class="icon-stat-value">{{ value }}</div>
+    </div>
+  </div>
+  {% if pct is not none %}
+  <div class="stat-spark"><i class="tone-{{ tone }}" style="width:{{ pct }}%;"></i></div>
+  {% endif %}
+  {% if href or foot %}
+  <div class="stat-tile-foot">
+    {% if foot %}<span>{{ foot }}</span>{% endif %}
+    {% if href %}<a href="{{ href }}">View details</a>{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{# --- a ranked list row: leading dot/badge, title link, right-hand meta ---- #}
+{% macro list_row(title, href=None, meta=None, badge=None, badge_tone='GREY', avatar=None) %}
+<div class="list-row">
+  {% if avatar %}<span class="list-avatar">{{ avatar }}</span>{% endif %}
+  <div class="list-row-body">
+    <div class="list-row-title">{% if href %}<a href="{{ href }}">{{ title }}</a>{% else %}{{ title }}{% endif %}</div>
+    {% if meta %}<div class="list-row-meta">{{ meta }}</div>{% endif %}
+  </div>
+  {% if badge %}<span class="badge badge-{{ badge_tone }}">{{ badge }}</span>{% endif %}
+</div>
+{% endmacro %}
+
+{# --- expiry / RAG row used by every "due soon" panel -------------------- #}
+{% macro rag_row(days, doc_no, href, meta) %}
+<div class="rag-row">
+  <span class="badge badge-{{ 'RED' if days <= 30 else 'AMBER' }}"><span class="dot dot-{{ 'RED' if days <= 30 else 'AMBER' }}"></span>{{ days }}d</span>
+  <a href="{{ href }}">{{ doc_no }}</a>
+  <span class="rag-meta">{{ meta }}</span>
+</div>
+{% endmacro %}
+
+{# --- horizontal bar breakdown ------------------------------------------- #}
+{% macro bars(items, fallback_color='var(--primary)') %}
+{% for bar in items %}
+<div class="breakdown-row">
+  <span class="breakdown-label" title="{{ bar.label }}">{{ bar.label }}</span>
+  <div class="breakdown-track"><div class="breakdown-fill" style="width: {{ bar.pct }}%; background: {{ bar.color or fallback_color }};"></div></div>
+  <span class="breakdown-count">{{ bar.count }}</span>
+</div>
+{% endfor %}
+{% endmacro %}
+
+{# --- empty state -------------------------------------------------------- #}
+{% macro empty(text) %}
+<div class="empty-state">{{ text }}</div>
+{% endmacro %}

@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Settings · DHARANI 360{% endblock %}
+{% block content %}
+
+<div class="topbar">
+  <div>
+    <h1 class="dept-title">{{ icon('settings') }}Settings &amp; Email Digest</h1>
+    <div class="breadcrumb">
+      <a href="{{ url_for('dashboard') }}">Home</a>{{ icon('chevron') }}
+      <span>Administration</span>{{ icon('chevron') }}
+      <span class="current">Settings</span>
+    </div>
+    <div class="crumbs">Configure an SMTP account so DHARANI 360 can email a daily red/amber compliance digest. Administrators only.</div>
+  </div>
+</div>
+
+<div class="card form-card">
+  <div class="doc-header">
+    <div>
+      <div class="doc-title">SMTP Configuration</div>
+      <div class="doc-purpose">Most providers (Gmail, Outlook/Microsoft 365, Zoho) support SMTP with an app password. This is stored locally in your database, not sent anywhere else.</div>
+    </div>
+  </div>
+  <form method="post">
+    <div class="form-grid">
+      <div class="field">
+        <label>SMTP Host</label>
+        <input type="text" name="smtp_host" value="{{ settings.smtp_host }}" placeholder="smtp.gmail.com">
+      </div>
+      <div class="field">
+        <label>SMTP Port</label>
+        <input type="number" name="smtp_port" value="{{ settings.smtp_port or 587 }}">
+      </div>
+      <div class="field">
+        <label>SMTP Username</label>
+        <input type="text" name="smtp_username" value="{{ settings.smtp_username }}" placeholder="you@yourcompany.com">
+      </div>
+      <div class="field">
+        <label>SMTP Password / App Password</label>
+        <input type="password" name="smtp_password" placeholder="{% if settings.smtp_password %}(unchanged - leave blank to keep){% else %}App password{% endif %}">
+      </div>
+      <div class="field">
+        <label>Use TLS</label>
+        <div style="display:flex; align-items:center; gap:8px; padding:9px 0;">
+          <input type="checkbox" name="smtp_use_tls" id="tls" {% if settings.smtp_use_tls != '0' %}checked{% endif %}>
+          <label for="tls" style="margin:0; font-weight:400;">Yes (recommended, port 587)</label>
+        </div>
+      </div>
+      <div class="field">
+        <label>Send From Address</label>
+        <input type="text" name="digest_from" value="{{ settings.digest_from }}" placeholder="Defaults to SMTP username">
+      </div>
+      <div class="field">
+        <label>Send To (comma-separated for multiple)</label>
+        <input type="text" name="digest_to" value="{{ settings.digest_to }}" placeholder="admin@yourcompany.com, director@yourcompany.com">
+      </div>
+      <div class="field">
+        <label>Include Items Due Within (days)</label>
+        <input type="number" name="digest_horizon_days" value="{{ settings.digest_horizon_days or 90 }}">
+      </div>
+    </div>
+    <div class="btn-row">
+      <button type="submit" class="btn">Save Settings</button>
+    </div>
+  </form>
+
+  <form method="post" action="{{ url_for('settings_send_test') }}">
+    <div class="btn-row" style="border-top:1px solid var(--border); padding-top:14px;">
+      <button type="submit" class="btn btn-secondary">Send Test Digest Now</button>
+    </div>
+  </form>
+</div>
+
+<div class="section-title">Leave Policy Note</div>
+<div class="card form-card">
+  <div class="doc-purpose" style="margin-bottom:12px;">Shown on every employee's personal dashboard. Use it for the plain-language leave policy summary — carry-forward rules, notice period, etc.</div>
+  <form method="post">
+    <input type="hidden" name="smtp_host" value="{{ settings.smtp_host }}">
+    <input type="hidden" name="smtp_port" value="{{ settings.smtp_port }}">
+    <input type="hidden" name="smtp_username" value="{{ settings.smtp_username }}">
+    <input type="hidden" name="digest_from" value="{{ settings.digest_from }}">
+    <input type="hidden" name="digest_to" value="{{ settings.digest_to }}">
+    <input type="hidden" name="digest_horizon_days" value="{{ settings.digest_horizon_days }}">
+    {% if settings.smtp_use_tls != '0' %}<input type="hidden" name="smtp_use_tls" value="on">{% endif %}
+    <div class="form-grid">
+      <div class="field full">
+        <label>Leave Policy Note {% if settings.leave_policy_updated %}<span style="color:var(--text-dim); font-weight:400;">(last updated {{ settings.leave_policy_updated }})</span>{% endif %}</label>
+        <textarea name="leave_policy_note" placeholder="e.g. 30 annual leave days/year, request at least 5 working days in advance, unused days do not carry forward.">{{ settings.leave_policy_note }}</textarea>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button type="submit" class="btn">Save Leave Policy Note</button>
+    </div>
+  </form>
+</div>
+
+<div class="section-title">Public Holidays</div>
+<div class="card form-card">
+  <form method="post" action="{{ url_for('holiday_add') }}" class="form-grid" style="margin-bottom:16px;">
+    <div class="field">
+      <label>Holiday Name</label>
+      <input type="text" name="name" required>
+    </div>
+    <div class="field">
+      <label>Date</label>
+      <input type="date" name="holiday_date" required>
+    </div>
+    <div class="field" style="justify-content:flex-end;">
+      <button type="submit" class="btn btn-secondary">+ Add Holiday</button>
+    </div>
+  </form>
+  {% if holidays %}
+    {% for h in holidays %}
+    <div class="rag-row">
+      <span>{{ h.name }}</span>
+      <span class="rag-meta">{{ h.holiday_date }}</span>
+      <form method="post" action="{{ url_for('holiday_delete', holiday_id=h.id) }}" style="margin-left:auto;">
+        <button type="submit" class="btn btn-sm btn-danger">Remove</button>
+      </form>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty-state">No holidays on file yet.</div>
+  {% endif %}
+</div>
+
+<div class="section-title">Automate it (Windows Task Scheduler)</div>
+<div class="card">
+  <p style="color:var(--text-dim); font-size:13.5px; line-height:1.6; margin:0;">
+    Once SMTP is saved, DHARANI 360 can email this digest automatically every morning without the portal needing to
+    be open. In Windows: open <b>Task Scheduler</b> &rarr; <b>Create Basic Task</b> &rarr; name it "DHARANI 360 Digest" &rarr;
+    trigger <b>Daily</b> at your preferred time &rarr; action <b>Start a program</b> &rarr; point it at
+    <code>send_digest.bat</code> inside this folder. Full steps are in <code>README.md</code>.
+  </p>
+</div>
+
+{% endblock %}

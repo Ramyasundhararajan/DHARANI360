@@ -1,0 +1,342 @@
+{% extends "base.html" %}
+{% import "_charts.html" as charts %}
+{% import "_ui.html" as ui %}
+{% block title %}Admin Dashboard · DHARANI 360{% endblock %}
+{% block content %}
+
+<div class="topbar">
+  <div>
+    <h1 class="dept-title">{{ icon('board') }}Admin Dashboard</h1>
+    <div class="breadcrumb">
+      <a href="{{ url_for('dashboard') }}">Home</a>{{ icon('chevron') }}
+      <a href="{{ url_for('dashboards_hub') }}">Dashboard</a>{{ icon('chevron') }}
+      <span class="current">Admin Dashboard</span>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <a class="btn btn-sm btn-secondary" href="{{ url_for('insights_center') }}">{{ icon('trending-up') }}AI Insights</a>
+    <a class="btn btn-sm" href="{{ url_for('regulations') }}">{{ icon('shield') }}Rules &amp; Regulations</a>
+  </div>
+</div>
+
+<div class="welcome-card no-print">
+  {% if current_user.photo_path %}
+    <img class="welcome-avatar" src="{{ url_for('photo_file', relpath=current_user.photo_path) }}" alt="">
+  {% else %}
+    <span class="welcome-avatar">{{ (current_user.full_name or current_user.username)[:1]|upper }}</span>
+  {% endif %}
+  <div class="welcome-body">
+    <div class="welcome-title">Welcome back, {{ (current_user.full_name or current_user.username).split()[0] }}</div>
+    <div class="welcome-sub">
+      You have <b>{{ approvals|length }}</b> pending approval{{ '' if approvals|length == 1 else 's' }},
+      <b>{{ urgent|length }}</b> urgent expiry item{{ '' if urgent|length == 1 else 's' }}
+      and <b>{{ todos|rejectattr('done')|list|length }}</b> open to-do{{ '' if todos|rejectattr('done')|list|length == 1 else 's' }}.
+    </div>
+  </div>
+  <div class="welcome-actions">
+    <a class="btn btn-sm btn-secondary" href="{{ url_for('calendar') }}">{{ icon('calendar-check') }}Calendar</a>
+    <a class="btn btn-sm" href="{{ url_for('todos_page') }}">{{ icon('clipboard-list') }}My To-Do</a>
+  </div>
+</div>
+
+{# ---------------------------------------------------------- stat tiles -- #}
+<div class="grid grid-icon-stats">
+  {% set stat_links = {
+      'Active Employees': url_for('register', form_code='HR-002'),
+      'Active Clients': url_for('register', form_code='SAL-002'),
+      'Open Transactions': url_for('register', form_code='TXN-001'),
+      'Commission Paid (AED)': url_for('register', form_code='TXN-004'),
+      'Open Requisitions': url_for('register', form_code='REC-001'),
+      'Candidates in Pipeline': url_for('register', form_code='REC-002'),
+      'Open Support Tickets': url_for('register', form_code='HLP-001'),
+  } %}
+  {% for s in stat_cards %}
+    {{ ui.stat_tile(s.value, s.label, icon(s.icon), s.tone, stat_links.get(s.label)) }}
+  {% endfor %}
+</div>
+
+{# ------------------------------------------------- workforce + presence -- #}
+<div class="widget-grid">
+  <div class="card">
+    {{ ui.card_head('Headcount by Department', icon('users'), url_for('register', form_code='HR-002'), 'Register') }}
+    {% if dept_bars %}{{ ui.bars(dept_bars) }}{% else %}{{ ui.empty('No employee records yet.') }}{% endif %}
+  </div>
+
+  <div class="card">
+    {{ ui.card_head('Employee Status Mix', icon('user-check')) }}
+    {% if status_bars %}
+      {{ charts.segbar(status_bars, status_bars|sum(attribute='count')) }}
+    {% else %}{{ ui.empty('No employee records yet.') }}{% endif %}
+  </div>
+</div>
+
+<div class="widget-grid">
+  <div class="card">
+    {{ ui.card_head("Today's Attendance", icon('calendar-check'), url_for('register', form_code='ATT-001'), 'Attendance') }}
+    {% if attendance_mix %}
+      {{ charts.donut(attendance_mix, attendance_total, attendance_total, 'Logged Today') }}
+    {% else %}{{ ui.empty('No attendance logged for today yet.') }}{% endif %}
+  </div>
+
+  <div class="card">
+    {{ ui.card_head('Clock In / Out — Today', icon('clock')) }}
+    {% for r in clock_rows[:7] %}
+      {{ ui.list_row(r.employee_name or r.doc_no,
+                     url_for('record_view', form_code='ATT-001', record_id=r.id),
+                     'in ' ~ (r.check_in or '—') ~ ' · out ' ~ (r.check_out or '—'),
+                     r.status or '—', status_color(r.status),
+                     (r.employee_name or r.doc_no)[:1]|upper) }}
+    {% else %}
+      {{ ui.empty('No punches recorded today yet.') }}
+    {% endfor %}
+  </div>
+</div>
+
+{# ---------------------------------------------------- approvals + todo -- #}
+<div class="widget-grid">
+  <div class="card">
+    {{ ui.card_head('Pending Approvals', icon('check-square')) }}
+    {% for a in approvals[:8] %}
+    <div class="approval-row">
+      <div>
+        <div class="approval-title"><a href="{{ url_for('record_view', form_code=a.form_code, record_id=a.record_id) }}">{{ a.title }}</a></div>
+        <div class="rag-meta" style="margin-left:0; text-align:left;">{{ a.meta }}</div>
+      </div>
+      <div class="approval-actions">
+        <form method="post" action="{{ url_for('approval_action', form_code=a.form_code, record_id=a.record_id, action='approve') }}">
+          <button type="submit" class="btn btn-xs btn-approve">Approve</button>
+        </form>
+        <form method="post" action="{{ url_for('approval_action', form_code=a.form_code, record_id=a.record_id, action='reject') }}">
+          <button type="submit" class="btn btn-xs btn-reject">Decline</button>
+        </form>
+      </div>
+    </div>
+    {% else %}
+      {{ ui.empty('Nothing waiting on your approval.') }}
+    {% endfor %}
+    {% if approvals|length > 8 %}
+    <div class="rules-strip-foot" style="margin:12px -20px -20px;">{{ approvals|length - 8 }} more waiting further down the registers.</div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    {{ ui.card_head('My To-Do List', icon('clipboard-list'), url_for('todos_page'), 'Open') }}
+    <div class="todo-list">
+      {% for t in todos %}
+      <div class="todo-row tint-{{ t.color or 'blue' }} {% if t.done %}done{% endif %}">
+        <form method="post" action="{{ url_for('todo_toggle', todo_id=t.id) }}"><button type="submit" class="todo-check-btn" title="Mark done / not done">{{ icon('check-square') }}</button></form>
+        <span class="todo-text">{{ t.text }}</span>
+        <form method="post" action="{{ url_for('todo_delete', todo_id=t.id) }}"><button type="submit" class="todo-del" title="Delete">&times;</button></form>
+      </div>
+      {% else %}
+      {{ ui.empty('No to-dos yet — add one below.') }}
+      {% endfor %}
+    </div>
+    <form method="post" action="{{ url_for('todo_add') }}" class="todo-add-row" style="margin-top:14px; margin-bottom:0;">
+      <input type="text" name="text" placeholder="Add a to-do…" required>
+      <select name="color" aria-label="Colour">
+        <option value="blue">Blue</option>
+        <option value="green">Green</option>
+        <option value="amber">Amber</option>
+        <option value="red">Red</option>
+      </select>
+      <button type="submit" class="btn btn-sm">Add</button>
+    </form>
+  </div>
+</div>
+
+{# -------------------------------------------------- people + pipeline --- #}
+<div class="widget-grid">
+  <div class="card">
+    {{ ui.card_head('Recent Job Applicants', icon('user-plus'), url_for('register', form_code='REC-002'), 'Pipeline') }}
+    {% for r in applicant_rows %}
+      {{ ui.list_row(r.candidate_name or r.doc_no,
+                     url_for('record_view', form_code='REC-002', record_id=r.id),
+                     r.position_applied or '—',
+                     r.status or '—', status_color(r.status),
+                     (r.candidate_name or r.doc_no)[:1]|upper) }}
+    {% else %}
+      {{ ui.empty('No candidates in the pipeline right now.') }}
+    {% endfor %}
+  </div>
+
+  <div class="card">
+    {{ ui.card_head('Employees', icon('users'), url_for('register', form_code='HR-002'), 'View all') }}
+    {% for r in new_joiners %}
+      {{ ui.list_row(r.full_name or r.doc_no,
+                     url_for('record_view', form_code='HR-002', record_id=r.id),
+                     (r.position or '—') ~ ' · ' ~ (r.department or '—'),
+                     r.status or '—', status_color(r.status),
+                     (r.full_name or r.doc_no)[:1]|upper) }}
+    {% else %}
+      {{ ui.empty('No employee records yet.') }}
+    {% endfor %}
+  </div>
+</div>
+
+{# ------------------------------------------------------ money + risk --- #}
+<div class="widget-grid widget-grid-wide">
+  <div class="card">
+    {{ ui.card_head('Sales Overview — Commission Paid (Last 6 Months)', icon('trending-up'), url_for('register', form_code='TXN-004'), 'Commissions') }}
+    {% set maxv = (sales_overview|map(attribute='total')|list|max) if sales_overview else 0 %}
+    {% if maxv %}
+      {{ charts.col_chart(sales_overview, maxv) }}
+    {% else %}{{ ui.empty('No commission payments recorded yet.') }}{% endif %}
+  </div>
+
+  <div class="card">
+    {{ ui.card_head('Compliance Calendar Status', icon('shield'), url_for('register', form_code='COR-003'), 'Calendar') }}
+    {% if compliance_bars %}
+      {{ charts.donut(compliance_bars, compliance_bars|sum(attribute='count'), compliance_bars|sum(attribute='count'), 'Total Items') }}
+    {% else %}{{ ui.empty('No compliance items on file.') }}{% endif %}
+  </div>
+</div>
+
+<div class="widget-grid">
+  <div class="card">
+    {{ ui.card_head('Invoices Awaiting Verification', icon('file-text'), url_for('register', form_code='FIN-006'), 'Invoices') }}
+    {% for r in invoice_rows %}
+      {{ ui.list_row(r.vendor_name or r.doc_no,
+                     url_for('record_view', form_code='FIN-006', record_id=r.id),
+                     'AED ' ~ '{:,.0f}'.format(r.invoice_amount or 0),
+                     r.status or '—', status_color(r.status)) }}
+    {% else %}
+      {{ ui.empty('No invoices pending verification.') }}
+    {% endfor %}
+  </div>
+
+  <div class="card">
+    {{ ui.card_head('Upcoming Birthdays (30 days)', icon('star')) }}
+    {% for b in birthdays %}
+      {{ ui.list_row(b._name, url_for('record_view', form_code='HR-002', record_id=b.id),
+                     'today' if b._days == 0 else 'in ' ~ b._days ~ ' days',
+                     None, 'GREY', b._name[:1]|upper) }}
+    {% else %}
+      {{ ui.empty('No birthdays in the next 30 days.') }}
+    {% endfor %}
+  </div>
+</div>
+
+{# --------------------------------------------------------- meetings ----- #}
+<div class="card">
+  {{ ui.card_head('Upcoming Meetings', icon('calendar'), url_for('calendar'), 'Calendar') }}
+  {% for m in meetings %}
+  <div class="meeting-row">
+    <div class="meeting-date-chip">
+      <div class="d">{{ m.meeting_date[8:10] if m.meeting_date else '—' }}</div>
+      <div class="m">{{ m.meeting_date[5:7] if m.meeting_date else '' }}</div>
+    </div>
+    <div class="meeting-body">
+      <div class="meeting-title">{{ m.title }}</div>
+      <div class="meeting-meta">{{ m.category or "—" }} &middot; {{ m.start_time or "—" }}{% if m.end_time %}–{{ m.end_time }}{% endif %}{% if m.attendees %} &middot; {{ m.attendees }}{% endif %}</div>
+    </div>
+    {% if m.link %}<a class="btn btn-xs btn-secondary" href="{{ m.link }}" target="_blank" rel="noopener">Join</a>{% endif %}
+    <form method="post" action="{{ url_for('meeting_delete', meeting_id=m.id) }}"><button type="submit" class="todo-del" title="Remove">&times;</button></form>
+  </div>
+  {% else %}
+    {{ ui.empty('No meetings scheduled.') }}
+  {% endfor %}
+
+  <details class="inline-form no-print">
+    <summary>+ Schedule a meeting</summary>
+    <form method="post" action="{{ url_for('meeting_add') }}" class="form-grid">
+      <div class="field"><label>Title</label><input type="text" name="title" required></div>
+      <div class="field"><label>Category</label><input type="text" name="category" placeholder="e.g. Sales, Ops"></div>
+      <div class="field"><label>Date</label><input type="date" name="meeting_date" required></div>
+      <div class="field"><label>Start</label><input type="time" name="start_time"></div>
+      <div class="field"><label>End</label><input type="time" name="end_time"></div>
+      <div class="field"><label>Link (optional)</label><input type="text" name="link" placeholder="https://…"></div>
+      <div class="field full"><label>Attendees</label><input type="text" name="attendees" placeholder="Comma-separated names"></div>
+      <div class="field full"><button type="submit" class="btn btn-sm">Schedule Meeting</button></div>
+    </form>
+  </details>
+</div>
+
+{# --------------------------------------------------------- risk lists --- #}
+<div class="widget-grid">
+  <div class="card">
+    {{ ui.card_head('Urgent — Action Needed', icon('alert-triangle')) }}
+    {% for i in urgent[:10] %}
+      {{ ui.rag_row(i.days_left, i.doc_no, url_for('record_view', form_code=i.form_code, record_id=i.record_id),
+                    i.form_title ~ ' · expires ' ~ i.expiry_date) }}
+    {% else %}
+      {{ ui.empty('Nothing urgent right now.') }}
+    {% endfor %}
+  </div>
+
+  <div class="card">
+    {{ ui.card_head('Upcoming — Within 90 Days', icon('clock')) }}
+    {% for i in upcoming[:10] %}
+      {{ ui.rag_row(i.days_left, i.doc_no, url_for('record_view', form_code=i.form_code, record_id=i.record_id),
+                    i.form_title ~ ' · expires ' ~ i.expiry_date) }}
+    {% else %}
+      {{ ui.empty('Nothing in this window.') }}
+    {% endfor %}
+  </div>
+</div>
+
+{# ----------------------------------------------------- open transactions #}
+<div class="section-title">{{ icon('credit-card') }}<span>Open Transactions</span>
+  <a class="section-title-action btn btn-xs btn-secondary" href="{{ url_for('register', form_code='TXN-001') }}">Full register</a>
+</div>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Transaction Ref.</th><th>Client</th><th>Agent</th><th>Type</th><th>Status</th><th>Opened</th></tr></thead>
+  <tbody>
+  {% for r in transaction_rows %}
+    <tr>
+      <td class="col-doc"><a href="{{ url_for('record_view', form_code='TXN-001', record_id=r.id) }}">{{ r.transaction_ref or r.doc_no }}</a></td>
+      <td>{{ r.client_name or "—" }}</td>
+      <td>{{ r.agent or "—" }}</td>
+      <td>{{ r.transaction_type or "—" }}</td>
+      <td><span class="badge badge-{{ status_color(r.status) }}">{{ r.status or "—" }}</span></td>
+      <td>{{ r.opened_date or "—" }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="6" class="empty-state">No transactions on file yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{# --------------------------------------------------------- departments -- #}
+<div class="section-title">{{ icon('board') }}<span>Departments</span>
+  <span class="section-title-note">{{ total_records }} records across {{ total_forms }} registers</span>
+</div>
+<div class="grid grid-cards">
+  {% for d in DEPARTMENTS %}
+    {% set s = summary[d.code] %}
+    <a class="card dept-card" style="border-left-color: {{ d.color }}" href="{{ url_for('department', dept_code=d.code) }}">
+      <div class="dept-name"><span class="dept-card-icon" style="color:{{ d.color }};">{{ dept_icon(d.code) }}</span>{{ d.name }}</div>
+      <div class="dept-desc">{{ d.desc }}</div>
+      <div class="dept-meta">
+        <span>{{ s.forms }} forms</span><span>&middot;</span><span>{{ s.total }} records</span>
+        {% if s.red %}<span class="badge badge-RED">{{ s.red }} red</span>{% endif %}
+        {% if s.amber %}<span class="badge badge-AMBER">{{ s.amber }} amber</span>{% endif %}
+      </div>
+    </a>
+  {% endfor %}
+</div>
+
+{# ------------------------------------------------------ recent activity - #}
+<div class="section-title">{{ icon('history') }}<span>Recent Activity</span></div>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Doc No.</th><th>Form</th><th>Status</th><th>By</th><th>When</th></tr></thead>
+  <tbody>
+  {% for r in recent %}
+    <tr>
+      <td class="col-doc"><a href="{{ url_for('record_view', form_code=r.form_code, record_id=r.record_id) }}">{{ r.doc_no }}</a></td>
+      <td>{{ r.form_title }}</td>
+      <td><span class="badge badge-{{ status_color(r.status) }}">{{ r.status or "—" }}</span></td>
+      <td>{{ r.created_by }}</td>
+      <td>{{ r.created_at }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="5" class="empty-state">No records yet. Pick a department on the left and fill in your first form.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% endblock %}

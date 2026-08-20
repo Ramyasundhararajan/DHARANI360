@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}My Profile · DHARANI 360{% endblock %}
+{% block content %}
+
+<div class="topbar">
+  <div>
+    <h1 class="dept-title">{{ icon('user') }}My Profile</h1>
+    <div class="breadcrumb">
+      <a href="{{ url_for('dashboard') }}">Home</a>{{ icon('chevron') }}
+      <span>Account</span>{{ icon('chevron') }}
+      <span class="current">My Profile</span>
+    </div>
+    <div class="crumbs">Your photo and display name are yours to change. Your role and sign-in email are set by an administrator.</div>
+  </div>
+</div>
+
+<div class="profile-layout">
+
+  <div class="card profile-card">
+    <form method="post" action="{{ url_for('account_photo') }}"
+          enctype="multipart/form-data" id="photo-form">
+      <input type="hidden" name="next" value="{{ url_for('profile') }}">
+
+      <!-- The picture itself is the button. Choosing a file submits straight
+           away, so there is no second click to miss and no way to fill this in
+           and then press Save on the other form by mistake. -->
+      <label class="photo-drop" for="photo-input" title="Click to change your photo">
+        {% if u.photo_path %}
+          <img class="profile-photo" id="photo-preview"
+               src="{{ url_for('photo_file', relpath=u.photo_path) }}" alt="">
+        {% else %}
+          <span class="profile-photo profile-photo-empty" id="photo-preview-initial">{{ (u.full_name or u.username)[:1]|upper }}</span>
+          <img class="profile-photo" id="photo-preview" src="" alt="" hidden>
+        {% endif %}
+        <span class="photo-drop-overlay">{{ icon('image') }}<span>Change</span></span>
+      </label>
+
+      <input type="file" name="photo" id="photo-input"
+             accept=".png,.jpg,.jpeg,.gif,.webp,image/png,image/jpeg,image/gif,image/webp"
+             class="visually-hidden">
+
+      <div class="profile-name">{{ u.full_name or u.username }}</div>
+      <div class="profile-role">{{ role_label }}</div>
+
+      <button type="button" class="btn btn-secondary btn-block" id="photo-pick">
+        {{ icon('image') }}{{ 'Change photo' if u.photo_path else 'Add a photo' }}
+      </button>
+      <div class="field-hint" id="photo-status" style="text-align:center;">
+        Click the picture. It uploads as soon as you choose one.
+      </div>
+    </form>
+  </div>
+
+  <div class="profile-main">
+
+    <div class="card form-card">
+      <div class="form-section-title">Your details</div>
+      <form method="post">
+        <div class="form-grid">
+          <div class="field">
+            <label>Display Name</label>
+            <input type="text" name="full_name" value="{{ u.full_name or '' }}" required>
+            <div class="field-hint">This is the name shown against everything you create.</div>
+          </div>
+          <div class="field">
+            <label>Username</label>
+            <input type="text" value="{{ u.username }}" disabled>
+            <div class="field-hint">Fixed &mdash; it is stamped on your existing records.</div>
+          </div>
+          <div class="field">
+            <label>Sign-in Email</label>
+            <input type="text" value="{{ u.email or 'not set' }}" disabled>
+            <div class="field-hint">Changed by an administrator on Users &amp; Access.</div>
+          </div>
+          <div class="field">
+            <label>Role</label>
+            <input type="text" value="{{ role_label }}" disabled>
+            <div class="field-hint">Decides which departments you can open.</div>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button type="submit" class="btn">Save Name</button>
+          <a class="btn btn-secondary" href="{{ url_for('change_password') }}">{{ icon('lock') }}Change Password</a>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="form-section-title">What you can reach</div>
+      <div class="profile-depts">
+        {% for d in ALL_DEPARTMENTS if d.code in my_depts %}
+          <a class="profile-dept-chip" href="{{ url_for('department', dept_code=d.code) }}">{{ d.name }}</a>
+        {% else %}
+          <div class="empty-state" style="padding:14px;">No departments are assigned to your role yet.</div>
+        {% endfor %}
+      </div>
+      <div class="field-hint" style="margin-top:10px;">
+        {{ my_depts|length }} of {{ ALL_DEPARTMENTS|length }} departments. Ask an administrator if you need more.
+      </div>
+    </div>
+
+    {% if staff %}
+    <div class="card">
+      <div class="form-section-title">Your employee file</div>
+      <table class="kv-table">
+        <tr><th>Position</th><td>{{ staff.position or '—' }}</td></tr>
+        <tr><th>Department</th><td>{{ staff.department or '—' }}</td></tr>
+        <tr><th>Employment</th><td>{{ staff.employment_type or '—' }}</td></tr>
+        <tr><th>Status</th><td>{{ staff.status or '—' }}</td></tr>
+      </table>
+      <div class="btn-row">
+        <a class="btn btn-secondary btn-sm" href="{{ url_for('record_view', form_code='HR-002', record_id=staff.id) }}">Open full record</a>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="card">
+      <div class="form-section-title">Account</div>
+      <table class="kv-table">
+        <tr><th>Last sign-in</th><td>{{ (u.last_login or 'this is your first')[:16] }}</td></tr>
+        <tr><th>Account created</th><td>{{ (u.created_at or '—')[:10] }}</td></tr>
+      </table>
+      <div class="btn-row">
+        <a class="btn btn-danger btn-sm" href="{{ url_for('logout') }}">{{ icon('logout') }}Log Out</a>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<script>
+/* The photo form submits itself the moment a file is chosen.
+   Two forms on one page meant it was easy to pick a file and then press the
+   other form's Save button, which posted no file at all and still reported
+   success. Removing the second click removes the mistake. */
+(function () {
+  var input  = document.getElementById('photo-input');
+  var form   = document.getElementById('photo-form');
+  var pick   = document.getElementById('photo-pick');
+  var status = document.getElementById('photo-status');
+  var img    = document.getElementById('photo-preview');
+  var letter = document.getElementById('photo-preview-initial');
+  if (!input || !form) return;
+
+  if (pick) pick.addEventListener('click', function () { input.click(); });
+
+  input.addEventListener('change', function () {
+    if (!input.files || !input.files.length) return;
+    var file = input.files[0];
+
+    // Show it immediately, so it is obvious the right file was picked.
+    if (img && window.FileReader) {
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        img.src = e.target.result;
+        img.hidden = false;
+        if (letter) letter.hidden = true;
+      };
+      reader.readAsDataURL(file);
+    }
+    if (status) {
+      status.textContent = 'Uploading ' + file.name + '…';
+    }
+    if (pick) { pick.disabled = true; }
+    form.submit();
+  });
+})();
+</script>
+
+{% endblock %}

@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}DHARANI 360{% endblock %}</title>
+<link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="print-header no-screen">
+  <img src="{{ url_for('static', filename='images/logo.png') }}" alt="">
+  <div>
+    <div class="print-header-brand">DHARANI 360</div>
+    <div class="print-header-sub">Realty Operations &amp; Compliance Suite</div>
+  </div>
+</div>
+<div class="layout">
+  {% if current_user %}
+  <div class="nav-backdrop no-print" id="nav-backdrop" hidden></div>
+  <div class="sidebar no-print" id="app-sidebar">
+    <div class="brand-row">
+      <img class="brand-mark" src="{{ url_for('static', filename='images/logo.png') }}" alt="DHARANI 360">
+      <div>
+        <div class="brand">DHARANI 360</div>
+        <div class="brand-sub">Realty Operations &amp; Compliance Suite</div>
+      </div>
+    </div>
+
+    {% set is_active_dashboards = request.endpoint in ('dashboard', 'dashboards_hub', 'dashboard_view', 'employee_dashboard') %}
+    <details class="dept-group" {% if is_active_dashboards %}open{% endif %}>
+      <summary class="dept-summary">
+        <span class="dept-summary-icon">{{ icon('board') }}</span>
+        <span class="dept-summary-label">Dashboard</span>
+        <span class="badge-tag badge-tag-hot">Hot</span>
+        <span class="dept-summary-chevron">{{ icon('chevron') }}</span>
+      </summary>
+      <div class="dept-items">
+        <a class="nav-sub-link {% if request.endpoint=='dashboards_hub' %}active{% endif %}" href="{{ url_for('dashboards_hub') }}">
+          {{ icon('board') }}<span>All Dashboards</span>
+        </a>
+        {% for d in DASHBOARDS_VISIBLE %}
+        <a class="nav-sub-link {% if (request.endpoint=='dashboard_view' and request.view_args.get('key')==d.key) or (d.key=='employee' and request.endpoint=='employee_dashboard') or (d.key=='admin' and request.endpoint=='dashboard') %}active{% endif %}"
+           href="{{ url_for('dashboard') if d.key=='admin' else (url_for('employee_dashboard') if d.key=='employee' else url_for('dashboard_view', key=d.key)) }}">
+          {{ dashboard_icon(d.key) }}<span>{{ d.title }}</span>
+          {% if d.tag %}<span class="badge-tag badge-tag-new">{{ d.tag }}</span>{% endif %}
+        </a>
+        {% endfor %}
+      </div>
+    </details>
+
+    <div class="nav-section-title">Applications</div>
+    <a class="nav-link top-link {% if request.endpoint=='calendar' %}active{% endif %}" href="{{ url_for('calendar') }}">
+      {{ icon('calendar-check') }}<span>Calendar</span>
+    </a>
+    <a class="nav-link top-link {% if request.endpoint=='todos_page' %}active{% endif %}" href="{{ url_for('todos_page') }}">
+      {{ icon('clipboard-list') }}<span>To Do</span>
+    </a>
+    <a class="nav-link top-link {% if request.endpoint=='notes_page' %}active{% endif %}" href="{{ url_for('notes_page') }}">
+      {{ icon('file-text') }}<span>Notes</span>
+    </a>
+    {% if 'SAL' in (DEPARTMENTS | map(attribute='code') | list) %}
+    {% set call_view = request.args.get('view', 'all') %}
+    {% set in_calls = request.endpoint in ('calls', 'call_detail') %}
+    <details class="dept-group" {% if in_calls %}open{% endif %}>
+      <summary class="dept-summary">
+        <span class="dept-summary-icon">{{ icon('phone') }}</span>
+        <span class="dept-summary-label">Calls</span>
+        <span class="badge-tag badge-tag-new">New</span>
+        <span class="dept-summary-chevron">{{ icon('chevron') }}</span>
+      </summary>
+      <div class="dept-items">
+        {% for key, label, ic in [('voice','Voice Call','phone'), ('video','Video Call','video'),
+                                   ('outgoing','Outgoing Call','phone-outgoing'),
+                                   ('incoming','Incoming Call','phone-incoming'),
+                                   ('missed','Missed Call','phone-missed'),
+                                   ('all','Call History','history')] %}
+        <a class="nav-sub-link {% if request.endpoint=='calls' and call_view==key %}active{% endif %}"
+           href="{{ url_for('calls', view=key) }}">
+          {{ icon(ic) }}<span>{{ label }}</span>
+        </a>
+        {% endfor %}
+      </div>
+    </details>
+    {% endif %}
+    <a class="nav-link top-link {% if request.endpoint in ('chat',) %}active{% endif %}" href="{{ url_for('chat') }}">
+      {{ icon('mail') }}<span>Chat</span>
+      {% if chat_unread %}<span class="nav-count nav-count-alert">{{ chat_unread }}</span>{% endif %}
+    </a>
+    <a class="nav-link top-link {% if request.endpoint=='files_manager' %}active{% endif %}" href="{{ url_for('files_manager') }}">
+      {{ icon('archive') }}<span>File Manager</span>
+    </a>
+    <a class="nav-link top-link {% if request.endpoint=='projects_kanban' %}active{% endif %}" href="{{ url_for('projects_kanban') }}">
+      {{ icon('check-square') }}<span>Kanban</span>
+    </a>
+    <a class="nav-link top-link {% if request.endpoint=='search' %}active{% endif %}" href="{{ url_for('search') }}">
+      {{ icon('search') }}<span>Search Everything</span>
+    </a>
+
+    <div class="nav-section-title">Governance</div>
+    <a class="nav-link top-link {% if request.endpoint=='regulations' %}active{% endif %}" href="{{ url_for('regulations') }}">
+      {{ icon('shield') }}<span>Rules &amp; Regulations</span>
+      <span class="badge-tag badge-tag-new">New</span>
+    </a>
+
+    {% if can_see_insights %}
+    <div class="nav-section-title">AI Center</div>
+    <a class="nav-link top-link {% if request.endpoint=='insights_center' %}active{% endif %}" href="{{ url_for('insights_center') }}">
+      {{ icon('trending-up') }}<span>AI Insights Center</span>
+    </a>
+    {% endif %}
+
+    <div class="nav-section-title">Departments</div>
+    {% for d in ALL_DEPARTMENTS %}
+      {% set allowed = d in DEPARTMENTS %}
+      {% set is_active_dept = request.view_args and (request.view_args.get('dept_code')==d.code or (request.view_args.get('form_code') and request.view_args.get('form_code').startswith(d.code))) %}
+      {% if allowed %}
+      <details class="dept-group" {% if is_active_dept %}open{% endif %}>
+        <summary class="dept-summary">
+          <span class="dept-summary-icon" style="color:{{ d.color }};">{{ dept_icon(d.code) }}</span>
+          <span class="dept-summary-label">{{ d.name }}</span>
+          <span class="dept-summary-chevron">{{ icon('chevron') }}</span>
+        </summary>
+        <div class="dept-items">
+          <a class="nav-sub-link {% if request.endpoint=='department' and request.view_args.get('dept_code')==d.code %}active{% endif %}" href="{{ url_for('department', dept_code=d.code) }}">
+            {{ icon('board') }}<span>Overview</span>
+          </a>
+          {% for f in forms_for_dept(d.code) %}
+          <a class="nav-sub-link {% if request.view_args and request.view_args.get('form_code')==f.code %}active{% endif %}" href="{{ url_for('register', form_code=f.code) }}">
+            {{ form_icon(f.code) }}<span>{{ f.title }}</span>
+            {% if nav_counts.get(f.code) %}<span class="nav-count">{{ nav_counts.get(f.code) }}</span>{% endif %}
+          </a>
+          {% endfor %}
+        </div>
+      </details>
+      {% else %}
+      <div class="nav-link nav-link-locked" title="Not available for your role">
+        <span class="dept-summary-icon">{{ dept_icon(d.code) }}</span>
+        <span>{{ d.name }}</span>
+        <span class="lock-icon">&#128274;</span>
+      </div>
+      {% endif %}
+    {% endfor %}
+
+    {% if is_admin %}
+    <div class="nav-section-title">Administration</div>
+    <a class="nav-link top-link {% if request.endpoint=='users' %}active{% endif %}" href="{{ url_for('users') }}">{{ icon('user-cog') }}<span>Users &amp; Access</span></a>
+    <a class="nav-link top-link {% if request.endpoint=='login_activity' %}active{% endif %}" href="{{ url_for('login_activity') }}">{{ icon('lock') }}<span>Login Activity</span></a>
+    <a class="nav-link top-link {% if request.endpoint=='settings' %}active{% endif %}" href="{{ url_for('settings') }}">{{ icon('settings') }}<span>Settings &amp; Email Digest</span></a>
+    {% endif %}
+
+    <div class="nav-section-title">Account</div>
+    <a class="user-card user-card-link {% if request.endpoint=='employee_dashboard' %}active{% endif %}" href="{{ url_for('employee_dashboard') }}" title="My Dashboard">
+      {% if current_user.photo_path %}
+        <img class="user-avatar user-avatar-photo" src="{{ url_for('photo_file', relpath=current_user.photo_path) }}" alt="">
+      {% else %}
+        <div class="user-avatar">{{ (current_user.full_name or current_user.username)[:1]|upper }}</div>
+      {% endif %}
+      <div>
+        <div class="user-name">{{ current_user.full_name or current_user.username }}</div>
+        <div class="user-role">{{ ROLES[current_user.role].label if current_user.role in ROLES else current_user.role }}</div>
+      </div>
+    </a>
+    <a class="nav-link top-link {% if request.endpoint=='documentation' %}active{% endif %}" href="{{ url_for('documentation') }}">{{ icon('help-circle') }}<span>Help &amp; User Guide</span></a>
+    <a class="nav-link top-link {% if request.endpoint=='change_password' %}active{% endif %}" href="{{ url_for('change_password') }}">{{ icon('lock') }}<span>Change Password</span></a>
+    <a class="nav-link top-link" href="{{ url_for('logout') }}">{{ icon('logout') }}<span>Log Out</span></a>
+  </div>
+  {% endif %}
+
+  <div class="main-wrap">
+  {% if current_user %}
+  <header class="app-header no-print">
+    <button type="button" class="nav-toggle" id="nav-toggle"
+            aria-label="Menu" aria-expanded="false" aria-controls="app-sidebar">
+      <span class="nav-toggle-bars"></span>
+    </button>
+    <form class="app-search" method="get" action="{{ url_for('search') }}">
+      <span class="app-search-icon">{{ icon('search') }}</span>
+      <input type="text" name="q" value="{{ request.args.get('q','') if request.endpoint=='search' else '' }}"
+             placeholder="Search records, people, property, docs…" aria-label="Search everything">
+      <span class="app-search-kbd">ENTER</span>
+    </form>
+    <span class="app-header-spacer"></span>
+    <span class="app-header-date">{{ icon('calendar') }}{{ today_label }}</span>
+    <div class="app-header-actions">
+      <a class="app-icon-btn phone-only" href="{{ url_for('search') }}" title="Search">{{ icon('search') }}</a>
+      <a class="app-icon-btn" href="{{ url_for('calendar') }}" title="Calendar">{{ icon('calendar-check') }}</a>
+      <a class="app-icon-btn" href="{{ url_for('todos_page') }}" title="To Do">{{ icon('clipboard-list') }}</a>
+      <a class="app-icon-btn" href="{{ url_for('chat') }}" title="Chat">
+        {{ icon('mail') }}{% if chat_unread %}<span class="app-dot"></span>{% endif %}
+      </a>
+      {% if is_admin %}
+      <a class="app-icon-btn" href="{{ url_for('settings') }}" title="Settings">{{ icon('settings') }}</a>
+      {% endif %}
+
+      {% set notif_urgent = notifications | selectattr('tone', 'equalto', 'red') | list | length %}
+      <div class="menu-wrap">
+        <button type="button" class="app-icon-btn" data-menu="notif-menu"
+                title="Notifications" aria-haspopup="true" aria-expanded="false">
+          {{ icon('bell') }}
+          {% if notifications %}<span class="app-count {{ 'app-count-red' if notif_urgent else '' }}">{{ notifications|length }}</span>{% endif %}
+        </button>
+        <div class="menu-panel menu-panel-wide" id="notif-menu" hidden>
+          <div class="menu-head">
+            <span>Notifications</span>
+            {% if notif_urgent %}<span class="menu-head-tag">{{ notif_urgent }} need attention today</span>{% endif %}
+          </div>
+          <div class="menu-scroll">
+            {% for n in notifications %}
+            <a class="notif" href="{{ n.url }}">
+              <span class="notif-dot notif-{{ n.tone }}">{{ icon(n.icon) }}</span>
+              <span class="notif-body">
+                <span class="notif-title">{{ n.title }}</span>
+                <span class="notif-detail">{{ n.detail }}</span>
+              </span>
+            </a>
+            {% else %}
+            <div class="notif-empty">
+              {{ icon('bell-off') }}
+              <div>Nothing needs your attention.</div>
+              <div class="field-hint">Expiries, messages, tasks and meetings appear here.</div>
+            </div>
+            {% endfor %}
+          </div>
+          <a class="menu-foot" href="{{ url_for('calendar') }}">Open the compliance calendar</a>
+        </div>
+      </div>
+
+      <div class="menu-wrap">
+        <button type="button" class="app-user" data-menu="profile-menu"
+                aria-haspopup="true" aria-expanded="false">
+          {% if current_user.photo_path %}
+            <img class="app-user-avatar" src="{{ url_for('photo_file', relpath=current_user.photo_path) }}" alt="">
+          {% else %}
+            <span class="app-user-avatar">{{ (current_user.full_name or current_user.username)[:1]|upper }}</span>
+          {% endif %}
+          <span class="app-user-name">{{ (current_user.full_name or current_user.username).split()[0] }}</span>
+          {{ icon('chevron-down') }}
+        </button>
+        <div class="menu-panel" id="profile-menu" hidden>
+          <div class="menu-id">
+            <div class="menu-id-name">{{ current_user.full_name or current_user.username }}</div>
+            <div class="menu-id-sub">{{ current_user.email or current_user.username }}</div>
+            <div class="menu-id-role">{{ ROLES[current_user.role].label if current_user.role in ROLES else current_user.role }}</div>
+          </div>
+          <a class="menu-item" href="{{ url_for('profile') }}">{{ icon('user') }}My Profile</a>
+          <a class="menu-item" href="{{ url_for('employee_dashboard') }}">{{ icon('employee') }}My Dashboard</a>
+          <a class="menu-item" href="{{ url_for('todos_page') }}">{{ icon('clipboard-list') }}My To Do</a>
+          <a class="menu-item" href="{{ url_for('change_password') }}">{{ icon('lock') }}Change Password</a>
+          <div class="menu-sep"></div>
+          <a class="menu-item menu-item-danger" href="{{ url_for('logout') }}">{{ icon('logout') }}Log Out</a>
+        </div>
+      </div>
+    </div>
+  </header>
+  {% endif %}
+
+  <div class="main">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash flash-{{ category }} no-print">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+
+    <div class="footer-note no-print">DHARANI 360 &mdash; local system, data stored on this computer only. &ldquo;Every activity that affects money, people, property, clients, company assets, legal rights, regulatory compliance or confidential information must have a record.&rdquo;</div>
+  </div>
+  </div>
+</div>
+
+<script>
+/* One confirmation handler for the whole app.
+   Confirm text lives in a data-confirm attribute rather than an inline
+   onsubmit="confirm('...')", because any value interpolated into that inline
+   string (a doc number, a username, a record title) becomes JavaScript source.
+   A single apostrophe in the data would have broken the page script. As an
+   HTML attribute the same text is just text, whatever characters it contains. */
+/* The sidebar becomes a drawer below 1000px. It is the same markup either
+   way - only CSS changes - so nothing needs re-rendering and no state can
+   get out of step between the two layouts. */
+(function () {
+  var btn  = document.getElementById('nav-toggle');
+  var back = document.getElementById('nav-backdrop');
+  var side = document.getElementById('app-sidebar');
+  if (!btn || !side) return;
+
+  function setOpen(open) {
+    document.body.classList.toggle('nav-open', open);
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (back) back.hidden = !open;
+  }
+  btn.addEventListener('click', function () {
+    setOpen(!document.body.classList.contains('nav-open'));
+  });
+  if (back) back.addEventListener('click', function () { setOpen(false); });
+
+  // Following a link should close the drawer, or the new page appears
+  // underneath a menu that is still open.
+  side.addEventListener('click', function (e) {
+    if (e.target.closest && e.target.closest('a')) setOpen(false);
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') setOpen(false);
+  });
+  // Going back to a wide window must not leave the drawer state behind.
+  window.addEventListener('resize', function () {
+    if (window.innerWidth > 1000) setOpen(false);
+  });
+})();
+
+/* Header dropdowns. One listener for all of them: a button carrying
+   data-menu="<id>" toggles the panel with that id, clicking anywhere else
+   closes it, and Escape closes it too. No library, no inline handlers. */
+(function () {
+  var panels = [].slice.call(document.querySelectorAll('.menu-panel'));
+  function closeAll(except) {
+    panels.forEach(function (p) {
+      if (p === except) return;
+      p.hidden = true;
+      var btn = document.querySelector('[data-menu="' + p.id + '"]');
+      if (btn) btn.setAttribute('aria-expanded', 'false');
+    });
+  }
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest ? e.target.closest('[data-menu]') : null;
+    if (btn) {
+      e.preventDefault();
+      var panel = document.getElementById(btn.getAttribute('data-menu'));
+      if (!panel) return;
+      var opening = panel.hidden;
+      closeAll(panel);
+      panel.hidden = !opening;
+      btn.setAttribute('aria-expanded', opening ? 'true' : 'false');
+      return;
+    }
+    if (!e.target.closest || !e.target.closest('.menu-panel')) closeAll(null);
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeAll(null);
+  });
+})();
+
+document.addEventListener('submit', function (e) {
+  var form = e.target;
+  if (!form || !form.getAttribute) return;
+  var message = form.getAttribute('data-confirm');
+  if (message && !window.confirm(message)) {
+    e.preventDefault();
+  }
+}, true);
+</script>
+</body>
+</html>

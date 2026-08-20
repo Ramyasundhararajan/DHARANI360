@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Login Activity · DHARANI 360{% endblock %}
+{% block content %}
+
+<div class="topbar">
+  <div>
+    <h1 class="dept-title">{{ icon('lock') }}Login Activity</h1>
+    <div class="breadcrumb">
+      <a href="{{ url_for('dashboard') }}">Home</a>{{ icon('chevron') }}
+      <span>Administration</span>{{ icon('chevron') }}
+      <span class="current">Login Activity</span>
+    </div>
+    <div class="crumbs">Every successful sign-in to this system, most recent first. Administrators only.</div>
+  </div>
+</div>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>When (UTC)</th><th>Username</th><th>Full Name</th><th>Role</th><th>IP Address</th></tr></thead>
+  <tbody>
+  {% for l in logins %}
+    <tr>
+      <td>{{ (l.at or "")[:16].replace("T", " ") }}</td>
+      <td>{{ l.username }}</td>
+      <td>{{ l.full_name or "—" }}</td>
+      <td>{{ l.role or "—" }}</td>
+      <td>{{ l.ip_address or "—" }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="5" class="empty-state">No logins recorded yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% endblock %}

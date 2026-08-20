@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Projects Kanban · DHARANI 360{% endblock %}
+{% block content %}
+
+<div class="topbar">
+  <div>
+    <h1 class="dept-title">{{ icon('check-square') }}Projects Kanban Board</h1>
+    <div class="breadcrumb">
+      <a href="{{ url_for('dashboard') }}">Home</a>{{ icon('chevron') }}
+      <span>Applications</span>{{ icon('chevron') }}
+      <span class="current">Kanban</span>
+    </div>
+    <div class="crumbs">Every task from the Task / Milestone register (PRJ-002), grouped by status. Move a task with the dropdown on its card.</div>
+  </div>
+  <div class="btn-row">
+    <a class="btn btn-secondary btn-sm" href="{{ url_for('department', dept_code='PRJ') }}">Projects Overview</a>
+    <a class="btn btn-sm" href="{{ url_for('form_view', form_code='PRJ-002') }}">+ New Task</a>
+  </div>
+</div>
+
+<div class="kanban-board">
+  {% for col in columns %}
+  <div class="kanban-col">
+    <div class="kanban-col-head">
+      <span>{{ col }}</span>
+      <span class="nav-count">{{ board[col]|length }}</span>
+    </div>
+    <div class="kanban-col-body">
+      {% for t in board[col] %}
+      <div class="kanban-card">
+        <a class="kanban-card-title" href="{{ url_for('record_view', form_code='PRJ-002', record_id=t.id) }}">{{ t.task_title or t.doc_no }}</a>
+        <div class="kanban-card-meta">{{ t.project_name or "—" }}</div>
+        <div class="kanban-card-meta">{{ t.assigned_to or "Unassigned" }}{% if t.due_date %} &middot; due {{ t.due_date }}{% endif %}</div>
+        {% if t.priority %}<span class="badge badge-{{ 'RED' if t.priority in ('High','Urgent') else ('AMBER' if t.priority == 'Medium' else 'GREY') }}">{{ t.priority }}</span>{% endif %}
+        <form method="post" action="{{ url_for('projects_kanban_status', record_id=t.id) }}" class="kanban-move-form">
+          <select name="status" onchange="this.form.submit()">
+            {% for c in columns %}
+            <option value="{{ c }}" {% if c == col %}selected{% endif %}>{{ c }}</option>
+            {% endfor %}
+          </select>
+        </form>
+      </div>
+      {% else %}
+      <div class="empty-state" style="padding:20px 8px;">No tasks</div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% endblock %}

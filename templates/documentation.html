@@ -1,0 +1,296 @@
+{% extends "base.html" %}
+{% block title %}Guide · DHARANI 360{% endblock %}
+{% block content %}
+
+<div class="topbar">
+  <div>
+    <h1 class="dept-title">{{ icon('help-circle') }}Guide</h1>
+    <div class="breadcrumb">
+      <a href="{{ url_for('dashboard') }}">Home</a>{{ icon('chevron') }}
+      <span class="current">Guide</span>
+    </div>
+    <div class="crumbs">How DHARANI 360 works, what to do day to day, and where everything lives. Everything below reflects what you personally can see.</div>
+  </div>
+</div>
+
+<div class="doc-page">
+
+<!-- jump chips: the page is long by design, so make it navigable -->
+<nav class="doc-jump" aria-label="Sections">
+  <a href="#doc-idea">The one idea</a>
+  <a href="#doc-day">Your day</a>
+  <a href="#doc-rules">The rules</a>
+  <a href="#doc-howto">How do I…</a>
+  <a href="#doc-depts">Departments</a>
+  <a href="#doc-tools">Tools</a>
+  <a href="#doc-mistakes">Mistakes</a>
+</nav>
+
+<!-- ---------------------------------------------------------------- search -->
+<div class="doc-search-wrap">
+  <span class="doc-search-icon">{{ icon('search') }}</span>
+  <input type="text" id="doc-filter" class="doc-search"
+         placeholder="Type what you're trying to do — “expiry”, “commission”, “photo”, “duplicate”…"
+         autocomplete="off" aria-label="Filter this guide">
+  <button type="button" class="doc-search-clear" id="doc-clear" hidden aria-label="Clear">&times;</button>
+</div>
+<div class="doc-nohits" id="doc-nohits" hidden>
+  Nothing in the guide matches that. Try a single word — the guide searches headings and body text.
+</div>
+
+<!-- ------------------------------------------------------------ start here -->
+<div class="doc-section" id="doc-idea" data-doc>
+  <div class="section-title">Start here — the one idea</div>
+  <div class="doc-flow">
+    <div class="doc-flow-step">
+      <span class="doc-flow-num">1</span>
+      <div>
+        <div class="doc-flow-title">You fill in a form</div>
+        <p>A form is only the input. If you close it without submitting, nothing is kept.</p>
+      </div>
+    </div>
+    <span class="doc-flow-arrow" aria-hidden="true">&rarr;</span>
+    <div class="doc-flow-step">
+      <span class="doc-flow-num">2</span>
+      <div>
+        <div class="doc-flow-title">It becomes a record</div>
+        <p>On submit it is stamped with a document number, today's date and your name. That stamp is what makes it evidence.</p>
+      </div>
+    </div>
+    <span class="doc-flow-arrow" aria-hidden="true">&rarr;</span>
+    <div class="doc-flow-step">
+      <span class="doc-flow-num">3</span>
+      <div>
+        <div class="doc-flow-title">The record joins a register</div>
+        <p>The register is the permanent list. It is never overwritten and never quietly deleted — it is the company's memory.</p>
+      </div>
+    </div>
+  </div>
+  <div class="doc-quote">
+    “The form is merely the input. The register is the memory of the company.”
+    <span>So a form you did not submit did not happen, and a record with no document attached is only a claim.</span>
+  </div>
+</div>
+
+<!-- --------------------------------------------------------- daily habits -->
+<div class="doc-section" id="doc-day" data-doc>
+  <div class="section-title">Your day — four habits</div>
+  <div class="doc-habits">
+    <div class="doc-habit">
+      <div class="doc-habit-when">When you sign in</div>
+      <div class="doc-habit-what">Open the bell first</div>
+      <p>Red means overdue or inside 30 days. Clear red before starting anything new — an expiry does not wait for a quiet afternoon.</p>
+      <a class="doc-link" href="{{ url_for('calendar') }}">{{ icon('calendar-check') }}Open the compliance calendar</a>
+    </div>
+    <div class="doc-habit">
+      <div class="doc-habit-when">Before you create anything</div>
+      <div class="doc-habit-what">Search, then create</div>
+      <p>Type the client, property or agent name into the search bar. If a record exists, open it. A second record for the same thing is how commission arguments start.</p>
+      <a class="doc-link" href="{{ url_for('search') }}">{{ icon('search') }}Search every register</a>
+    </div>
+    <div class="doc-habit">
+      <div class="doc-habit-when">While you work</div>
+      <div class="doc-habit-what">Record as you go</div>
+      <p>Fill the form at the moment the thing happens — during the viewing, at the end of the call. “I'll enter it later” is the commonest reason a record does not exist.</p>
+    </div>
+    <div class="doc-habit">
+      <div class="doc-habit-when">Before you leave</div>
+      <div class="doc-habit-what">Attach the evidence</div>
+      <p>The signed form, the permit, the invoice. Open the record and use Attach. A typed summary is not evidence.</p>
+      <a class="doc-link" href="{{ url_for('files_manager') }}">{{ icon('archive') }}See every attached file</a>
+    </div>
+  </div>
+</div>
+
+<!-- ------------------------------------------------------------ the rules -->
+<div class="doc-section" id="doc-rules" data-doc>
+  <div class="section-title">The rules everyone follows</div>
+  <div class="doc-rules">
+    {% for n, t, d in [
+      (1, 'It needs a record', 'Anything affecting money, people, property, clients, company assets, legal rights, compliance or confidential information.'),
+      (2, 'Same working day', 'Record it the day it happens. A record dated three days late is worth far less if it is ever questioned.'),
+      (3, 'Attach the original', 'Scan or photograph the signed document and attach it to the record.'),
+      (4, 'Never share a login', 'The system stamps your name on everything you do. Lend your login and the trail names the wrong person.'),
+      (5, 'Search before creating', 'One client, one record. Duplicates split the history and cost somebody their commission.'),
+      (6, 'Correct, never conceal', 'Made a mistake? Add a correcting entry. Editing history to hide something is what turns an error into misconduct.'),
+      (7, 'Every date needs an owner', 'A deadline with no name against it belongs to nobody — and nobody is what it will get.'),
+      (8, 'Ask before, not after', 'If you are unsure whether something needs recording, ask while there is still time to do it properly.')
+    ] %}
+    <div class="doc-rule">
+      <span class="doc-rule-no">{{ n }}</span>
+      <div>
+        <div class="doc-rule-title">{{ t }}</div>
+        <p>{{ d }}</p>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- --------------------------------------------------------- how to do X -->
+<div class="doc-section" id="doc-howto" data-doc>
+  <div class="section-title">How do I…</div>
+  <div class="doc-howto">
+    {% for q, a in [
+      ('…find a record I created last month?',
+       'Use Search Everything and type any value from it — a client name, a document number, a phone number. Search looks across every register you can open, not just one.'),
+      ('…know what is due soon?',
+       'The bell in the top bar, and the Calendar. Both are scored red / amber / green by how many days remain: red is overdue or inside 30 days, amber is 30–60, green is over 60.'),
+      ('…attach a document to a record?',
+       'Open the record, scroll to Attachments and use Attach. PDFs, images and Office files are accepted up to 15 MB each.'),
+      ('…correct something I entered wrongly?',
+       'Open the record and edit it, or add a correcting entry if the original matters. Never delete a record to hide an error — the correction is the professional answer.'),
+      ('…change my photo or my name?',
+       'My Profile, from the menu under your name. Click the picture and choose a file; it uploads immediately. Your role and sign-in email are set by an administrator.'),
+      ('…get access to another department?',
+       'Ask a Director. Roles are changed on Users & Access. Never work around it by borrowing somebody else\'s login.'),
+      ('…see what the law actually says?',
+       'Rules & Regulations holds the obligation, the authority, the reference and the penalty for every department — and the same strip appears at the top of each department page.'),
+      ('…export a register?',
+       'Open the register and use the export link. You get a CSV of exactly the rows and columns you can see, including any filter you have applied.')
+    ] %}
+    <details class="doc-qa">
+      <summary>{{ q }}</summary>
+      <p>{{ a }}</p>
+    </details>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- ------------------------------------------------------- your workspace -->
+<div class="doc-section" id="doc-depts" data-doc>
+  <div class="section-title">Your departments</div>
+  <p class="doc-lead">
+    You can open {{ visible_depts|length }} department{{ '' if visible_depts|length == 1 else 's' }}.
+    Registers are grouped into departments in the left sidebar; records that share a real value —
+    the same client, agent, property, transaction or employee name — link to each other automatically
+    under <b>Related Records</b> on any record page. Nothing has to be set up for that; it is driven
+    by matching field values.
+  </p>
+  <div class="doc-dept-grid">
+    {% for d in visible_depts %}
+    <a class="doc-dept" href="{{ url_for('department', dept_code=d.code) }}">
+      <span class="doc-dept-code">DR-{{ d.code }}</span>
+      <span class="doc-dept-name">{{ d.name }}</span>
+      <span class="doc-dept-count">{{ forms_for_dept(d.code)|length }} registers</span>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- ---------------------------------------------------------- the tools -->
+<div class="doc-section" id="doc-tools" data-doc>
+  <div class="section-title">Tools you can use anywhere</div>
+  <div class="doc-tools">
+    {% for ep, ic, name, desc in [
+      ('calendar', 'calendar-check', 'Calendar', 'Everything expiring soon, across every register you can open.'),
+      ('todos_page', 'clipboard-list', 'To Do', 'Your own task list. Private to you.'),
+      ('notes_page', 'file-text', 'Notes', 'Private sticky notes — not a record, so nothing here counts as evidence.'),
+      ('files_manager', 'archive', 'File Manager', 'Every file attached to any record, in one place.'),
+      ('projects_kanban', 'board', 'Kanban', 'The Projects task board.'),
+      ('search', 'search', 'Search Everything', 'One box across every register you can see.'),
+      ('insights_center', 'trending-up', 'AI Insights Center', 'Rule-based risk and workload signals, calculated on this computer.')
+    ] %}
+    <a class="doc-tool" href="{{ url_for(ep) }}">
+      <span class="doc-tool-icon">{{ icon(ic) }}</span>
+      <span class="doc-tool-body">
+        <span class="doc-tool-name">{{ name }}</span>
+        <span class="doc-tool-desc">{{ desc }}</span>
+      </span>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- ----------------------------------------------------------- mistakes -->
+<div class="doc-section" id="doc-mistakes" data-doc>
+  <div class="section-title">Mistakes to avoid</div>
+  <div class="doc-mistakes">
+    {% for bad, cost, fix in [
+      ('“I\'ll enter it later.”', 'It does not get entered, and the record is missing on the one day it matters.', 'Fill the form while the thing is happening.'),
+      ('A second record for the same client', 'Two histories, two owners, and an argument nobody can settle.', 'Search first; if it exists, add to it.'),
+      ('A screenshot instead of the document', 'A picture of a message is not the signed form.', 'Attach the actual signed document or permit.'),
+      ('Expiry date left blank', 'The calendar cannot see it, so nobody is warned before it lapses.', 'Never save a licence, permit or card without its expiry date.'),
+      ('Sharing a login', 'Every action is stamped with the wrong person\'s name, permanently.', 'One person, one login. Ask for the access you need.'),
+      ('“I told them verbally.”', 'No record means it did not happen, as far as the company is concerned.', 'Put it in the register the same day, then tell them.')
+    ] %}
+    <div class="doc-mistake">
+      <div class="doc-mistake-bad">{{ bad }}</div>
+      <p class="doc-mistake-cost">{{ cost }}</p>
+      <div class="doc-mistake-fix"><b>Do this</b> {{ fix }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="doc-note doc-note-good">
+    Nobody is in trouble for an honest mistake that is recorded. The problem is always the missing record.
+  </div>
+</div>
+
+<!-- ------------------------------------------------ what is not here, why -->
+<div class="doc-section" id="doc-absent" data-doc>
+  <div class="section-title">What is deliberately not here</div>
+  <div class="doc-absent">
+    <div>
+      <div class="doc-absent-title">Live email inbox, voice and video calls</div>
+      <p>These need a mail server and real-time messaging infrastructure that an offline, single-computer system does not have. Call <em>logs</em> are recorded under Sales; the call itself happens on your phone.</p>
+    </div>
+    <div>
+      <div class="doc-absent-title">A separate social feed</div>
+      <p>Covered by Company Announcements under Content &amp; Documentation, so the data lives in one place rather than being duplicated.</p>
+    </div>
+    <div>
+      <div class="doc-absent-title">A generic invoices tool</div>
+      <p>Covered by Vendor Invoice Verification under Finance &amp; Accounting, for the same reason.</p>
+    </div>
+    <div>
+      <div class="doc-absent-title">An AI chatbot</div>
+      <p>The AI Insights Center is rule-based analytics — thresholds and counts over your own registers, run entirely on this computer. It sends nothing to any external service.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ------------------------------------------------------------- privacy -->
+<div class="doc-section" id="doc-data" data-doc>
+  <div class="doc-note">
+    <b>Where your data lives.</b> Everything is stored in one database file on this computer.
+    Nothing is sent anywhere else, and no external service sees your records. That also means the
+    computer running DHARANI 360 must be backed up — if it is lost, the records are lost with it.
+  </div>
+</div>
+
+</div><!-- /doc-page -->
+
+<script>
+/* Filter the guide as you type. Every section carries data-doc; a section is
+   hidden when none of its text matches. Plain text matching on purpose - the
+   guide is short enough that anything cleverer would only be harder to trust. */
+(function () {
+  var input = document.getElementById('doc-filter');
+  var clear = document.getElementById('doc-clear');
+  var none  = document.getElementById('doc-nohits');
+  if (!input) return;
+  var sections = [].slice.call(document.querySelectorAll('[data-doc]'));
+
+  function apply() {
+    var q = input.value.trim().toLowerCase();
+    if (clear) clear.hidden = !q;
+    var shown = 0;
+    sections.forEach(function (sec) {
+      var hit = !q || sec.textContent.toLowerCase().indexOf(q) !== -1;
+      sec.hidden = !hit;
+      if (hit) shown++;
+      // Open any collapsed question that matches, or the answer stays hidden.
+      if (q && hit) {
+        sec.querySelectorAll('details').forEach(function (d) {
+          d.open = d.textContent.toLowerCase().indexOf(q) !== -1;
+        });
+      }
+    });
+    if (none) none.hidden = shown !== 0;
+  }
+  input.addEventListener('input', apply);
+  if (clear) clear.addEventListener('click', function () { input.value = ''; apply(); input.focus(); });
+})();
+</script>
+
+{% endblock %}

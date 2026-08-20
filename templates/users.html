@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}Users & Access · DHARANI 360{% endblock %}
+{% block content %}
+
+<div class="topbar">
+  <div>
+    <h1 class="dept-title">{{ icon('user-cog') }}Users &amp; Access</h1>
+    <div class="breadcrumb">
+      <a href="{{ url_for('dashboard') }}">Home</a>{{ icon('chevron') }}
+      <span>Administration</span>{{ icon('chevron') }}
+      <span class="current">Users & Access</span>
+    </div>
+    <div class="crumbs">Least-privilege by role &mdash; each role only sees the departments listed below. Administrators only.</div>
+  </div>
+</div>
+
+<div class="section-title">Roles</div>
+<div class="grid grid-cards">
+  {% for name, r in ROLES.items() %}
+  <div class="card">
+    <div class="dept-name">{{ r.label }} {% if r.is_admin %}<span class="badge badge-BLUE">Admin</span>{% endif %}</div>
+    <div class="dept-desc">{{ r.desc }}</div>
+    <div class="dept-meta">{{ r.depts|join(', ') if r.depts else '—' }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="section-title">Add a User</div>
+<div class="card form-card">
+  <form method="post">
+    <div class="form-grid">
+      <div class="field">
+        <label>Username <span class="req">*</span></label>
+        <input type="text" name="username" required>
+      </div>
+      <div class="field">
+        <label>Full Name</label>
+        <input type="text" name="full_name">
+      </div>
+      <div class="field">
+        <label>Work Email <span class="req">*</span></label>
+        <input type="email" name="email" required placeholder="name@dharanis.ae">
+        <div class="field-hint">This is what they sign in with. Without it the account cannot be used.</div>
+      </div>
+      <div class="field">
+        <label>Role <span class="req">*</span></label>
+        <select name="role" required>
+          {% for name in ROLE_NAMES %}
+          <option value="{{ name }}" {% if name == 'Receptionist' %}selected{% endif %}>{{ ROLES[name].label }}{% if ROLES[name].is_admin %} — full admin{% endif %}</option>
+          {% endfor %}
+        </select>
+        <div class="field-hint">Starts on the lowest access on purpose. Promote from the list below once you are sure.</div>
+      </div>
+      <div class="field">
+        <label>Temporary Password <span class="req">*</span></label>
+        <input type="text" name="password" minlength="6" required placeholder="At least 6 characters">
+      </div>
+    </div>
+    <div class="btn-row">
+      <button type="submit" class="btn">Create User</button>
+    </div>
+  </form>
+</div>
+
+<div class="section-title">Existing Users</div>
+{% for u in user_list %}
+<form id="user-form-{{ u.id }}" method="post" action="{{ url_for('user_update', user_id=u.id) }}"></form>
+<form id="reset-form-{{ u.id }}" method="post" action="{{ url_for('user_reset_password', user_id=u.id) }}" data-confirm="Reset the password for {{ u.username }}? A new temporary password will be generated."></form>
+<form id="delete-form-{{ u.id }}" method="post" action="{{ url_for('user_delete', user_id=u.id) }}" data-confirm="Delete the account for {{ u.username }}? They will no longer be able to sign in. Their sign-in history and every record they created are kept. This cannot be undone."></form>
+{% endfor %}
+<div class="table-wrap">
+<table>
+  <thead><tr><th></th><th>Username</th><th>Full Name</th><th>Work Email</th><th>Role</th><th>Active</th><th>Last Login</th><th>Actions</th></tr></thead>
+  <tbody>
+  {% for u in user_list %}
+    <tr data-user-row="{{ u.id }}">
+      <td>
+        {% if u.photo_path %}
+          <img src="{{ url_for('photo_file', relpath=u.photo_path) }}" alt="" style="width:28px; height:28px; border-radius:50%; object-fit:cover; display:block;">
+        {% else %}
+          <div class="user-avatar" style="width:28px; height:28px; font-size:11px;">{{ (u.full_name or u.username)[:1]|upper }}</div>
+        {% endif %}
+      </td>
+      <td>{{ u.username }}</td>
+      <td>
+        <span class="row-read">{{ u.full_name or '—' }}</span>
+        <input class="row-edit" type="text" name="full_name" form="user-form-{{ u.id }}" value="{{ u.full_name or '' }}" style="width:150px;" hidden>
+      </td>
+      <td>
+        <span class="row-read">{{ u.email or '—' }}</span>
+        <input class="row-edit" type="email" name="email" form="user-form-{{ u.id }}" value="{{ u.email or '' }}" placeholder="name@dharanis.ae" style="width:200px;" hidden>
+        {% if u.active and not can_sign_in(u) %}
+        <div class="field-hint hint-warn">{{ icon('alert-triangle') }}Cannot sign in &mdash; {{ 'no email set' if not u.email else 'not on the allowlist' }}</div>
+        {% endif %}
+      </td>
+      <td>
+        <span class="row-read">{{ ROLES[u.role].label if u.role in ROLES else u.role }}</span>
+        <select class="row-edit" name="role" form="user-form-{{ u.id }}" hidden>
+          {% for name in ROLE_NAMES %}
+          <option value="{{ name }}" {% if u.role == name %}selected{% endif %}>{{ ROLES[name].label }}</option>
+          {% endfor %}
+        </select>
+      </td>
+      <td>
+        <span class="row-read">
+          {% if u.active %}<span class="pill pill-on">Active</span>{% else %}<span class="pill pill-off">Disabled</span>{% endif %}
+        </span>
+        <input class="row-edit" type="checkbox" name="active" form="user-form-{{ u.id }}" {% if u.active %}checked{% endif %} hidden>
+      </td>
+      <td>{{ (u.last_login or "never")[:16] }}</td>
+      <td class="row-actions">
+        <button type="button" class="icon-btn row-read" data-edit-row="{{ u.id }}" title="Edit this user" aria-label="Edit {{ u.username }}">{{ icon('edit') }}</button>
+        <button type="submit" form="reset-form-{{ u.id }}" class="icon-btn row-read" title="Reset password" aria-label="Reset password for {{ u.username }}">{{ icon('key') }}</button>
+        <button type="submit" form="delete-form-{{ u.id }}" class="icon-btn icon-btn-danger row-read" title="Delete this user" aria-label="Delete {{ u.username }}">{{ icon('trash') }}</button>
+
+        <button type="submit" form="user-form-{{ u.id }}" class="btn btn-sm row-edit" hidden>Save</button>
+        <button type="button" class="btn btn-sm btn-secondary row-edit" data-cancel-row="{{ u.id }}" hidden>Cancel</button>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<script>
+/* The pencil turns one row into inputs; Cancel puts it back.
+   Both states are already in the page, so nothing is fetched and a row
+   cannot end up half-rendered. */
+(function () {
+  function setRow(id, editing) {
+    var row = document.querySelector('[data-user-row="' + id + '"]');
+    if (!row) return;
+    row.classList.toggle('is-editing', editing);
+    row.querySelectorAll('.row-read').forEach(function (el) { el.hidden = editing; });
+    row.querySelectorAll('.row-edit').forEach(function (el) { el.hidden = !editing; });
+    if (editing) {
+      var first = row.querySelector('.row-edit');
+      if (first && first.focus) first.focus();
+    }
+  }
+  document.addEventListener('click', function (e) {
+    var edit = e.target.closest && e.target.closest('[data-edit-row]');
+    if (edit) { setRow(edit.getAttribute('data-edit-row'), true); return; }
+    var cancel = e.target.closest && e.target.closest('[data-cancel-row]');
+    if (cancel) { setRow(cancel.getAttribute('data-cancel-row'), false); }
+  });
+})();
+</script>
+
+{% endblock %}

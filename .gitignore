@@ -1,0 +1,38 @@
+# ---------------------------------------------------------------------------
+# DHARANI 360 - what never goes into the repository
+# ---------------------------------------------------------------------------
+
+# Live secrets for THIS installation. Every deployment gets its own copy.
+supabase_config.json
+.env
+instance/secret_key
+
+# The database, uploaded attachments, staff photos and library files.
+# These are company records, not source code.
+instance/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+
+# Large media - keep these out of git history, they bloat every clone
+*.mp4
+*.mov
+*.zip
+*.tar.gz
+
+# Editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Scratch
+_to_delete/
+*.bak
+*.log

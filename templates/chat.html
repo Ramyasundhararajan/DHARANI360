@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}Chat · DHARANI 360{% endblock %}
+{% block content %}
+
+<div class="topbar">
+  <div>
+    <h1 class="dept-title">{{ icon('mail') }}Chat</h1>
+    <div class="breadcrumb">
+      <a href="{{ url_for('dashboard') }}">Home</a>{{ icon('chevron') }}
+      <span>Applications</span>{{ icon('chevron') }}
+      <span class="current">Chat</span>
+    </div>
+    <div class="crumbs">
+      Internal messages between colleagues. Everything stays in this system's own database on this
+      computer &mdash; no message is sent anywhere else.
+    </div>
+  </div>
+</div>
+
+<div class="chat-shell">
+
+  <aside class="chat-rail">
+    <div class="chat-rail-head">
+      <b>Chats</b>
+      <span class="reg-count-pill">{{ colleagues|length }}</span>
+    </div>
+    <div class="chat-search no-print">
+      {{ icon('search') }}
+      <input type="text" id="chatFilter" placeholder="Search colleagues..." autocomplete="off">
+    </div>
+
+    <div class="chat-rail-label">All chats</div>
+    <div class="chat-list">
+      {% for c in colleagues %}
+      <a class="chat-person {% if active and active.username == c.username %}active{% endif %}"
+         href="{{ url_for('chat', username=c.username) }}"
+         data-name="{{ (c.full_name or c.username)|lower }}">
+        <div class="chat-avatar">
+          {% if c.photo_path %}
+            <img src="{{ url_for('photo_file', relpath=c.photo_path) }}" alt="">
+          {% else %}
+            {{ (c.full_name or c.username)[:1]|upper }}
+          {% endif %}
+        </div>
+        <div class="chat-person-body">
+          <div class="chat-person-top">
+            <span class="chat-person-name">{{ c.full_name or c.username }}</span>
+            <span class="chat-person-time">{{ (c.last_at or '')[11:16] }}</span>
+          </div>
+          <div class="chat-person-bottom">
+            <span class="chat-person-last">
+              {% if c.last_message %}{% if c.last_from_me %}You: {% endif %}{{ c.last_message }}
+              {% else %}{{ ROLES[c.role].label if c.role in ROLES else c.role }}{% endif %}
+            </span>
+            {% if c.unread %}<span class="chat-unread">{{ c.unread }}</span>{% endif %}
+          </div>
+          <div class="chat-person-meta">
+            {{ icon('phone') }}<span>{{ c.call_count }} call{{ 's' if c.call_count != 1 else '' }} logged</span>
+          </div>
+        </div>
+      </a>
+      {% else %}
+      <div class="empty-state">No other colleagues have accounts yet.</div>
+      {% endfor %}
+    </div>
+  </aside>
+
+  <section class="chat-main">
+    {% if active %}
+    <header class="chat-head">
+      <div class="chat-avatar chat-avatar-lg">
+        {% if active.photo_path %}
+          <img src="{{ url_for('photo_file', relpath=active.photo_path) }}" alt="">
+        {% else %}
+          {{ (active.full_name or active.username)[:1]|upper }}
+        {% endif %}
+      </div>
+      <div>
+        <div class="chat-head-name">{{ active.full_name or active.username }}</div>
+        <div class="chat-head-sub">
+          {{ ROLES[active.role].label if active.role in ROLES else active.role }}
+          &middot; {{ active.call_count }} call{{ 's' if active.call_count != 1 else '' }} logged
+        </div>
+      </div>
+      <a class="btn btn-sm btn-secondary no-print" href="{{ url_for('calls') }}">{{ icon('phone') }}<span>Call log</span></a>
+    </header>
+
+    <div class="chat-thread" id="chatThread">
+      {% for m in thread %}
+      <div class="chat-msg {% if m.from_user == me.username %}mine{% endif %}">
+        <div class="chat-bubble">{{ m.body }}</div>
+        <div class="chat-stamp">{{ (m.created_at or '')[11:16] }}</div>
+      </div>
+      {% else %}
+      <div class="empty-state">
+        No messages with {{ active.full_name or active.username }} yet. Say something below.
+      </div>
+      {% endfor %}
+    </div>
+
+    <form class="chat-composer no-print" method="post"
+          action="{{ url_for('chat_send', username=active.username) }}">
+      <input type="text" name="body" id="chatBody" placeholder="Type your message..."
+             autocomplete="off" required maxlength="4000">
+      <button type="submit" class="btn" title="Send">{{ icon('share') }}<span>Send</span></button>
+    </form>
+    {% else %}
+    <div class="card empty-state">Select a colleague on the left to start a conversation.</div>
+    {% endif %}
+  </section>
+</div>
+
+<script>
+(function () {
+  var thread = document.getElementById('chatThread');
+  if (thread) thread.scrollTop = thread.scrollHeight;
+
+  var filter = document.getElementById('chatFilter');
+  if (filter) {
+    filter.addEventListener('input', function () {
+      var q = filter.value.trim().toLowerCase();
+      document.querySelectorAll('.chat-person').forEach(function (el) {
+        el.style.display = (!q || el.getAttribute('data-name').indexOf(q) !== -1) ? '' : 'none';
+      });
+    });
+  }
+
+  {% if active %}
+  // Poll for replies so a message from a colleague appears without a reload.
+  // Deliberately modest (6s) - this is one computer, not a chat service.
+  var POLL_URL = {{ url_for('chat_messages_json', username=active.username)|tojson }};
+  var lastId = {{ (thread[-1].id if thread else 0)|tojson }};
+
+  setInterval(function () {
+    fetch(POLL_URL, {credentials: 'same-origin'})
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        if (!data || !data.messages || !data.messages.length) return;
+        var newest = data.messages[data.messages.length - 1];
+        if (newest.id === lastId) return;
+        var atBottom = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 60;
+        thread.innerHTML = '';
+        data.messages.forEach(function (m) {
+          var wrap = document.createElement('div');
+          wrap.className = 'chat-msg' + (m.mine ? ' mine' : '');
+          var bubble = document.createElement('div');
+          bubble.className = 'chat-bubble';
+          bubble.textContent = m.body;          // textContent, never innerHTML
+          var stamp = document.createElement('div');
+          stamp.className = 'chat-stamp';
+          stamp.textContent = m.at;
+          wrap.appendChild(bubble); wrap.appendChild(stamp);
+          thread.appendChild(wrap);
+        });
+        lastId = newest.id;
+        if (atBottom) thread.scrollTop = thread.scrollHeight;
+      })
+      .catch(function () { /* offline or server restarting - try again next tick */ });
+  }, 6000);
+  {% endif %}
+})();
+</script>
+
+{% endblock %}

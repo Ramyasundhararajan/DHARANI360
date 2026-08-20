@@ -1,0 +1,106 @@
+{# Full action set for a single record: view / edit / share / download / print / delete.
+   Requires: form, record. #}
+<div class="action-bar no-print">
+  <a class="btn" href="{{ url_for('record_edit', form_code=form.code, record_id=record.id) }}">
+    {{ icon('edit') }}<span>Edit</span>
+  </a>
+
+  <div class="action-menu">
+    <button type="button" class="btn btn-secondary action-menu-trigger">
+      {{ icon('download') }}<span>Download</span>{{ icon('chevron') }}
+    </button>
+    <div class="action-menu-panel">
+      <button type="button" onclick="window.print()">{{ icon('printer') }}<span>PDF <em>(print dialog)</em></span></button>
+      <a href="{{ url_for('record_download', form_code=form.code, record_id=record.id, fmt='csv') }}">{{ icon('download') }}<span>CSV spreadsheet</span></a>
+      <a href="{{ url_for('record_download', form_code=form.code, record_id=record.id, fmt='json') }}">{{ icon('download') }}<span>JSON data</span></a>
+    </div>
+  </div>
+
+  <div class="action-menu">
+    <button type="button" class="btn btn-secondary action-menu-trigger">
+      {{ icon('share') }}<span>Share</span>{{ icon('chevron') }}
+    </button>
+    <div class="action-menu-panel">
+      <button type="button" data-copy-link>{{ icon('link') }}<span>Copy link to this record</span></button>
+      <button type="button" data-copy-summary>{{ icon('copy') }}<span>Copy summary text</span></button>
+      <a href="mailto:?subject={{ record.doc_no|urlencode }}%20-%20{{ form.title|urlencode }}&body=Record%20{{ record.doc_no|urlencode }}%20in%20DHARANI%20360.%0A%0AOpen%20on%20the%20office%20computer%3A%20{{ request.url|urlencode }}">
+        {{ icon('mail') }}<span>Email this link</span>
+      </a>
+    </div>
+  </div>
+
+  <button type="button" class="btn btn-secondary" onclick="window.print()">{{ icon('printer') }}<span>Print</span></button>
+
+  <a class="btn btn-secondary" href="{{ url_for('register', form_code=form.code) }}">Back to Register</a>
+
+  <form method="post" action="{{ url_for('record_delete', form_code=form.code, record_id=record.id) }}"
+        data-confirm="Delete {{ record.doc_no }} permanently? This removes the record and cannot be undone."
+        class="action-bar-end">
+    <button type="submit" class="btn btn-danger">{{ icon('trash') }}<span>Delete</span></button>
+  </form>
+</div>
+
+<div class="copy-toast" id="copyToast" role="status" aria-live="polite">Copied</div>
+
+<script>
+(function () {
+  // Dropdowns: only one open at a time, closes on outside click or Escape.
+  var menus = Array.prototype.slice.call(document.querySelectorAll('.action-menu'));
+  menus.forEach(function (menu) {
+    var trigger = menu.querySelector('.action-menu-trigger');
+    trigger.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var wasOpen = menu.classList.contains('open');
+      menus.forEach(function (m) { m.classList.remove('open'); });
+      if (!wasOpen) menu.classList.add('open');
+    });
+  });
+  document.addEventListener('click', function () {
+    menus.forEach(function (m) { m.classList.remove('open'); });
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') menus.forEach(function (m) { m.classList.remove('open'); });
+  });
+
+  var toast = document.getElementById('copyToast');
+  function flash(msg) {
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(function () { toast.classList.remove('show'); }, 1900);
+  }
+  function copy(text, msg) {
+    // navigator.clipboard needs a secure context; on plain http://127.0.0.1 it
+    // usually works, but fall back to a hidden textarea so this never silently
+    // does nothing.
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(function () { flash(msg); },
+                                               function () { legacy(text, msg); });
+    } else { legacy(text, msg); }
+  }
+  function legacy(text, msg) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); flash(msg); }
+    catch (err) { flash('Could not copy - please copy the address bar manually'); }
+    document.body.removeChild(ta);
+  }
+
+  var linkBtn = document.querySelector('[data-copy-link]');
+  if (linkBtn) linkBtn.addEventListener('click', function () { copy(window.location.href, 'Link copied'); });
+
+  var sumBtn = document.querySelector('[data-copy-summary]');
+  if (sumBtn) sumBtn.addEventListener('click', function () {
+    var lines = [{{ record.doc_no|tojson }} + ' - ' + {{ form.title|tojson }}];
+    document.querySelectorAll('.view-field').forEach(function (f) {
+      var l = f.querySelector('.view-label'), v = f.querySelector('.view-value');
+      if (l && v && v.textContent.trim() && v.textContent.trim() !== '—') {
+        lines.push(l.textContent.trim() + ': ' + v.textContent.trim());
+      }
+    });
+    lines.push('', 'From DHARANI 360 - ' + window.location.href);
+    copy(lines.join('\n'), 'Summary copied');
+  });
+})();
+</script>

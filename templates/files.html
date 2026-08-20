@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}File Manager · DHARANI 360{% endblock %}
+{% block content %}
+
+<div class="topbar">
+  <div>
+    <h1 class="dept-title">{{ icon('archive') }}File Manager</h1>
+    <div class="breadcrumb">
+      <a href="{{ url_for('dashboard') }}">Home</a>{{ icon('chevron') }}
+      <span>Applications</span>{{ icon('chevron') }}
+      <span class="current">File Manager</span>
+    </div>
+    <div class="crumbs">
+      The company file library, plus every file attached to any record you have access to.
+      Everything is stored on this computer.
+    </div>
+  </div>
+</div>
+
+<div class="grid grid-stats">
+  <div class="card stat-card"><div class="stat-value">{{ library|length }}</div><div class="stat-label">Files in the library</div></div>
+  <div class="card stat-card stat-card-blue"><div class="stat-value">{{ files|length }}</div><div class="stat-label">Files attached to records</div></div>
+  <div class="card stat-card"><div class="stat-value">{{ "%.1f"|format(total_mb) }}<span class="stat-unit">MB</span></div><div class="stat-label">Total stored</div></div>
+  <div class="card stat-card"><div class="stat-value">{{ folders|length }}</div><div class="stat-label">Folders available</div></div>
+</div>
+
+<details class="quick-log no-print" {% if not library %}open{% endif %}>
+  <summary class="quick-log-summary">
+    {{ icon('download') }}<span>Upload a file</span>
+    <em>Goes into the company library &mdash; up to 15MB</em>
+    <span class="rules-strip-chevron">{{ icon('chevron') }}</span>
+  </summary>
+  <form method="post" action="{{ url_for('library_upload') }}" enctype="multipart/form-data" class="quick-log-form">
+    <div class="form-grid">
+      <div class="field full">
+        <label>File <span class="req">*</span></label>
+        <input type="file" name="file" required>
+      </div>
+      <div class="field">
+        <label>Folder</label>
+        <select name="folder">
+          {% for f in folders %}<option>{{ f }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>Description</label>
+        <input type="text" name="description" placeholder="What this file is">
+      </div>
+    </div>
+    <div class="btn-row" style="margin-bottom:0;">
+      <button type="submit" class="btn">{{ icon('download') }}<span>Upload</span></button>
+      <span class="crumbs" style="align-self:center;">Allowed: {{ allowed_ext|join(', ') }}</span>
+    </div>
+  </form>
+</details>
+
+<div class="section-title">{{ icon('archive') }}<span>Company library</span></div>
+{% if library %}
+<div class="table-wrap">
+<table>
+  <thead><tr><th>File</th><th>Folder</th><th>Description</th><th>Uploaded By</th><th>Uploaded</th><th>Size</th><th class="col-actions no-print">Actions</th></tr></thead>
+  <tbody>
+  {% for f in library %}
+    <tr>
+      <td class="col-doc">{{ f.original_name }}</td>
+      <td><span class="badge badge-BLUE">{{ f.folder or 'General' }}</span></td>
+      <td class="cell-clip" title="{{ f.description }}">{{ f.description or '—' }}</td>
+      <td>{{ f.uploaded_by or '—' }}</td>
+      <td>{{ (f.uploaded_at or '')[:16].replace('T', ' ') }}</td>
+      <td>{{ "%.0f KB"|format((f.size_bytes or 0) / 1024) }}</td>
+      <td class="col-actions no-print">
+        <div class="row-actions">
+          <a class="row-action" title="Download" href="{{ url_for('library_download', file_id=f.id) }}">{{ icon('download') }}</a>
+          <form method="post" action="{{ url_for('library_delete', file_id=f.id) }}"
+                data-confirm="Delete {{ f.original_name }} from the library? This cannot be undone.">
+            <button type="submit" class="row-action row-action-danger" title="Delete">{{ icon('trash') }}</button>
+          </form>
+        </div>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="card empty-state">The library is empty. Use <b>Upload a file</b> above to add the first one.</div>
+{% endif %}
+
+<div class="section-title">{{ icon('file-text') }}<span>Attached to records</span></div>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>File</th><th>Attached To</th><th>Register</th><th>Uploaded By</th><th>Uploaded</th><th>Size</th><th class="col-actions no-print">Actions</th></tr></thead>
+  <tbody>
+  {% for f in files %}
+    <tr>
+      <td class="col-doc">{{ f.original_name }}</td>
+      <td><a href="{{ url_for('record_view', form_code=f.form_code, record_id=f.record_id) }}">{{ f.form_code }}-{{ f.record_id }}</a></td>
+      <td>{{ f.form_title }}</td>
+      <td>{{ f.uploaded_by or "—" }}</td>
+      <td>{{ (f.uploaded_at or "")[:16].replace("T", " ") }}</td>
+      <td>{{ "%.0f KB"|format((f.size_bytes or 0) / 1024) }}</td>
+      <td class="col-actions no-print">
+        <div class="row-actions">
+          <a class="row-action" title="Download" href="{{ url_for('attachment_download', attachment_id=f.id) }}">{{ icon('download') }}</a>
+          <a class="row-action" title="Open record" href="{{ url_for('record_view', form_code=f.form_code, record_id=f.record_id) }}">{{ icon('eye') }}</a>
+        </div>
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="7" class="empty-state">No files attached to records yet. Attach files from any record's detail page.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% endblock %}

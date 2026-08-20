@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui %}
+{% block title %}To-Do Board · DHARANI 360{% endblock %}
+{% block content %}
+
+{% set lane_tone = {'To Do': 'info', 'In Progress': 'warning', 'Done': 'success'} %}
+{% set lane_icon = {'To Do': 'clipboard-list', 'In Progress': 'repeat', 'Done': 'check-square'} %}
+
+<div class="topbar">
+  <div>
+    <h1 class="dept-title">{{ icon('clipboard-list') }}To-Do Board</h1>
+    <div class="breadcrumb">
+      <a href="{{ url_for('dashboard') }}">Home</a>{{ icon('chevron') }}
+      <span>Applications</span>{{ icon('chevron') }}
+      <span class="current">To Do</span>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <div class="view-switch no-print">
+      <a class="{% if view == 'board' %}active{% endif %}" href="{{ url_for('todos_page') }}">{{ icon('board') }}Board</a>
+      <a class="{% if view == 'list' %}active{% endif %}" href="{{ url_for('todos_page', view='list') }}">{{ icon('clipboard-list') }}List</a>
+    </div>
+  </div>
+</div>
+
+<div class="welcome-card no-print">
+  <span class="welcome-avatar">{{ icon('clipboard-list') }}</span>
+  <div class="welcome-body">
+    <div class="welcome-title">
+      {{ board['To Do']|length + board['In Progress']|length }} open
+      {%- if board['Done'] %}, {{ board['Done']|length }} done{% endif %}
+    </div>
+    <div class="welcome-sub">Private to your account, and mirrored on your Dashboard. Move a card with the arrows on it.</div>
+  </div>
+  <div class="welcome-actions">
+    {% for s in statuses %}
+    <span class="reg-chip"><span class="dot" style="background: var(--{{ lane_tone[s] }});"></span>{{ s }} <b style="margin-left:4px; color:var(--ink);">{{ board[s]|length }}</b></span>
+    {% endfor %}
+  </div>
+</div>
+
+{# ------------------------------------------------------------- add form -- #}
+<form method="post" action="{{ url_for('todo_add') }}" class="card todo-compose no-print">
+  <input type="text" name="text" placeholder="What needs doing?" required aria-label="To-do text">
+  <select name="color" aria-label="Colour">
+    <option value="blue">Blue</option>
+    <option value="green">Green</option>
+    <option value="amber">Amber</option>
+    <option value="red">Red</option>
+  </select>
+  <select name="status" aria-label="Lane">
+    {% for s in statuses %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+  </select>
+  <button type="submit" class="btn">{{ icon('user-plus') }}Add task</button>
+</form>
+
+{% if view == 'board' %}
+{# ---------------------------------------------------------------- board -- #}
+<div class="kanban-board todo-board">
+  {% for s in statuses %}
+  <div class="kanban-col todo-col todo-col-{{ lane_tone[s] }}">
+    <div class="kanban-col-head">
+      <span class="dot" style="background: var(--{{ lane_tone[s] }});"></span>
+      <span>{{ s }}</span>
+      <span class="nav-count">{{ board[s]|length }}</span>
+    </div>
+    <div class="kanban-col-body">
+      {% for t in board[s] %}
+      <article class="kanban-card todo-card tint-{{ t.color or 'blue' }}">
+        <div class="todo-card-text">{{ t.text }}</div>
+        <div class="todo-card-foot">
+          {% if t.created_at %}<span class="kanban-card-meta">{{ t.created_at[:10] }}</span>{% endif %}
+          <div class="todo-card-actions">
+            {% if statuses.index(s) > 0 %}
+            <form method="post" action="{{ url_for('todo_status', todo_id=t.id) }}">
+              <input type="hidden" name="status" value="{{ statuses[statuses.index(s) - 1] }}">
+              <button type="submit" class="row-action" title="Move to {{ statuses[statuses.index(s) - 1] }}">&larr;</button>
+            </form>
+            {% endif %}
+            {% if statuses.index(s) < statuses|length - 1 %}
+            <form method="post" action="{{ url_for('todo_status', todo_id=t.id) }}">
+              <input type="hidden" name="status" value="{{ statuses[statuses.index(s) + 1] }}">
+              <button type="submit" class="row-action" title="Move to {{ statuses[statuses.index(s) + 1] }}">&rarr;</button>
+            </form>
+            {% endif %}
+            <form method="post" action="{{ url_for('todo_delete', todo_id=t.id) }}"
+                  data-confirm="Delete this to-do?">
+              <button type="submit" class="row-action row-action-danger" title="Delete">{{ icon('trash') }}</button>
+            </form>
+          </div>
+        </div>
+      </article>
+      {% else %}
+      <div class="todo-col-empty">Nothing in {{ s|lower }}.</div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+{# ----------------------------------------------------------------- list -- #}
+<div class="card" style="max-width:760px;">
+  {{ ui.card_head('All to-dos (' ~ todos|length ~ ')', icon('clipboard-list')) }}
+  <div class="todo-list">
+    {% for t in todos %}
+    <div class="todo-row tint-{{ t.color or 'blue' }} {% if t.done %}done{% endif %}">
+      <form method="post" action="{{ url_for('todo_toggle', todo_id=t.id) }}">
+        <button type="submit" class="todo-check-btn" title="Mark done / not done">{{ icon('check-square') }}</button>
+      </form>
+      <span class="todo-text">
+        {{ t.text }}
+        <span class="badge badge-{{ 'GREEN' if t.status == 'Done' else ('AMBER' if t.status == 'In Progress' else 'BLUE') }}" style="margin-left:auto;">{{ t.status }}</span>
+      </span>
+      <form method="post" action="{{ url_for('todo_delete', todo_id=t.id) }}" data-confirm="Delete this to-do?">
+        <button type="submit" class="todo-del" title="Delete">&times;</button>
+      </form>
+    </div>
+    {% else %}
+    {{ ui.empty('No to-dos yet — add one above.') }}
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

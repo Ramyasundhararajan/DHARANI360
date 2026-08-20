@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% import "_charts.html" as charts %}
+{% block title %}AI Insights Center · DHARANI 360{% endblock %}
+{% block content %}
+
+<div class="topbar">
+  <div>
+    <h1 class="dept-title">{{ icon('trending-up') }}AI Insights Center</h1>
+    <div class="breadcrumb">
+      <a href="{{ url_for('dashboard') }}">Home</a>{{ icon('chevron') }}
+      <span>AI Center</span>{{ icon('chevron') }}
+      <span class="current">AI Insights Center</span>
+    </div>
+    <div class="crumbs">Rule-based analytics over your own data — thresholds and counts computed locally on this computer, not an external AI service.</div>
+  </div>
+</div>
+
+<div class="grid grid-icon-stats" style="margin-bottom:20px;">
+  {% for k in kpis %}
+  <div class="stat-tile">
+    <div class="stat-tile-top">
+      <span class="icon-stat-badge tone-{{ k.tone }}">{{ icon('trending-up') }}</span>
+      <div class="stat-tile-body">
+        <div class="icon-stat-label">{{ k.label }}</div>
+        <div class="icon-stat-value">{{ k.value }}</div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="card" style="margin-bottom:20px;">
+  <div class="widget-card-title">{{ icon('star') }}<span>Smart Suggestions</span></div>
+  {% for s in suggestions %}
+  <div class="rag-row"><span class="dot dot-{{ 'RED' if 'overdue' in s or 'Critical' in s or 'open' in s else 'AMBER' }}"></span><span>{{ s }}</span></div>
+  {% endfor %}
+</div>
+
+<div class="widget-grid">
+  <div class="card">
+    <div class="widget-card-title">{{ icon('alert-triangle') }}<span>Compliance Items At Risk (≤30 days)</span></div>
+    {% if at_risk %}
+      {% for i in at_risk %}
+      <div class="rag-row">
+        <span class="dot dot-{{ i.rag }}"></span>
+        <a href="{{ url_for('record_view', form_code=i.form_code, record_id=i.record_id) }}">{{ i.doc_no }}</a>
+        <span class="rag-meta">{{ i.form_title }}</span>
+        <span class="rag-days" style="color:var(--{{ 'red' if i.rag == 'RED' else 'amber' }});">{{ i.days_left }}d</span>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">Nothing at risk in the next 30 days.</div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="widget-card-title">{{ icon('check-square') }}<span>Pending Approvals</span></div>
+    {% if approvals %}
+      {% for a in approvals %}
+      <div class="rag-row">
+        <a href="{{ url_for('record_view', form_code=a.form_code, record_id=a.record_id) }}">{{ a.title }}</a>
+        <span class="rag-meta">{{ a.meta }}</span>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">Nothing pending approval.</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="widget-grid">
+  <div class="card">
+    <div class="widget-card-title">{{ icon('user-plus') }}<span>Recruitment Pipeline Mix</span></div>
+    {% if recruitment_bars %}
+      {{ charts.segbar(recruitment_bars, recruitment_bars|sum(attribute='count')) }}
+    {% else %}
+      <div class="empty-state">No candidates in the pipeline.</div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="widget-card-title">{{ icon('flag') }}<span>Projects Snapshot</span></div>
+    <div class="rag-row"><span>Open projects</span><span class="rag-days">{{ open_projects }}</span></div>
+    <div class="rag-row"><span>Blocked tasks</span><span class="rag-days" style="color:var(--red);">{{ blocked_tasks }}</span></div>
+    <div class="rag-row"><span>Overdue tasks</span><span class="rag-days" style="color:var(--red);">{{ overdue_tasks }}</span></div>
+    <div class="btn-row" style="margin-top:12px;"><a class="btn btn-sm btn-secondary" href="{{ url_for('projects_kanban') }}">Open Kanban Board</a></div>
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui %}
+{% block title %}{{ dept.name }} · DHARANI 360{% endblock %}
+{% block content %}
+
+<div class="topbar">
+  <div>
+    <h1 class="dept-title"><span class="dept-title-icon" style="color:{{ dept.color }};">{{ dept_icon(dept.code) }}</span>{{ dept.name }}</h1>
+    <div class="breadcrumb">
+      <a href="{{ url_for('dashboard') }}">Home</a>{{ icon('chevron') }}
+      <span>Departments</span>{{ icon('chevron') }}
+      <span class="current">{{ dept.name }}</span>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <span class="app-header-date">{{ icon('calendar') }}{{ today_label }}</span>
+    <a class="btn btn-sm btn-secondary" href="{{ url_for('regulations', dept=dept.code) }}">{{ icon('shield') }}Rules</a>
+  </div>
+</div>
+
+<div class="welcome-card no-print" style="background: linear-gradient(103deg, {{ dept.color }}1a 0%, #fff 46%);">
+  <span class="welcome-avatar" style="background: {{ dept.color }};">{{ dept_icon(dept.code) }}</span>
+  <div class="welcome-body">
+    <div class="welcome-title">{{ dept.name }}</div>
+    <div class="welcome-sub">{{ dept.desc }}</div>
+  </div>
+</div>
+
+<div class="grid grid-icon-stats">
+  {{ ui.stat_tile(total, 'Records in this department', icon('archive'), 'teal') }}
+  {{ ui.stat_tile(forms|length, 'Forms / registers', icon('clipboard-list'), 'blue') }}
+  {{ ui.stat_tile(red|length, 'Urgent — expiring ≤30 days', icon('alert-triangle'), 'red' if red else 'green') }}
+  {{ ui.stat_tile(amber|length, 'Upcoming — within 90 days', icon('clock'), 'amber' if amber else 'green') }}
+</div>
+
+{% include "_rules_strip.html" %}
+
+{% if dept.procedure %}
+<div class="card">
+  {{ ui.card_head('How this department works', icon('git-branch'), url_for('regulations', dept=dept.code), 'Full library') }}
+  <ol class="proc-flow" style="list-style:none; padding:0; margin:0;">
+    {% for p in dept.procedure %}
+    <li class="proc-step">
+      <span class="proc-num">{{ '%02d'|format(loop.index) }}</span>
+      <div class="proc-body">
+        <div class="proc-title">{{ p.step }}</div>
+        <div class="proc-detail">{{ p.detail }}</div>
+        {% if p.law %}<div class="proc-law">{{ p.law }}</div>{% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ol>
+</div>
+{% endif %}
+
+{% if red or amber %}
+<div class="card">
+  {{ ui.card_head('Due Soon in ' ~ dept.name, icon('alert-triangle')) }}
+  {% for i in (red + amber)[:14] %}
+    {{ ui.rag_row(i.days_left, i.doc_no, url_for('record_view', form_code=i.form_code, record_id=i.record_id),
+                  i.form_title ~ ' · expires ' ~ i.expiry_date) }}
+  {% endfor %}
+</div>
+{% endif %}
+
+{% set kpi_panels   = insight_panels|selectattr('type','equalto','kpis')|list %}
+{% set other_panels = insight_panels|rejectattr('type','equalto','kpis')|list %}
+
+{% for panel in kpi_panels %}
+<div class="grid grid-stats">
+  {% for item in panel.kpis %}
+  <div class="card stat-card stat-card-{{ item.tone }}">
+    <div class="stat-value">{{ item.value }}</div>
+    <div class="stat-label">{{ item.label }}</div>
+  </div>
+  {% endfor %}
+</div>
+{% endfor %}
+
+<div class="widget-grid">
+{% for panel in other_panels %}
+
+  {% if panel.type == 'funnel' %}
+  <div class="card funnel-card" style="grid-column: 1 / -1;">
+    {{ ui.card_head(panel.title, icon('git-branch')) }}
+    <div class="funnel">
+      {% for stage in panel.stages %}
+      <div class="funnel-stage">
+        <div class="funnel-count">{{ stage.count }}</div>
+        <div class="funnel-label">{{ stage.label }}</div>
+      </div>
+      {% if not loop.last %}<div class="funnel-arrow">{{ icon('chevron') }}</div>{% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+  {% elif panel.type == 'breakdown' %}
+  <div class="card">
+    {{ ui.card_head(panel.title, icon('trending-up')) }}
+    {% if panel.bars %}{{ ui.bars(panel.bars, dept.color) }}{% else %}{{ ui.empty('No data yet.') }}{% endif %}
+  </div>
+
+  {% elif panel.type == 'list' %}
+  <div class="card">
+    {{ ui.card_head(panel.title, icon(panel.icon) if panel.icon else icon('clipboard-list')) }}
+    {% for r in panel.rows %}
+    <div class="list-row">
+      <span class="dot dot-{{ r.tone }}"></span>
+      <div class="list-row-body">
+        <div class="list-row-title"><a href="{{ url_for('record_view', form_code=r.form_code, record_id=r.record_id) }}">{{ r.title }}</a></div>
+        <div class="list-row-meta">{{ r.meta }}</div>
+      </div>
+    </div>
+    {% else %}
+      {{ ui.empty(panel.empty_text) }}
+    {% endfor %}
+  </div>
+  {% endif %}
+
+{% endfor %}
+</div>
+
+<div class="section-title">{{ icon('archive') }}<span>Forms &amp; Registers</span>
+  <span class="section-title-note">{{ forms|length }} register{{ '' if forms|length == 1 else 's' }}</span>
+</div>
+<div class="grid grid-cards">
+  {% for f in forms %}
+  <div class="card dept-card" style="border-left-color: {{ dept.color }};">
+    <div class="dept-name"><span class="dept-card-icon" style="color:{{ dept.color }};">{{ form_icon(f.code) }}</span>{{ f.title }}</div>
+    <div class="dept-desc">{{ f.purpose }}</div>
+    <div class="dept-meta" style="margin-bottom:12px;">
+      <span class="doc-code">DR-{{ f.code }}</span>
+      <span>{{ counts.get(f.code, 0) }} records</span>
+    </div>
+    <div class="btn-row" style="margin:0;">
+      <a class="btn btn-sm" href="{{ url_for('form_view', form_code=f.code) }}">+ New Entry</a>
+      <a class="btn btn-sm btn-secondary" href="{{ url_for('register', form_code=f.code) }}">View Register</a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="section-title">{{ icon('history') }}<span>Recent Activity in {{ dept.name }}</span></div>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Doc No.</th><th>Form</th><th>Status</th><th>By</th><th>When</th></tr></thead>
+  <tbody>
+  {% for r in recent %}
+    <tr>
+      <td class="col-doc"><a href="{{ url_for('record_view', form_code=r.form_code, record_id=r.record_id) }}">{{ r.doc_no }}</a></td>
+      <td>{{ r.form_title }}</td>
+      <td><span class="badge badge-{{ status_color(r.status) }}">{{ r.status or "—" }}</span></td>
+      <td>{{ r.created_by }}</td>
+      <td>{{ r.created_at }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="5" class="empty-state">No activity in this department yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% endblock %}

@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}{{ record.doc_no }} · DHARANI 360{% endblock %}
+{% block content %}
+
+<div class="topbar no-print">
+  <div>
+    <h1 class="dept-title">
+      <span class="dept-title-icon" style="color:{{ dept.color }};">{{ form_icon(form.code) }}</span>{{ record.doc_no }}
+    </h1>
+    <div class="breadcrumb">
+      <a href="{{ url_for('dashboard') }}">Home</a>{{ icon('chevron') }}
+      <a href="{{ url_for('department', dept_code=dept.code) }}">{{ dept.name }}</a>{{ icon('chevron') }}
+      <a href="{{ url_for('register', form_code=form.code) }}">{{ form.title }}</a>{{ icon('chevron') }}
+      <span class="current">{{ record.doc_no }}</span>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <span class="badge badge-{{ status_color(record.status) }}">{{ record.status or "—" }}</span>
+  </div>
+</div>
+
+<div class="card form-card">
+  <div class="doc-header">
+    <div>
+      <div class="doc-title">{{ form.title }}</div>
+      <div class="doc-purpose">{{ form.purpose }}</div>
+    </div>
+    <div style="text-align:right;">
+      <span class="doc-code">{{ record.doc_no }}</span>
+      <div style="margin-top:8px;"><span class="badge badge-{{ status_color(record.status) }}">{{ record.status or "—" }}</span></div>
+    </div>
+  </div>
+
+  {% include "_record_actions.html" %}
+
+  <div class="view-meta">Prepared by <b>{{ record.created_by }}</b> on {{ record.created_at }}
+    {% if record.updated_at and record.updated_at != record.created_at %} &middot; last updated {{ record.updated_at }}{% endif %}
+  </div>
+
+  {% for section_name, fields in grouped %}
+  <div class="form-section">
+    <div class="form-section-title">{{ section_name }}</div>
+    <div class="view-grid">
+      {% for f in fields %}
+      <div class="view-field">
+        <div class="view-label">{{ f.label }}</div>
+        {% if f.type == 'photo' %}
+          {% if record.get(f.name) %}
+            <img class="photo-preview" src="{{ url_for('photo_file', relpath=record.get(f.name)) }}" alt="">
+          {% else %}
+            <div class="view-value">—</div>
+          {% endif %}
+        {% else %}
+          <div class="view-value">{{ record.get(f.name)|tidy or "—" }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+
+  {% if record.notes %}
+  <div class="form-section">
+    <div class="form-section-title">Notes</div>
+    <div class="view-value" style="white-space:pre-wrap;">{{ record.notes }}</div>
+  </div>
+  {% endif %}
+</div>
+
+{% if related %}
+<div class="section-title no-print">🔗 Related Records</div>
+<div class="card no-print">
+  {% for group in related %}
+    <div class="related-group">
+      <div class="related-group-title">Same {{ group.field.replace('_', ' ') }}: <span class="related-value">{{ group.value }}</span></div>
+      {% for m in group.matches %}
+      <div class="rag-row">
+        <span class="badge badge-{{ status_color(m.status) }}">{{ m.status or "—" }}</span>
+        <a href="{{ url_for('record_view', form_code=m.form_code, record_id=m.record_id) }}">{{ m.doc_no }}</a>
+        <span class="rag-meta">{{ m.form_title }} &middot; {{ m.dept }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="section-title no-print">📎 Attachments</div>
+<div class="card no-print">
+  {% if attachments %}
+    {% for a in attachments %}
+    <div class="rag-row">
+      <a href="{{ url_for('attachment_download', attachment_id=a.id) }}">{{ a.original_name }}</a>
+      <span class="rag-meta">{{ (a.size_bytes / 1024)|round(1) }} KB &middot; uploaded by {{ a.uploaded_by }} on {{ a.uploaded_at[:10] }}</span>
+      <form method="post" action="{{ url_for('attachment_delete', attachment_id=a.id) }}" data-confirm="Remove the attachment {{ a.original_name }}?" style="margin-left:auto;">
+        <button type="submit" class="btn btn-sm btn-danger">Remove</button>
+      </form>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty-state">No files attached yet.</div>
+  {% endif %}
+
+  <form method="post" action="{{ url_for('attach_file', form_code=form.code, record_id=record.id) }}" enctype="multipart/form-data" class="btn-row" style="border-top:1px solid var(--border); padding-top:14px; margin-top:14px;">
+    <input type="file" name="file" required>
+    <button type="submit" class="btn btn-secondary">Upload Attachment</button>
+    <span class="crumbs" style="align-self:center;">Allowed: {{ allowed_ext|join(', ') }} &middot; max 15MB</span>
+  </form>
+</div>
+
+{% endblock %}

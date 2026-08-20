@@ -1,0 +1,304 @@
+{% extends "base.html" %}
+{% block title %}Calendar · DHARANI 360{% endblock %}
+{% block content %}
+
+{% set CATEGORIES = ['Meeting', 'Client Viewing', 'Site Visit', 'Handover',
+                     'Training', 'Internal Review', 'Deadline', 'Other Event'] %}
+
+<div class="topbar">
+  <div>
+    <h1 class="dept-title">{{ icon('calendar-check') }}Calendar</h1>
+    <div class="breadcrumb">
+      <a href="{{ url_for('dashboard') }}">Home</a>{{ icon('chevron') }}
+      <span>Applications</span>{{ icon('chevron') }}
+      <span class="current">Calendar</span>
+    </div>
+    <div class="crumbs">
+      Click any day to schedule a meeting on it, or click an existing entry to change it.
+      Company holidays and every register deadline appear here automatically.
+    </div>
+  </div>
+  <div class="cal-nav no-print">
+    <a class="btn btn-secondary btn-sm" href="{{ url_for('calendar', year=prev_y, month=prev_m) }}" title="Previous month">&larr;</a>
+    <span class="cal-nav-label">{{ month_name }} {{ year }}</span>
+    <a class="btn btn-secondary btn-sm" href="{{ url_for('calendar', year=next_y, month=next_m) }}" title="Next month">&rarr;</a>
+    <a class="btn btn-secondary btn-sm" href="{{ url_for('calendar') }}">Today</a>
+    <button type="button" class="btn btn-sm" id="calNewBtn">{{ icon('calendar-check') }}<span>New meeting</span></button>
+  </div>
+</div>
+
+<div class="grid grid-stats">
+  <div class="card stat-card"><div class="stat-value">{{ meeting_count }}</div><div class="stat-label">Meetings &amp; events this month</div></div>
+  <div class="card stat-card stat-card-amber"><div class="stat-value">{{ deadline_count }}</div><div class="stat-label">Deadlines this month</div></div>
+  <div class="card stat-card stat-card-red"><div class="stat-value">{{ upcoming|selectattr('rag','equalto','RED')|list|length }}</div><div class="stat-label">Urgent overall</div></div>
+  <div class="card stat-card"><div class="stat-value">{{ upcoming|length }}</div><div class="stat-label">Upcoming deadlines tracked</div></div>
+</div>
+
+<div class="cal-legend no-print">
+  <span><i class="cal-dot cal-dot-meeting"></i>Meeting / event</span>
+  <span><i class="cal-dot cal-dot-holiday"></i>Holiday</span>
+  <span><i class="cal-dot cal-dot-RED"></i>Urgent deadline</span>
+  <span><i class="cal-dot cal-dot-AMBER"></i>Upcoming deadline</span>
+  <span><i class="cal-dot cal-dot-GREEN"></i>Deadline in hand</span>
+  <span class="cal-legend-hint">{{ icon('calendar-check') }}Click a day to schedule</span>
+</div>
+
+<div class="cal-grid">
+  {% for wd in weekday_names %}<div class="cal-weekday">{{ wd }}</div>{% endfor %}
+
+  {% for week in grid %}
+    {% for day in week %}
+    <div class="cal-day {% if not day.in_month %}cal-day-out{% endif %} {% if day.is_today %}cal-day-today{% endif %}"
+         data-newday="{{ day.iso }}" role="button" tabindex="0"
+         aria-label="Schedule a meeting on {{ day.iso }}">
+      <div class="cal-day-head">
+        <span class="cal-day-num">{{ day.date.day }}</span>
+        <span class="cal-day-add no-print" aria-hidden="true">+</span>
+      </div>
+      <div class="cal-day-entries">
+        {% for e in day.entries[:4] %}
+          {% if e.kind == 'meeting' %}
+          <button type="button" class="cal-entry cal-entry-meeting"
+                  title="{{ e.title }}{% if e.meta %} — {{ e.meta }}{% endif %}"
+                  data-edit-id="{{ e.id }}"
+                  data-edit-title="{{ e.title }}"
+                  data-edit-category="{{ e.category }}"
+                  data-edit-date="{{ e.date }}"
+                  data-edit-start="{{ e.start_time }}"
+                  data-edit-end="{{ e.end_time }}"
+                  data-edit-attendees="{{ e.attendees }}"
+                  data-edit-link="{{ e.link }}">
+            <span class="cal-entry-title">{{ e.title }}</span>
+          </button>
+          {% elif e.kind == 'holiday' %}
+          <div class="cal-entry cal-entry-holiday" title="{{ e.title }} — Holiday">
+            <span class="cal-entry-title">{{ e.title }}</span>
+          </div>
+          {% else %}
+          <a class="cal-entry cal-entry-{{ e.tone }}" href="{{ e.url }}" title="{{ e.title }} — {{ e.meta }}">
+            <span class="cal-entry-title">{{ e.title }}</span>
+          </a>
+          {% endif %}
+        {% endfor %}
+        {% if day.entries|length > 4 %}
+        <div class="cal-more">+{{ day.entries|length - 4 }} more</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  {% endfor %}
+</div>
+
+{# ---------------------------------------------------------------------------
+   Scheduling dialog. One form serves both cases: with no id it posts to
+   meeting_add, with an id it posts to meeting_edit. The JS only swaps the
+   action and fills the fields.
+   ------------------------------------------------------------------------ #}
+<div class="modal-backdrop no-print" id="calModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="calModalTitle">
+    <div class="modal-head">
+      <h2 id="calModalTitle">Schedule a meeting</h2>
+      <button type="button" class="modal-close" id="calModalClose" aria-label="Close">&times;</button>
+    </div>
+
+    <form method="post" id="calForm" action="{{ url_for('meeting_add') }}">
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="field full">
+            <label>Title <span class="req">*</span></label>
+            <input type="text" name="title" id="mTitle" required
+                   placeholder="e.g. Owner handover - Marina Tower 1204">
+          </div>
+          <div class="field">
+            <label>Type</label>
+            <select name="category" id="mCategory">
+              {% for c in CATEGORIES %}<option>{{ c }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label>Date <span class="req">*</span></label>
+            <input type="date" name="meeting_date" id="mDate" required>
+          </div>
+          <div class="field"><label>Start time</label><input type="time" name="start_time" id="mStart"></div>
+          <div class="field"><label>End time</label><input type="time" name="end_time" id="mEnd"></div>
+          <div class="field full">
+            <label>Attendees</label>
+            <input type="text" name="attendees" id="mAttendees" placeholder="Names, comma separated">
+          </div>
+          <div class="field full">
+            <label>Location or link</label>
+            <input type="text" name="link" id="mLink" placeholder="Office, address, or a meeting link">
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-foot">
+        <button type="submit" class="btn" id="mSubmit">Add to calendar</button>
+        <button type="button" class="btn btn-secondary" id="calCancel">Cancel</button>
+      </div>
+    </form>
+
+    <form method="post" id="calDeleteForm" class="modal-delete" hidden
+          data-confirm="Remove this entry from the calendar?">
+      <button type="submit" class="btn btn-danger">{{ icon('trash') }}<span>Remove</span></button>
+    </form>
+  </div>
+</div>
+
+<div class="section-title">{{ icon('clipboard-list') }}<span>{{ month_name }} agenda</span></div>
+{% if agenda %}
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Date</th><th>What</th><th>Type</th><th>Details</th><th class="col-actions no-print">Actions</th></tr></thead>
+  <tbody>
+  {% for d, e in agenda %}
+    <tr>
+      <td><b>{{ d }}</b></td>
+      <td>{% if e.url %}<a href="{{ e.url }}">{{ e.title }}</a>{% else %}{{ e.title }}{% endif %}</td>
+      <td>
+        {% if e.kind == 'meeting' %}<span class="badge badge-BLUE">{{ e.tone }}</span>
+        {% elif e.kind == 'holiday' %}<span class="badge badge-GREEN">Holiday</span>
+        {% else %}<span class="badge badge-{{ e.tone }}">Deadline</span>{% endif %}
+      </td>
+      <td>{{ e.meta or '—' }}</td>
+      <td class="col-actions no-print">
+        <div class="row-actions">
+        {% if e.kind == 'meeting' %}
+          <button type="button" class="row-action" title="Edit"
+                  data-edit-id="{{ e.id }}" data-edit-title="{{ e.title }}"
+                  data-edit-category="{{ e.category }}" data-edit-date="{{ e.date }}"
+                  data-edit-start="{{ e.start_time }}" data-edit-end="{{ e.end_time }}"
+                  data-edit-attendees="{{ e.attendees }}" data-edit-link="{{ e.link }}">{{ icon('edit') }}</button>
+          <form method="post" action="{{ url_for('meeting_delete', meeting_id=e.id) }}"
+                data-confirm="Remove &quot;{{ e.title }}&quot; from the calendar?">
+            <button type="submit" class="row-action row-action-danger" title="Remove">{{ icon('trash') }}</button>
+          </form>
+        {% elif e.url %}
+          <a class="row-action" href="{{ e.url }}" title="Open record">{{ icon('eye') }}</a>
+        {% endif %}
+        </div>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="card empty-state">Nothing scheduled or due in {{ month_name }} {{ year }}. Click any day above to add something.</div>
+{% endif %}
+
+<div class="section-title">{{ icon('alert-triangle') }}<span>Next deadlines across all registers</span></div>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Status</th><th>Days left</th><th>Doc No.</th><th>Register</th><th>Dept</th><th>Expiry</th></tr></thead>
+  <tbody>
+  {% for i in upcoming %}
+    <tr>
+      <td><span class="badge badge-{{ i.rag }}"><span class="dot dot-{{ i.rag }}"></span>{{ i.rag }}</span></td>
+      <td>{{ i.days_left }}d</td>
+      <td><a href="{{ url_for('record_view', form_code=i.form_code, record_id=i.record_id) }}">{{ i.doc_no }}</a></td>
+      <td>{{ i.form_title }}</td>
+      <td>{{ i.dept }}</td>
+      <td>{{ i.expiry_date }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="6" class="empty-state">Nothing expiring. Every tracked document is in date.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<script>
+(function () {
+  var modal   = document.getElementById('calModal'),
+      form    = document.getElementById('calForm'),
+      delForm = document.getElementById('calDeleteForm'),
+      titleEl = document.getElementById('calModalTitle'),
+      submit  = document.getElementById('mSubmit');
+
+  var ADD_URL  = {{ url_for('meeting_add')|tojson }};
+  var EDIT_URL = {{ (url_for('meeting_edit', meeting_id=0))|tojson }};
+  var DEL_URL  = {{ (url_for('meeting_delete', meeting_id=0))|tojson }};
+  var TODAY    = {{ today_iso|tojson }};
+
+  // The routes are built with id 0 as a placeholder; swap that one segment.
+  function urlFor(template, id) { return template.replace('/0/', '/' + String(id) + '/'); }
+
+  function set(id, value) { document.getElementById(id).value = value || ''; }
+
+  function open(mode, data) {
+    data = data || {};
+    if (mode === 'edit') {
+      titleEl.textContent = 'Edit calendar entry';
+      submit.textContent = 'Save changes';
+      form.action = urlFor(EDIT_URL, data.id);
+      delForm.action = urlFor(DEL_URL, data.id);
+      delForm.hidden = false;
+    } else {
+      titleEl.textContent = 'Schedule a meeting';
+      submit.textContent = 'Add to calendar';
+      form.action = ADD_URL;
+      delForm.hidden = true;
+    }
+    set('mTitle', data.title);
+    set('mDate', data.date || TODAY);
+    set('mStart', data.start);
+    set('mEnd', data.end);
+    set('mAttendees', data.attendees);
+    set('mLink', data.link);
+    var cat = document.getElementById('mCategory');
+    cat.value = data.category || 'Meeting';
+    if (!cat.value) cat.selectedIndex = 0;
+
+    modal.hidden = false;
+    document.body.classList.add('modal-open');
+    setTimeout(function () { document.getElementById('mTitle').focus(); }, 30);
+  }
+
+  function close() {
+    modal.hidden = true;
+    document.body.classList.remove('modal-open');
+  }
+
+  function readEdit(el) {
+    return {
+      id: el.getAttribute('data-edit-id'),
+      title: el.getAttribute('data-edit-title'),
+      category: el.getAttribute('data-edit-category'),
+      date: el.getAttribute('data-edit-date'),
+      start: el.getAttribute('data-edit-start'),
+      end: el.getAttribute('data-edit-end'),
+      attendees: el.getAttribute('data-edit-attendees'),
+      link: el.getAttribute('data-edit-link')
+    };
+  }
+
+  document.addEventListener('click', function (e) {
+    var editEl = e.target.closest('[data-edit-id]');
+    if (editEl) { e.stopPropagation(); open('edit', readEdit(editEl)); return; }
+
+    var dayEl = e.target.closest('[data-newday]');
+    if (dayEl && !e.target.closest('a')) {
+      open('new', { date: dayEl.getAttribute('data-newday') });
+      return;
+    }
+
+    if (e.target.id === 'calNewBtn' || e.target.closest('#calNewBtn')) { open('new', {}); return; }
+    if (e.target.id === 'calModalClose' || e.target.id === 'calCancel') { close(); return; }
+    if (e.target === modal) { close(); }
+  });
+
+  // Keyboard: Enter or Space on a focused day opens the same dialog.
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !modal.hidden) { close(); return; }
+    if ((e.key === 'Enter' || e.key === ' ') && document.activeElement &&
+        document.activeElement.hasAttribute &&
+        document.activeElement.hasAttribute('data-newday')) {
+      e.preventDefault();
+      open('new', { date: document.activeElement.getAttribute('data-newday') });
+    }
+  });
+})();
+</script>
+
+{% endblock %}

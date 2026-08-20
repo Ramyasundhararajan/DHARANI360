@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{# Some form titles already end in "Register" - don't say it twice. #}
+{% set reg_label = form.title if form.title.endswith('Register') else form.title ~ ' Register' %}
+{% block title %}{{ reg_label }} · DHARANI 360{% endblock %}
+{% block content %}
+
+<div class="topbar">
+  <div>
+    <h1 class="dept-title">
+      <span class="dept-title-icon" style="color:{{ dept.color }};">{{ form_icon(form.code) }}</span>{{ form.title }}
+      <span class="doc-code">DR-{{ form.code }}</span>
+    </h1>
+    <div class="breadcrumb">
+      <a href="{{ url_for('dashboard') }}">Home</a>{{ icon('chevron') }}
+      <a href="{{ url_for('department', dept_code=dept.code) }}">{{ dept.name }}</a>{{ icon('chevron') }}
+      <span class="current">{{ reg_label }}</span>
+    </div>
+  </div>
+  <form class="search-box no-print" method="get">
+    <input type="text" name="q" value="{{ q }}" placeholder="Filter this register…">
+    <button type="submit" class="btn btn-sm btn-secondary">{{ icon('search') }}Filter</button>
+  </form>
+</div>
+
+{% include "_rules_strip.html" %}
+
+<div class="btn-row">
+  <a class="btn" href="{{ url_for('form_view', form_code=form.code) }}">+ New Entry</a>
+  <a class="btn btn-secondary" href="{{ url_for('export_csv', form_code=form.code) }}">Export CSV</a>
+  {% if q %}<a class="btn btn-secondary" href="{{ url_for('register', form_code=form.code) }}">Clear Filter</a>{% endif %}
+  <span class="crumbs" style="align-self:center; margin-left:auto;">{{ total }} record{{ 's' if total != 1 else '' }}</span>
+</div>
+
+{% macro sort_link(col, label) -%}
+  {% set next_dir = 'asc' if (sort == col and direction == 'desc') else 'desc' %}
+  <a href="{{ url_for('register', form_code=form.code, q=q, sort=col, dir=next_dir) }}" class="sort-link">
+    {{ label }}{% if sort == col %}<span class="sort-arrow">{{ '▲' if direction == 'asc' else '▼' }}</span>{% endif %}
+  </a>
+{%- endmacro %}
+
+<div class="table-wrap">
+<table>
+  <thead>
+    <tr>
+      <th>{{ sort_link('doc_no', 'Doc No.') }}</th>
+      <th>{{ sort_link('status', 'Status') }}</th>
+      {% for f in form.fields %}<th>{{ sort_link(f.name, f.label) }}</th>{% endfor %}
+      <th>{{ sort_link('created_by', 'By') }}</th>
+      <th>{{ sort_link('created_at', 'Created') }}</th>
+      <th>Files</th>
+      <th class="col-actions no-print">Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for row in rows %}
+    <tr>
+      <td class="col-doc"><a href="{{ url_for('record_view', form_code=form.code, record_id=row.id) }}">{{ row.doc_no }}</a></td>
+      <td><span class="badge badge-{{ status_color(row.status) }}">{{ row.status or "—" }}</span></td>
+      {% for f in form.fields %}
+        {% set v = row.get(f.name, "")|tidy %}
+        <td class="cell-clip" title="{{ v }}">{{ v }}</td>
+      {% endfor %}
+      <td>{{ row.created_by }}</td>
+      <td>{{ row.created_at[:10] if row.created_at else "" }}</td>
+      <td>{% set n = att_counts.get(row.id, 0) %}{% if n %}<span class="badge badge-BLUE">📎 {{ n }}</span>{% endif %}</td>
+      <td class="col-actions no-print">
+        <div class="row-actions">
+          <a class="row-action" title="View record" href="{{ url_for('record_view', form_code=form.code, record_id=row.id) }}">{{ icon('eye') }}</a>
+          <a class="row-action" title="Edit record" href="{{ url_for('record_edit', form_code=form.code, record_id=row.id) }}">{{ icon('edit') }}</a>
+          <a class="row-action" title="Download as CSV" href="{{ url_for('record_download', form_code=form.code, record_id=row.id, fmt='csv') }}">{{ icon('download') }}</a>
+          <form method="post" action="{{ url_for('record_delete', form_code=form.code, record_id=row.id) }}"
+                data-confirm="Delete {{ row.doc_no }} permanently?">
+            <button type="submit" class="row-action row-action-danger" title="Delete record">{{ icon('trash') }}</button>
+          </form>
+        </div>
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="{{ form.fields|length + 6 }}" class="empty-state">No records yet in this register.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% if total_pages > 1 %}
+<div class="pagination">
+  <a class="btn btn-sm btn-secondary {% if page <= 1 %}btn-disabled{% endif %}"
+     href="{{ url_for('register', form_code=form.code, q=q, sort=sort, dir=direction, page=page-1) if page > 1 else '#' }}">&larr; Previous</a>
+  <span class="crumbs">Page {{ page }} of {{ total_pages }}</span>
+  <a class="btn btn-sm btn-secondary {% if page >= total_pages %}btn-disabled{% endif %}"
+     href="{{ url_for('register', form_code=form.code, q=q, sort=sort, dir=direction, page=page+1) if page < total_pages else '#' }}">Next &rarr;</a>
+</div>
+{% endif %}
+
+{% endblock %}

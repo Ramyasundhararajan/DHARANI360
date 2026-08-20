@@ -1,0 +1,9 @@
+{
+  "_comment": "Copy this file to supabase_config.json and fill in the two values from your Supabase dashboard: Project Settings -> API. Only the publishable anon key belongs here. NEVER put the service_role key in this file - the app does not need it, and this folder syncs to OneDrive.",
+
+  "url": "https://YOUR-PROJECT-REF.supabase.co",
+  "anon_key": "YOUR-PUBLISHABLE-ANON-KEY",
+
+  "_offline_fallback": "true = if Supabase cannot be reached, accept the password cached locally at the last successful sign-in, so the office is not locked out when the internet is down. false = require Supabase every single time.",
+  "offline_fallback": true
+}

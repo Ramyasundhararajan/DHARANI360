@@ -1,0 +1,66 @@
+{# Compact, collapsible rules + regulations bar.
+   Included on every register and data-entry page so the governing rules are
+   always one click away from the work itself, not buried on the overview.
+   Requires: dept (department dict). `dept_obligations` is injected globally by
+   app.py, so this partial works on any page that has a department in scope. #}
+{% set obligs = dept_obligations(dept.code) %}
+{% set ocounts = dept_oblig_counts(dept.code) %}
+{% if dept.rules or dept.regulations or obligs %}
+<details class="rules-strip" style="border-left-color: {{ dept.color }};">
+  <summary>
+    <div class="rules-strip-summary">
+      <span class="rules-strip-icon" style="color: {{ dept.color }};">{{ icon('shield') }}</span>
+      <div>
+        <div class="rules-strip-heading">Rules &amp; Regulations for {{ dept.name }}</div>
+        <div class="rules-strip-label">
+          {{ ocounts.total }} statutory obligation{{ '' if ocounts.total == 1 else 's' }}
+          {%- if ocounts.critical %}, {{ ocounts.critical }} critical{% endif %}
+          &middot; {{ (dept.rules or [])|length }} company rule{{ '' if (dept.rules or [])|length == 1 else 's' }}
+        </div>
+      </div>
+      {% if ocounts.critical %}<span class="badge badge-RED">{{ ocounts.critical }} critical</span>{% endif %}
+      <span class="rules-strip-chevron">{{ icon('chevron') }}</span>
+    </div>
+  </summary>
+
+  <div class="rules-strip-col">
+    {% if obligs %}
+    <div class="reg-panel-col">
+      <div class="reg-panel-head">Top statutory obligations</div>
+      {% for r in obligs[:4] %}
+      <div class="reg-mini">
+        <div class="reg-mini-top">
+          <span class="badge badge-{{ SEVERITY_TONE[r.severity] }}">{{ SEVERITY_LABEL[r.severity] }}</span>
+          {{ r.title }}
+        </div>
+        <div class="reg-mini-law">{{ r.authority }}{% if r.cycle %} &middot; {{ r.cycle }}{% endif %}</div>
+        <div class="reg-mini-note">{{ r.requirement[:190] }}{% if r.requirement|length > 190 %}&hellip;{% endif %}</div>
+      </div>
+      {% endfor %}
+      {% if obligs|length > 4 %}
+      <div class="reg-mini-law">+ {{ obligs|length - 4 }} more in the library.</div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if dept.rules %}
+    <div class="reg-panel-col">
+      <div class="reg-panel-head">Company operating rules</div>
+      <div class="reg-rule-list reg-rule-list-compact">
+        {% for r in dept.rules %}
+        <div>
+          <div class="reg-rule-list-title">{{ r.title }}</div>
+          <div class="reg-rule-list-detail">{{ r.detail }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="rules-strip-foot no-print">
+    Reference only &mdash; not legal advice.
+    <a href="{{ url_for('regulations', dept=dept.code) }}" style="margin-left:6px;">Open the full library &rarr;</a>
+  </div>
+</details>
+{% endif %}

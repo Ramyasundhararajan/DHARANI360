@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui %}
+{% block title %}All Dashboards · DHARANI 360{% endblock %}
+{% block content %}
+
+<div class="topbar">
+  <div>
+    <h1 class="dept-title">{{ icon('board') }}All Dashboards</h1>
+    <div class="breadcrumb">
+      <a href="{{ url_for('dashboard') }}">Home</a>{{ icon('chevron') }}
+      <span class="current">All Dashboards</span>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <span class="app-header-date">{{ icon('calendar') }}{{ today_label }}</span>
+  </div>
+</div>
+
+<div class="welcome-card no-print">
+  <span class="welcome-avatar">{{ icon('board') }}</span>
+  <div class="welcome-body">
+    <div class="welcome-title">{{ dashboards|length }} dashboards available to you</div>
+    <div class="welcome-sub">Every board below is built from the live registers — no separate reporting layer, no stale extract. Your role decides which ones appear.</div>
+  </div>
+</div>
+
+<div class="grid grid-cards">
+  {% for d in dashboards %}
+    {% set tint = '#0e7490' if d.dept is none else (ALL_DEPARTMENTS | selectattr('code','equalto', d.dept) | list)[0].color %}
+    <a class="card dept-card" style="border-left-color: {{ tint }}"
+       href="{{ url_for('dashboard') if d.key=='admin' else (url_for('employee_dashboard') if d.key=='employee' else url_for('dashboard_view', key=d.key)) }}">
+      <div class="dept-name">
+        <span class="dept-card-icon" style="color: {{ tint }};">{{ dashboard_icon(d.key) }}</span>
+        {{ d.title }}
+        {% if d.tag %}<span class="badge-tag badge-tag-new">{{ d.tag }}</span>{% endif %}
+      </div>
+      <div class="dept-desc">{{ d.desc }}</div>
+      <div class="dept-meta">
+        <span class="reg-chip">{{ 'Company-wide' if d.dept is none else (ALL_DEPARTMENTS | selectattr('code','equalto', d.dept) | list)[0].name }}</span>
+      </div>
+    </a>
+  {% endfor %}
+</div>
+
+{% endblock %}

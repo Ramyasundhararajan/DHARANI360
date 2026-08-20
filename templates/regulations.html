@@ -1,0 +1,533 @@
+{% extends "base.html" %}
+{% block title %}Rules &amp; Regulations · DHARANI 360{% endblock %}
+{% block content %}
+{% macro auth_marks(raw) %}{% for m in authority_marks(raw) %}{% set logo = authority_logo(m.key) %}<span class="auth-mark" title="{{ m.name }}">{% if logo %}<img src="{{ url_for('static', filename='images/authorities/' ~ logo) }}" alt="{{ m.abbr }}">{% else %}<span class="auth-mono" style="background: {{ m.color }};">{{ m.abbr }}</span>{% endif %}</span>{% endfor %}{% endmacro %}
+
+
+<div class="topbar no-print">
+  <div>
+    <h1 class="dept-title">{{ icon('shield') }}Rules &amp; Regulations</h1>
+    <div class="breadcrumb">
+      <a href="{{ url_for('dashboard') }}">Home</a>{{ icon('chevron') }}
+      <span>Governance</span>{{ icon('chevron') }}
+      <span class="current">Rules &amp; Regulations</span>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <span class="app-header-date">{{ icon('calendar') }}{{ today_label }}</span>
+    {% if focus %}<a class="btn btn-sm btn-secondary" href="{{ url_for('regulations') }}">All departments</a>{% endif %}
+    <button type="button" class="btn btn-sm btn-secondary" onclick="window.print()">{{ icon('printer') }}Print</button>
+  </div>
+</div>
+
+{# ============================================================== hero ==== #}
+<div class="reg-hero">
+  <div class="reg-hero-body">
+    <div class="reg-hero-eyebrow">Compliance Library &middot; UAE &amp; Dubai</div>
+    <div class="reg-hero-title">Rules &amp; Regulations</div>
+    <p class="reg-hero-sub">
+      Every department's own operating rules, and the UAE and Dubai law that sits behind them &mdash;
+      each obligation with the authority that enforces it, the article it comes from, the deadline it runs to,
+      the penalty for missing it, and a link to the source.
+    </p>
+  </div>
+  <div class="reg-hero-stats">
+    <div class="reg-hero-stat"><b data-count="{{ total_obligations }}">0</b><span>Statutory obligations</span></div>
+    <div class="reg-hero-stat"><b data-count="{{ total_critical }}">0</b><span>Rated critical</span></div>
+    <div class="reg-hero-stat"><b data-count="{{ total_rules }}">0</b><span>Company rules</span></div>
+    <div class="reg-hero-stat"><b data-count="{{ authorities|length }}">0</b><span>Authorities</span></div>
+    <div class="reg-hero-stat"><b data-count="{{ visible_depts|length }}">0</b><span>Departments</span></div>
+  </div>
+
+  {% set sev_total = severity_totals.critical + severity_totals.high + severity_totals.medium %}
+  {% if sev_total %}
+  <div class="reg-hero-meter">
+    <div class="reg-hero-bar">
+      <span style="width: {{ (100 * severity_totals.critical / sev_total)|round(1) }}%; background: #f0a3a3;" title="Critical"></span>
+      <span style="width: {{ (100 * severity_totals.high / sev_total)|round(1) }}%; background: #e8bf8a;" title="High"></span>
+      <span style="width: {{ (100 * severity_totals.medium / sev_total)|round(1) }}%; background: #9dc4dc;" title="Medium"></span>
+    </div>
+    <div class="reg-hero-key">
+      <span><i style="background:#f0a3a3;"></i>{{ severity_totals.critical }} critical</span>
+      <span><i style="background:#e8bf8a;"></i>{{ severity_totals.high }} high</span>
+      <span><i style="background:#9dc4dc;"></i>{{ severity_totals.medium }} medium</span>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{# ====================================== rail + content, two columns ==== #}
+<div class="reg-layout">
+
+  <aside class="reg-rail no-print">
+    <div class="reg-rail-inner">
+      <div class="reg-rail-search">
+        <span class="reg-rail-search-icon">{{ icon('search') }}</span>
+        <input type="text" id="regSearch" placeholder="Search obligations…" autocomplete="off" aria-label="Search obligations">
+      </div>
+
+      <div class="reg-rail-label">Severity</div>
+      <div class="reg-sev" id="sevFilter">
+        <a href="#" data-sev="" class="active"><span class="dot" style="background: var(--muted-2);"></span>All<b>{{ total_obligations }}</b></a>
+        <a href="#" data-sev="critical"><span class="dot" style="background: #e07070;"></span>Critical<b>{{ severity_totals.critical }}</b></a>
+        <a href="#" data-sev="high"><span class="dot" style="background: #d8a25e;"></span>High<b>{{ severity_totals.high }}</b></a>
+        <a href="#" data-sev="medium"><span class="dot" style="background: #6ba7c9;"></span>Medium<b>{{ severity_totals.medium }}</b></a>
+      </div>
+
+      <div class="reg-rail-label">
+        Departments
+        <span class="reg-rail-count">{{ nav_depts|length }}</span>
+      </div>
+
+      {% if focus %}
+      {# Focused on one department: the rail becomes cross-navigation, so every
+         entry is a link to that department's own view rather than an anchor. #}
+      <nav class="reg-rail-nav" id="regRailNav">
+        <a class="reg-rail-all" href="{{ url_for('regulations') }}">
+          {{ icon('board') }}<span class="reg-rail-name">All departments</span>
+          <b>{{ nav_depts|sum(attribute='total') }}</b>
+        </a>
+        {% for d in nav_depts %}
+        <a href="{{ url_for('regulations', dept=d.code) }}"
+           class="{% if d.code == focus %}active{% endif %}">
+          <span class="dot" style="background: {{ d.color }};"></span>
+          <span class="reg-rail-name">{{ d.name }}</span>
+          <b>{{ d.total }}</b>
+        </a>
+        {% endfor %}
+      </nav>
+      {% else %}
+      {# Full library: in-page anchors, tracked by the scroll spy. #}
+      <nav class="reg-rail-nav" id="regRailNav">
+        {% for d in nav_depts %}
+        <a href="#dept-{{ d.code }}" data-target="dept-{{ d.code }}">
+          <span class="dot" style="background: {{ d.color }};"></span>
+          <span class="reg-rail-name">{{ d.name }}</span>
+          <b>{{ d.total }}</b>
+        </a>
+        {% endfor %}
+      </nav>
+      {% endif %}
+
+      <div class="reg-rail-foot">
+        <span id="regMatchCount">{{ total_obligations }}</span> obligations shown
+        {% if focus %}<a class="reg-rail-back" href="{{ url_for('regulations') }}">Show all {{ nav_depts|sum(attribute='total') }} &rarr;</a>{% endif %}
+      </div>
+    </div>
+  </aside>
+
+  <div class="reg-main">
+
+  <div id="regNoResults" class="card empty-state" style="display:none;">
+    No rule, obligation or law matches that search.
+  </div>
+
+  {% for d in visible_depts %}
+  {% set oc = oblig_counts[d.code] %}
+  <section class="reg-dept" id="dept-{{ d.code }}" data-dept="{{ d.name|lower }} {{ d.code|lower }}">
+
+    <div class="reg-dept-head" style="--dept: {{ d.color }};">
+      <span class="reg-dept-icon" style="background: {{ d.color }};">{{ dept_icon(d.code) }}</span>
+      <div class="reg-dept-titles">
+        <h2>{{ d.name }}</h2>
+        <div class="reg-dept-desc">{{ d.desc }}</div>
+        {% if dept_marks[d.code] %}
+        <div class="reg-authorities">
+          {% for m in dept_marks[d.code] %}
+          {% set logo = authority_logo(m.key) %}
+          <span class="reg-chip reg-chip-auth" title="{{ m.name }}">
+            <span class="auth-mark">
+              {% if logo %}<img src="{{ url_for('static', filename='images/authorities/' ~ logo) }}" alt="">
+              {% else %}<span class="auth-mono" style="background: {{ m.color }};">{{ m.abbr }}</span>{% endif %}
+            </span>{{ m.name }}
+          </span>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      <div class="reg-dept-counts">
+        {% if oc.critical %}<span class="badge badge-RED">{{ oc.critical }} critical</span>{% endif %}
+        {% if oc.high %}<span class="badge badge-AMBER">{{ oc.high }} high</span>{% endif %}
+        {% if oc.medium %}<span class="badge badge-BLUE">{{ oc.medium }} medium</span>{% endif %}
+        <span class="reg-count-pill">{{ (d.rules or [])|length }} company rules</span>
+        <a class="btn btn-sm btn-secondary no-print" href="{{ url_for('department', dept_code=d.code) }}">Open department</a>
+      </div>
+    </div>
+
+    {# ------------------------------------- statutory obligations ------- #}
+    {% if obligations[d.code] %}
+    <div class="reg-panel-head">UAE &amp; Dubai statutory obligations</div>
+    <div class="reg-rules-grid">
+      {% for r in obligations[d.code] %}
+      <article class="reg-rule reg-rule-open" tabindex="0" role="button"
+               aria-label="Open full detail for {{ r.title }}"
+               data-severity="{{ r.severity }}"
+               data-search="{{ (r.title ~ ' ' ~ r.authority ~ ' ' ~ r.reference ~ ' ' ~ r.requirement ~ ' ' ~ r.penalty ~ ' ' ~ r.cycle ~ ' ' ~ r.tip)|lower }}">
+        <div class="reg-rule-title">
+          <span class="reg-rule-no">{{ '%02d'|format(loop.index) }}</span>
+          <span>{{ r.title }}</span>
+          <span class="badge badge-{{ SEVERITY_TONE[r.severity] }}" style="margin-left:auto;">{{ SEVERITY_LABEL[r.severity] }}</span>
+        </div>
+        <div class="reg-law-authority">{{ auth_marks(r.authority) }}<span>{{ authority_label(r.authority) }}</span></div>
+        {% if r.reference %}<code class="reg-law-ref">{{ r.reference }}</code>{% endif %}
+
+        <p class="reg-rule-body reg-clamp">{{ r.requirement }}</p>
+
+        <div class="reg-oblig">
+          {% if r.cycle %}
+          <div class="reg-mini">
+            <span class="reg-block-label">{{ icon('repeat') }}Cycle</span>
+            <div class="reg-mini-top">{{ r.cycle }}</div>
+          </div>
+          {% endif %}
+          {% if r.deadline %}
+          <div class="reg-mini">
+            <span class="reg-block-label">{{ icon('clock') }}Deadline</span>
+            <div class="reg-mini-note reg-clamp-2">{{ r.deadline }}</div>
+          </div>
+          {% endif %}
+        </div>
+
+        <div class="reg-rule-foot">
+          <span class="reg-mini-law">{{ d.name }}</span>
+          <span class="reg-open-hint">{{ icon('eye') }}Full detail</span>
+        </div>
+
+        {# The modal is built from this, so nothing has to be re-fetched and
+           the filter never has to look inside it. <template> is inert. #}
+        <template class="reg-full">
+          <div class="reg-modal-head">
+            <span class="badge badge-{{ SEVERITY_TONE[r.severity] }}">{{ SEVERITY_LABEL[r.severity] }}</span>
+            <span class="reg-modal-dept"><span class="dot" style="background: {{ d.color }};"></span>{{ d.name }}</span>
+          </div>
+          <h3 class="reg-modal-title">{{ r.title }}</h3>
+          <div class="reg-law-authority">{{ auth_marks(r.authority) }}<span>{{ authority_label(r.authority) }}</span></div>
+          {% if r.reference %}<code class="reg-law-ref">{{ r.reference }}</code>{% endif %}
+          <p class="reg-rule-body">{{ r.requirement }}</p>
+          <div class="reg-oblig">
+            {% if r.cycle %}
+            <div class="reg-mini">
+              <span class="reg-block-label">{{ icon('repeat') }}Cycle</span>
+              <div class="reg-mini-top">{{ r.cycle }}</div>
+            </div>
+            {% endif %}
+            {% if r.deadline %}
+            <div class="reg-mini">
+              <span class="reg-block-label">{{ icon('clock') }}Deadline</span>
+              <div class="reg-mini-note">{{ r.deadline }}</div>
+            </div>
+            {% endif %}
+          </div>
+          {% if r.penalty %}
+          <div class="reg-mini reg-mini-penalty">
+            <span class="reg-block-label">{{ icon('alert-triangle') }}If you get it wrong</span>
+            <div class="reg-mini-note reg-penalty">{{ r.penalty }}</div>
+          </div>
+          {% endif %}
+          {% if r.tip %}
+          <div class="reg-tip">{{ icon('star') }}<span>{{ r.tip }}</span></div>
+          {% endif %}
+          {% if r.source %}
+          <a class="btn btn-sm reg-modal-source" href="{{ r.source }}" target="_blank" rel="noopener noreferrer">
+            {{ icon('share') }}Read the source
+          </a>
+          {% endif %}
+        </template>
+
+        {# Print needs the whole thing on the page, since a modal never prints. #}
+        <div class="reg-print-only no-screen">
+          {% if r.penalty %}<div><b>If you get it wrong:</b> {{ r.penalty }}</div>{% endif %}
+          {% if r.tip %}<div><b>Tip:</b> {{ r.tip }}</div>{% endif %}
+          {% if r.source %}<div>Source: {{ r.source }}</div>{% endif %}
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {# ------------------------------------------- company rules --------- #}
+    {% if d.rules %}
+    <div class="reg-panel-head">Company operating rules</div>
+    <div class="reg-rules-grid reg-rules-grid-tight">
+      {% for r in d.rules %}
+      <div class="reg-rule" data-severity="company" data-search="{{ (r.title ~ ' ' ~ r.detail)|lower }}">
+        <div class="reg-rule-title">
+          <span class="reg-rule-no">{{ '%02d'|format(loop.index) }}</span>
+          <span>{{ r.title }}</span>
+        </div>
+        <div class="reg-rule-detail">{{ r.detail }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {# ---------------------------------------------- procedure ---------- #}
+    {% if d.procedure %}
+    <details class="rules-strip" style="margin-top:16px; border-left-color: {{ d.color }};">
+      <summary>
+        <div class="rules-strip-summary">
+          <span class="rules-strip-icon" style="color: {{ d.color }};">{{ icon('git-branch') }}</span>
+          <div>
+            <div class="rules-strip-heading">Standard procedure</div>
+            <div class="rules-strip-label">{{ d.procedure|length }} steps &mdash; the order of work, and the instrument each step satisfies</div>
+          </div>
+          <span class="rules-strip-chevron">{{ icon('chevron') }}</span>
+        </div>
+      </summary>
+      <div style="padding: 0 16px 16px;">
+        <ol class="proc-flow proc-flow-tight" style="list-style:none; padding:0; margin:0;">
+          {% for p in d.procedure %}
+          <li class="proc-step" data-search="{{ (p.step ~ ' ' ~ p.detail ~ ' ' ~ (p.law or ''))|lower }}">
+            <span class="proc-num">{{ '%02d'|format(loop.index) }}</span>
+            <div class="proc-body">
+              <div class="proc-title">{{ p.step }}</div>
+              <div class="proc-detail">{{ p.detail }}</div>
+              {% if p.law %}<div class="proc-law">{{ p.law }}</div>{% endif %}
+            </div>
+          </li>
+          {% endfor %}
+        </ol>
+      </div>
+    </details>
+    {% endif %}
+
+    {# ------------------------------------ wider framework -------------- #}
+    {% if d.regulations %}
+    <details class="rules-strip" style="margin-top:12px; border-left-color: {{ d.color }};">
+      <summary>
+        <div class="rules-strip-summary">
+          <span class="rules-strip-icon" style="color: {{ d.color }};">{{ icon('building') }}</span>
+          <div>
+            <div class="rules-strip-heading">Wider regulatory framework</div>
+            <div class="rules-strip-label">{{ d.regulations|length }} further instrument{{ '' if d.regulations|length == 1 else 's' }} this department sits under</div>
+          </div>
+          <span class="rules-strip-chevron">{{ icon('chevron') }}</span>
+        </div>
+      </summary>
+      <div class="reg-laws" style="padding: 0 16px 16px;">
+        {% for r in d.regulations %}
+        <article class="reg-law-card" data-severity="framework"
+                 data-search="{{ (r.law ~ ' ' ~ r.authority ~ ' ' ~ r.note ~ ' ' ~ (r.ref or ''))|lower }}">
+          <code class="reg-law-ref">{{ r.ref }}</code>
+          <div class="reg-law-title">{{ r.law }}</div>
+          <div class="reg-law-authority">{{ r.authority }}</div>
+          <p class="reg-law-note">{{ r.note }}</p>
+          {% if r.obligations %}
+          <div class="reg-rule-list reg-rule-list-compact" style="margin-top:8px;">
+            {% for o in r.obligations %}<div class="reg-rule-list-detail">&middot; {{ o }}</div>{% endfor %}
+          </div>
+          {% endif %}
+        </article>
+        {% endfor %}
+      </div>
+    </details>
+    {% endif %}
+
+    {% if not obligations[d.code] and not d.regulations %}
+    <div class="reg-none">
+      No specific external regulator sits over this department. It is governed by the company rules above,
+      plus the general data-protection duties that apply to every register in this system.
+    </div>
+    {% endif %}
+
+  </section>
+  {% endfor %}
+
+  <div class="reg-disclaimer reg-disclaimer-page">
+    <b>Not legal advice.</b> This library is orientation for staff so each team knows which framework applies to its
+    work. It was compiled from primary sources (DLD/RERA, DET, MOHRE, FTA, Ministry of Economy, the UAE Data Office,
+    TDRA, the Central Bank and FIU, DHA and the UAE legislation portal) and is current as at August 2026. Laws, fee
+    schedules and enforcement practice change, several entries are flagged in-text where a figure is pending or
+    contested, and how a rule applies depends on the specific facts. Confirm current requirements with a licensed
+    UAE legal advisor before relying on any of this for a compliance decision.
+  </div>
+
+  </div>{# /reg-main #}
+</div>{# /reg-layout #}
+
+{# =============================================================== modal == #}
+<div class="reg-modal-backdrop no-print" id="regModalBackdrop" hidden></div>
+<div class="reg-modal no-print" id="regModal" role="dialog" aria-modal="true" aria-labelledby="regModalTitle" hidden>
+  <button type="button" class="reg-modal-close" id="regModalClose" aria-label="Close">&times;</button>
+  <div class="reg-modal-body" id="regModalBody"></div>
+</div>
+
+<button type="button" class="reg-top no-print" id="regTop" aria-label="Back to top" hidden>{{ icon('chevron') }}</button>
+
+<script>
+(function () {
+  var search  = document.getElementById('regSearch');
+  var sevBar  = document.getElementById('sevFilter');
+  var railNav = document.getElementById('regRailNav');
+  if (!search || !sevBar) return;
+
+  var none      = document.getElementById('regNoResults');
+  var counter   = document.getElementById('regMatchCount');
+  var items     = Array.prototype.slice.call(document.querySelectorAll('[data-search]'));
+  var sections  = Array.prototype.slice.call(document.querySelectorAll('.reg-dept'));
+  var sev       = '';
+
+  /* -------------------------------------------------- filtering ------- */
+  /* The severity filter only judges statutory obligations. Company rules,
+     procedure steps and framework cards carry data-severity values that are
+     not severities ("company", "framework"), so choosing a severity hides
+     them rather than pretending they match one. */
+  function sevOk(el) {
+    return !sev || (el.getAttribute('data-severity') || '') === sev;
+  }
+
+  function apply() {
+    var q = search.value.trim().toLowerCase();
+
+    items.forEach(function (el) {
+      var textOk = !q || el.getAttribute('data-search').indexOf(q) !== -1;
+      el.hidden = !(textOk && sevOk(el));
+    });
+
+    var anyVisible = false;
+    sections.forEach(function (sec) {
+      /* Typing a department name reveals that whole department, not only the
+         cards whose own text happens to repeat the name. */
+      if (q && (sec.getAttribute('data-dept') || '').indexOf(q) !== -1) {
+        Array.prototype.forEach.call(sec.querySelectorAll('[data-search]'), function (el) {
+          el.hidden = !sevOk(el);
+        });
+      }
+      var shown = sec.querySelectorAll('[data-search]:not([hidden])').length;
+      sec.hidden = shown === 0;
+      if (shown) anyVisible = true;
+
+      var link = railNav && railNav.querySelector('[data-target="' + sec.id + '"]');
+      if (link) link.classList.toggle('muted', !shown);
+    });
+
+    none.style.display = anyVisible ? 'none' : '';
+    if (counter) {
+      counter.textContent = document.querySelectorAll('.reg-rule-open:not([hidden])').length;
+    }
+  }
+
+  search.addEventListener('input', apply);
+
+  sevBar.addEventListener('click', function (e) {
+    var a = e.target.closest('a[data-sev]');
+    if (!a) return;
+    e.preventDefault();
+    sev = a.getAttribute('data-sev');
+    Array.prototype.forEach.call(sevBar.querySelectorAll('a'), function (el) {
+      el.classList.toggle('active', el === a);
+    });
+    apply();
+  });
+
+  /* -------------------------------------------------- count-up -------- */
+  Array.prototype.forEach.call(document.querySelectorAll('[data-count]'), function (el) {
+    var target = parseInt(el.getAttribute('data-count'), 10) || 0;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || target === 0) {
+      el.textContent = target; return;
+    }
+    var start = null, dur = 900;
+    function step(ts) {
+      if (start === null) start = ts;
+      var p = Math.min((ts - start) / dur, 1);
+      el.textContent = Math.round(target * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  });
+
+  /* -------------------------------------------- reveal on scroll ------ */
+  if ('IntersectionObserver' in window &&
+      !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    var cards = document.querySelectorAll('.reg-rule, .reg-law-card, .reg-dept-head');
+    Array.prototype.forEach.call(cards, function (c) { c.classList.add('reg-reveal'); });
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (!en.isIntersecting) return;
+        var sibs = en.target.parentNode ? Array.prototype.indexOf.call(en.target.parentNode.children, en.target) : 0;
+        en.target.style.transitionDelay = Math.min(sibs, 5) * 45 + 'ms';
+        en.target.classList.add('reg-in');
+        io.unobserve(en.target);
+      });
+    }, { rootMargin: '0px 0px -8% 0px', threshold: 0.04 });
+    Array.prototype.forEach.call(cards, function (c) { io.observe(c); });
+  }
+
+  /* ------------------------------------------------- scroll spy ------- */
+  if (railNav && 'IntersectionObserver' in window) {
+    var spy = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        var link = railNav.querySelector('[data-target="' + en.target.id + '"]');
+        if (!link) return;
+        if (en.isIntersecting) {
+          Array.prototype.forEach.call(railNav.querySelectorAll('a'), function (a) { a.classList.remove('active'); });
+          link.classList.add('active');
+        }
+      });
+    }, { rootMargin: '-15% 0px -70% 0px' });
+    sections.forEach(function (s) { spy.observe(s); });
+  }
+
+  /* ----------------------------------------------------- modal -------- */
+  var modal    = document.getElementById('regModal');
+  var backdrop = document.getElementById('regModalBackdrop');
+  var body     = document.getElementById('regModalBody');
+  var closeBtn = document.getElementById('regModalClose');
+  var lastFocus = null;
+
+  function openModal(card) {
+    var tpl = card.querySelector('template.reg-full');
+    if (!tpl) return;
+    lastFocus = document.activeElement;
+    body.innerHTML = '';
+    body.appendChild(tpl.content.cloneNode(true));
+    var h = body.querySelector('.reg-modal-title');
+    if (h) h.id = 'regModalTitle';
+    backdrop.hidden = false; modal.hidden = false;
+    /* next frame, so the opening transition actually runs */
+    requestAnimationFrame(function () {
+      backdrop.classList.add('open'); modal.classList.add('open');
+    });
+    document.body.style.overflow = 'hidden';
+    closeBtn.focus();
+  }
+
+  function closeModal() {
+    backdrop.classList.remove('open'); modal.classList.remove('open');
+    document.body.style.overflow = '';
+    setTimeout(function () {
+      backdrop.hidden = true; modal.hidden = true; body.innerHTML = '';
+    }, 180);
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+
+  document.addEventListener('click', function (e) {
+    var card = e.target.closest('.reg-rule-open');
+    /* A click on the real source link inside a card should follow the link. */
+    if (card && !e.target.closest('a')) { openModal(card); return; }
+    if (e.target === backdrop || e.target.closest('#regModalClose')) closeModal();
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !modal.hidden) closeModal();
+    if ((e.key === 'Enter' || e.key === ' ') && document.activeElement &&
+        document.activeElement.classList.contains('reg-rule-open')) {
+      e.preventDefault();
+      openModal(document.activeElement);
+    }
+  });
+
+  /* --------------------------------------------------- back to top ---- */
+  var top = document.getElementById('regTop');
+  if (top) {
+    window.addEventListener('scroll', function () {
+      top.hidden = window.scrollY < 600;
+    }, { passive: true });
+    top.addEventListener('click', function () {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+})();
+</script>
+
+{% endblock %}

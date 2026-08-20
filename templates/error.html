@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>{{ code }} · DHARANI 360</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="auth-body">
+<div class="auth-card" style="text-align:center;">
+  <div class="brand" style="font-size:22px;">DHARANI 360</div>
+  <div style="font-size:48px; font-weight:800; color:var(--danger); margin:14px 0 6px;">{{ code }}</div>
+  <p style="color:var(--text-dim);">{{ message }}</p>
+  <a class="btn" href="/" style="margin-top:10px; display:inline-block;">Back to Dashboard</a>
+</div>
+</body>
+</html>

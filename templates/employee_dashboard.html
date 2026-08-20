@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+{% import "_charts.html" as charts %}
+{% block title %}My Dashboard · DHARANI 360{% endblock %}
+{% block content %}
+
+<div class="topbar">
+  <div>
+    <h1 class="dept-title">{{ icon('employee') }}Employee Dashboard</h1>
+    <div class="breadcrumb">
+      <a href="{{ url_for('dashboard') }}">Home</a>{{ icon('chevron') }}
+      <a href="{{ url_for('dashboards_hub') }}">Dashboard</a>{{ icon('chevron') }}
+      <span class="current">Employee Dashboard</span>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <span class="app-header-date">{{ icon('calendar') }}{{ today_label }}</span>
+    <a class="btn btn-sm btn-secondary" href="{{ url_for('change_password') }}">{{ icon('lock') }}Password</a>
+    {% if emp %}<a class="btn btn-sm" href="{{ url_for('record_view', form_code='HR-002', record_id=emp.id) }}">{{ icon('id-card') }}My HR Record</a>{% endif %}
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:20px;">
+  <div class="profile-card">
+    {% if photo %}
+      <img class="profile-photo" src="{{ url_for('photo_file', relpath=photo) }}" alt="">
+    {% else %}
+      <div class="profile-photo-fallback">{{ (current_user.full_name or current_user.username)[:1]|upper }}</div>
+    {% endif %}
+    <div style="flex:1; min-width:200px;">
+      <div class="profile-name">{{ emp.full_name if emp else (current_user.full_name or current_user.username) }}</div>
+      {% if emp %}
+      <div class="profile-meta">
+        <span>{{ emp.position or "—" }}</span>
+        <span>{{ emp.department or "—" }}</span>
+        <span>{{ emp.email or "—" }}</span>
+        <span>{{ emp.phone or "—" }}</span>
+      </div>
+      <div class="profile-tags">
+        <span class="badge badge-{{ status_color(emp.status) }}">{{ emp.status or "—" }}</span>
+        {% if emp.start_date %}<span class="badge badge-BLUE">Joined {{ emp.start_date }}</span>{% endif %}
+        {% if emp.nationality %}<span class="badge badge-GREY">{{ emp.nationality }}</span>{% endif %}
+      </div>
+      {% else %}
+      <div class="profile-meta">{{ ROLES[current_user.role].label if current_user.role in ROLES else current_user.role }}</div>
+      <div class="rag-meta" style="margin-top:8px;">No Employee Master Information record is linked to your account yet (matched by full name). Ask HR to add one so your profile, leave and skills widgets fill in automatically.</div>
+      {% endif %}
+    </div>
+    {% if emp %}
+    <a class="btn btn-secondary btn-sm" href="{{ url_for('record_view', form_code='HR-002', record_id=emp.id) }}">View HR Record</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid grid-icon-stats">
+  {% set tones = ['blue','green','amber','purple','teal','pink','red','neutral'] %}
+  {% for s in stat_cards %}
+  <div class="stat-tile">
+    <div class="stat-tile-top">
+      <span class="icon-stat-badge tone-{{ s.tone if s.tone is defined else tones[loop.index0 % tones|length] }}">{{ icon(s.icon) }}</span>
+      <div class="stat-tile-body">
+        <div class="icon-stat-label">{{ s.label }}</div>
+        <div class="icon-stat-value">{{ s.value }}</div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="widget-grid">
+  <div class="card punch-card">
+    <div class="widget-card-title" style="justify-content:center;">{{ icon('clock') }}<span>Punch Clock — Today</span></div>
+    <div class="punch-times">
+      <div>In<br><b>{{ today_att.check_in if today_att and today_att.check_in else "—" }}</b></div>
+      <div>Out<br><b>{{ today_att.check_out if today_att and today_att.check_out else "—" }}</b></div>
+      <div>Hours<br><b>{{ today_att.hours_worked if today_att and today_att.hours_worked else "—" }}</b></div>
+    </div>
+    {% set worked = (today_att.hours_worked|float) if today_att and today_att.hours_worked else 0 %}
+    <div class="punch-bar"><div class="punch-bar-fill" style="width: {{ [worked / 8 * 100, 100]|min }}%;"></div></div>
+    <div class="punch-status">
+      {% if today_att and today_att.check_in and not today_att.check_out %}Punched in at {{ today_att.check_in }} — still on the clock
+      {% elif today_att and today_att.check_out %}Completed for today
+      {% else %}You haven't punched in yet{% endif %}
+    </div>
+    <div class="btn-row" style="justify-content:center;">
+      <form method="post" action="{{ url_for('attendance_punch_in') }}"><button type="submit" class="btn" {% if today_att and today_att.check_in %}disabled{% endif %}>Punch In</button></form>
+      <form method="post" action="{{ url_for('attendance_punch_out') }}"><button type="submit" class="btn btn-secondary" {% if not today_att or not today_att.check_in or today_att.check_out %}disabled{% endif %}>Punch Out</button></form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="widget-card-title">{{ icon('calendar') }}<span>Leave — Approved This Year</span></div>
+    {% if leave_breakdown %}
+      {{ charts.donut(leave_breakdown, leave_breakdown|sum(attribute='count'), leave_days_taken|round(0)|int, 'Days Taken') }}
+    {% else %}
+      <div class="empty-state">No approved leave recorded this year.</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="widget-grid">
+  <div class="card">
+    <div class="widget-card-title">{{ icon('star') }}<span>My Skills</span></div>
+    {% if skill_bars %}
+      {{ charts.progress_bars(skill_bars, '%') }}
+    {% else %}
+      <div class="empty-state">No skills recorded yet.</div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="widget-card-title">{{ icon('trending-up') }}<span>Performance Trend</span></div>
+    {% if performance_trend %}
+      {{ charts.col_chart(performance_trend, 100) }}
+    {% else %}
+      <div class="empty-state">No performance reviews on file yet.</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="widget-grid">
+  <div class="card">
+    <div class="widget-card-title">{{ icon('credit-card') }}<span>My Transactions</span></div>
+    {% if my_transactions %}
+      {% for r in my_transactions %}
+      <div class="rag-row">
+        <span class="badge badge-{{ status_color(r.status) }}">{{ r.status or "—" }}</span>
+        <a href="{{ url_for('record_view', form_code='TXN-001', record_id=r.id) }}">{{ r.transaction_ref or r.doc_no }}</a>
+        <span class="rag-meta">{{ r.client_name or "—" }}</span>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">No transactions assigned to you.</div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="widget-card-title">{{ icon('calendar-check') }}<span>My Compliance Items</span></div>
+    {% if my_compliance_items %}
+      {% for r in my_compliance_items %}
+      <div class="rag-row">
+        <span class="badge badge-{{ status_color(r.status) }}">{{ r.status or "—" }}</span>
+        <a href="{{ url_for('record_view', form_code='COR-003', record_id=r.id) }}">{{ r.compliance_item or r.doc_no }}</a>
+        <span class="rag-meta">due {{ r.due_date or "—" }}</span>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">No compliance items assigned to you.</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="widget-grid">
+  <div class="card">
+    <div class="widget-card-title">{{ icon('clipboard-list') }}<span>My Requests</span></div>
+    {% if my_requests %}
+      {% for r in my_requests %}
+      <div class="rag-row">
+        <span class="badge badge-{{ status_color(r.status) }}">{{ r.status or "—" }}</span>
+        <a href="{{ url_for('record_view', form_code=r.form_code, record_id=r.record_id) }}">{{ r.title }}</a>
+        <span class="rag-meta">{{ r.meta }}</span>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">You haven't submitted any leave or advance requests yet.</div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="widget-card-title">{{ icon('star') }}<span>Team Birthdays (30 days)</span></div>
+    {% if birthdays %}
+      {% for b in birthdays %}
+      <div class="rag-row">
+        <span class="dot dot-BLUE"></span>
+        <a href="{{ url_for('record_view', form_code='HR-002', record_id=b.id) }}">{{ b._name }}</a>
+        <span class="rag-meta">{{ "today" if b._days == 0 else "in " ~ b._days ~ "d" }}</span>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">No birthdays in the next 30 days.</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="widget-grid">
+  <div class="card">
+    <div class="widget-card-title">{{ icon('users') }}<span>Team Members</span></div>
+    {% if team_members %}
+      {% for m in team_members %}
+      <div class="rag-row">
+        <span class="badge badge-{{ status_color(m.status) }}">{{ m.status or "—" }}</span>
+        <a href="{{ url_for('record_view', form_code='HR-002', record_id=m.id) }}">{{ m.full_name or m.doc_no }}</a>
+        <span class="rag-meta">{{ m.position or "—" }}</span>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">No other team members on file in your department.</div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="widget-card-title">{{ icon('calendar') }}<span>Upcoming Meetings</span></div>
+    {% if meetings %}
+      {% for m in meetings %}
+      <div class="meeting-row">
+        <div class="meeting-date-chip"><div class="d">{{ m.meeting_date[8:10] if m.meeting_date else '—' }}</div><div class="m">{{ m.meeting_date[5:7] if m.meeting_date else '' }}</div></div>
+        <div class="meeting-body">
+          <div class="meeting-title">{{ m.title }}</div>
+          <div class="meeting-meta">{{ m.category or "—" }} &middot; {{ m.start_time or "—" }}{% if m.end_time %}–{{ m.end_time }}{% endif %}</div>
+        </div>
+        {% if m.link %}<a class="btn btn-sm btn-secondary" href="{{ m.link }}" target="_blank" rel="noopener">Join</a>{% endif %}
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">No meetings scheduled.</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="widget-grid">
+  <div class="card">
+    <div class="widget-card-title">{{ icon('clipboard-list') }}<span>My To-Do List</span></div>
+    <div class="todo-list">
+      {% for t in todos %}
+      <div class="todo-row tint-{{ t.color or 'blue' }} {% if t.done %}done{% endif %}">
+        <form method="post" action="{{ url_for('todo_toggle', todo_id=t.id) }}"><button type="submit" class="todo-check-btn" title="Mark done / not done"><span class="todo-dot" style="background:var(--{{ t.color or 'blue' }});"></span></button></form>
+        <span class="todo-text">{{ t.text }}</span>
+        <form method="post" action="{{ url_for('todo_delete', todo_id=t.id) }}"><button type="submit" class="todo-del">&times;</button></form>
+      </div>
+      {% else %}
+      <div class="empty-state">No to-dos yet — add one below.</div>
+      {% endfor %}
+    </div>
+    <form method="post" action="{{ url_for('todo_add') }}" class="todo-add-row">
+      <input type="text" name="text" placeholder="Add a to-do..." required>
+      <select name="color">
+        <option value="blue">Blue</option>
+        <option value="green">Green</option>
+        <option value="amber">Amber</option>
+        <option value="red">Red</option>
+      </select>
+      <button type="submit" class="btn btn-sm">Add</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="widget-card-title">{{ icon('id-card') }}<span>Leave Policy &amp; Next Holiday</span></div>
+    {% if settings.leave_policy_note %}
+      <div class="view-value" style="white-space:pre-wrap; margin-bottom:14px;">{{ settings.leave_policy_note }}</div>
+      {% if settings.leave_policy_updated %}<div class="rag-meta" style="margin-bottom:14px;">Last updated {{ settings.leave_policy_updated }}</div>{% endif %}
+    {% else %}
+      <div class="empty-state" style="padding:20px;">No leave policy note on file yet. An administrator can add one under Settings.</div>
+    {% endif %}
+    {% if next_holiday %}
+      <div class="rag-row" style="border-top:1px solid var(--border); padding-top:12px;">
+        <span class="dot dot-GREEN"></span>
+        <span>{{ next_holiday.name }}</span>
+        <span class="rag-meta">{{ next_holiday.holiday_date }}</span>
+      </div>
+    {% else %}
+      <div class="rag-meta" style="border-top:1px solid var(--border); padding-top:12px;">No upcoming public holidays on file.</div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

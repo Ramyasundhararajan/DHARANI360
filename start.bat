@@ -1,0 +1,40 @@
+@echo off
+title DHARANI 360
+cd /d "%~dp0"
+
+echo Checking for Python...
+where python >nul 2>nul
+if %errorlevel% neq 0 (
+    echo.
+    echo Python was not found on this computer.
+    echo Please install Python from https://www.python.org/downloads/
+    echo During installation, make sure to check "Add python.exe to PATH".
+    echo Then run this file again.
+    echo.
+    pause
+    exit /b 1
+)
+
+if not exist ".venv" (
+    echo Setting up DHARANI 360 for the first time - this only happens once...
+    python -m venv .venv
+)
+
+call .venv\Scripts\activate.bat
+
+echo Installing/checking requirements...
+python -m pip install --quiet --upgrade pip
+python -m pip install --quiet -r requirements.txt
+
+echo.
+echo Starting DHARANI 360...
+echo Your browser will open automatically. If it doesn't, go to http://127.0.0.1:5000
+echo.
+echo Keep this window open while you are using DHARANI 360.
+echo Close this window (or press Ctrl+C) to stop the system.
+echo.
+
+start "" http://127.0.0.1:5000
+python app.py
+
+pause

@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% block title %}Calls · DHARANI 360{% endblock %}
+{% block content %}
+
+<div class="topbar">
+  <div>
+    <h1 class="dept-title">{{ icon('phone') }}Calls</h1>
+    <div class="breadcrumb">
+      <a href="{{ url_for('dashboard') }}">Home</a>{{ icon('chevron') }}
+      <span>Applications</span>{{ icon('chevron') }}
+      <span class="current">Calls</span>
+    </div>
+    <div class="crumbs">
+      Every client call your team makes or receives &mdash; incoming, outgoing, missed and video &mdash;
+      with the outcome and any follow-up owed.
+    </div>
+  </div>
+  <form class="search-box no-print" method="get">
+    <input type="hidden" name="view" value="{{ view }}">
+    <input type="text" name="q" value="{{ q }}" placeholder="Search calls...">
+    <button type="submit">Search</button>
+  </form>
+</div>
+
+<div class="grid grid-stats">
+  <div class="card stat-card"><div class="stat-value">{{ counts.all }}</div><div class="stat-label">Calls logged</div></div>
+  <div class="card stat-card stat-card-green"><div class="stat-value">{{ counts.incoming }}</div><div class="stat-label">Incoming</div></div>
+  <div class="card stat-card stat-card-blue"><div class="stat-value">{{ counts.outgoing }}</div><div class="stat-label">Outgoing</div></div>
+  <div class="card stat-card stat-card-red"><div class="stat-value">{{ counts.missed }}</div><div class="stat-label">Missed</div></div>
+  <div class="card stat-card"><div class="stat-value">{{ total_minutes }}<span class="stat-unit">min</span></div><div class="stat-label">Talk time in this view</div></div>
+</div>
+
+<div class="call-tabs no-print">
+  {% for t in [('all','Call History','history'), ('voice','Voice','phone'), ('video','Video','video'),
+               ('outgoing','Outgoing','phone-outgoing'), ('incoming','Incoming','phone-incoming'),
+               ('missed','Missed','phone-missed')] %}
+  <a class="call-tab {% if view == t[0] %}active{% endif %}"
+     href="{{ url_for('calls', view=t[0], q=q) }}">
+    {{ icon(t[2]) }}<span>{{ t[1] }}</span><b>{{ counts[t[0]] }}</b>
+  </a>
+  {% endfor %}
+</div>
+
+{% if follow_ups %}
+<div class="callout callout-amber no-print">
+  {{ icon('alert-triangle') }}
+  <div>
+    <b>{{ follow_ups|length }} call{{ 's' if follow_ups|length != 1 else '' }} needs a follow-up today or earlier.</b>
+    <span>{{ follow_ups[:4]|map(attribute='contact_name')|join(', ') }}{% if follow_ups|length > 4 %} and {{ follow_ups|length - 4 }} more{% endif %}.</span>
+  </div>
+</div>
+{% endif %}
+
+<details class="quick-log no-print">
+  <summary class="quick-log-summary">
+    {{ icon('phone') }}<span>Log a call</span>
+    <em>Records it straight into the Call Log register</em>
+    <span class="rules-strip-chevron">{{ icon('chevron') }}</span>
+  </summary>
+  <form method="post" action="{{ url_for('call_log_quick') }}" class="quick-log-form">
+    <input type="hidden" name="return_view" value="{{ view }}">
+    <div class="form-grid">
+      <div class="field">
+        <label>Direction <span class="req">*</span></label>
+        <select name="call_direction" required>
+          <option>Incoming</option><option>Outgoing</option><option>Missed</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Call type <span class="req">*</span></label>
+        <select name="call_type" required><option>Voice Call</option><option>Video Call</option></select>
+      </div>
+      <div class="field">
+        <label>Contact name <span class="req">*</span></label>
+        <input type="text" name="contact_name" required>
+      </div>
+      <div class="field"><label>Contact number</label><input type="tel" name="contact_number"></div>
+      <div class="field"><label>Date</label><input type="date" name="call_date" value="{{ today }}"></div>
+      <div class="field"><label>Time</label><input type="text" name="call_time" placeholder="e.g. 14:30"></div>
+      <div class="field">
+        <label>Duration (minutes)</label>
+        <div class="timer-row">
+          <input type="number" step="1" min="0" name="duration_minutes" id="durationInput">
+          <button type="button" class="btn btn-sm btn-secondary" id="timerBtn" title="Time the call as it happens">
+            {{ icon('play') }}<span id="timerLabel">Start timer</span>
+          </button>
+          <span class="timer-clock" id="timerClock">00:00</span>
+        </div>
+      </div>
+      <div class="field"><label>Related lead / client</label><input type="text" name="related_lead"></div>
+      <div class="field">
+        <label>Outcome</label>
+        <select name="outcome">
+          <option value="">&mdash; select &mdash;</option>
+          {% set outcome_field = form.fields | selectattr('name', 'equalto', 'outcome') | list | first %}
+          {% for o in outcome_field.options %}
+          <option>{{ o }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field"><label>Follow-up date</label><input type="date" name="follow_up_date"></div>
+      <div class="field full"><label>What was discussed</label><textarea name="summary"></textarea></div>
+    </div>
+    <div class="btn-row" style="margin-bottom:0;">
+      <button type="submit" class="btn">Save call</button>
+      <a class="btn btn-secondary" href="{{ url_for('form_view', form_code='SAL-009') }}">Open the full form</a>
+    </div>
+  </form>
+</details>
+
+<div class="section-title">
+  {{ icon('clock') }}<span>Call history</span>
+  <a class="section-title-action no-print" href="{{ url_for('register', form_code='SAL-009') }}">Open the register &rarr;</a>
+</div>
+
+{% if rows %}
+<div class="call-list">
+  {% for r in rows %}
+  {% set dir = r.call_direction or 'Incoming' %}
+  <div class="call-row call-row-{{ dir|lower }}">
+    <div class="call-dir" title="{{ dir }}{% if r.call_type == 'Video Call' %} video call{% endif %}">
+      {% if r.call_type == 'Video Call' %}{{ icon('video') }}
+      {% elif dir == 'Outgoing' %}{{ icon('phone-outgoing') }}
+      {% elif dir == 'Missed' %}{{ icon('phone-missed') }}
+      {% else %}{{ icon('phone-incoming') }}{% endif %}
+    </div>
+
+    <div class="call-main">
+      <div class="call-name">
+        <a href="{{ url_for('call_detail', record_id=r.id) }}">{{ r.contact_name or '—' }}</a>
+        <span class="call-chip call-chip-{{ dir|lower }}">{{ dir }}</span>
+        {% if r.call_type == 'Video Call' %}<span class="call-chip call-chip-video">Video</span>{% endif %}
+      </div>
+      <div class="call-meta">
+        {% if r.contact_number %}{{ r.contact_number }} &middot; {% endif %}
+        {{ r.call_date or '—' }}{% if r.call_time %} at {{ r.call_time }}{% endif %}
+        {% if r.agent_name %} &middot; handled by {{ r.agent_name }}{% endif %}
+        {% if r.related_lead %} &middot; {{ r.related_lead }}{% endif %}
+      </div>
+      {% if r.summary %}<div class="call-summary">{{ r.summary }}</div>{% endif %}
+    </div>
+
+    <div class="call-side">
+      {% if r.outcome %}<span class="badge badge-{{ status_color(r.status) }}">{{ r.outcome }}</span>{% endif %}
+      <div class="call-duration">
+        {% if r.duration_minutes %}{{ r.duration_minutes|tidy }} min{% else %}&mdash;{% endif %}
+      </div>
+      {% if r.follow_up_date %}
+      <div class="call-followup {% if r.follow_up_date <= today and r.status != 'Closed' %}due{% endif %}">
+        Follow up {{ r.follow_up_date }}
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="row-actions no-print">
+      <a class="row-action" title="Open call" href="{{ url_for('call_detail', record_id=r.id) }}">{{ icon('eye') }}</a>
+      <a class="row-action" title="Edit" href="{{ url_for('record_edit', form_code='SAL-009', record_id=r.id) }}">{{ icon('edit') }}</a>
+      <a class="row-action" title="Download CSV" href="{{ url_for('record_download', form_code='SAL-009', record_id=r.id, fmt='csv') }}">{{ icon('download') }}</a>
+      <form method="post" action="{{ url_for('record_delete', form_code='SAL-009', record_id=r.id) }}"
+            data-confirm="Delete the call record for {{ r.contact_name }} permanently?">
+        <button type="submit" class="row-action row-action-danger" title="Delete">{{ icon('trash') }}</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card empty-state">
+  {% if q %}No call matches &ldquo;{{ q }}&rdquo;.{% else %}No calls logged in this view yet. Use <b>Log a call</b> above to add the first one.{% endif %}
+</div>
+{% endif %}
+
+<div class="footnote-hint no-print">
+  This is a call <b>record</b>, not a dialer. DHARANI 360 runs offline on this computer and isn't connected to a
+  phone line or video service, so calls are placed on your phone or usual app and logged here for the client history.
+</div>
+
+<script>
+(function () {
+  /* Times a call while it is happening and writes the elapsed minutes into the
+     duration box, so the logged figure is measured rather than guessed. */
+  var btn = document.getElementById('timerBtn');
+  if (!btn) return;
+  var clock = document.getElementById('timerClock'),
+      label = document.getElementById('timerLabel'),
+      input = document.getElementById('durationInput'),
+      startedAt = null, tick = null;
+
+  function paint() {
+    var secs = Math.floor((Date.now() - startedAt) / 1000);
+    var m = Math.floor(secs / 60), sRem = secs % 60;
+    clock.textContent = (m < 10 ? '0' : '') + m + ':' + (sRem < 10 ? '0' : '') + sRem;
+  }
+  btn.addEventListener('click', function () {
+    if (startedAt === null) {
+      startedAt = Date.now();
+      label.textContent = 'Stop timer';
+      btn.classList.add('timer-running');
+      paint();
+      tick = setInterval(paint, 1000);
+    } else {
+      clearInterval(tick);
+      var mins = Math.max(1, Math.round((Date.now() - startedAt) / 60000));
+      input.value = mins;
+      startedAt = null;
+      label.textContent = 'Start timer';
+      btn.classList.remove('timer-running');
+    }
+  });
+})();
+</script>
+
+{% endblock %}

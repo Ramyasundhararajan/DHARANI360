@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}{{ form.title }} · DHARANI 360{% endblock %}
+{% block content %}
+
+<div class="topbar">
+  <div>
+    <h1 class="dept-title">
+      <span class="dept-title-icon" style="color:{{ dept.color }};">{{ form_icon(form.code) }}</span>{{ 'Edit' if edit else 'New' }} — {{ form.title }}
+    </h1>
+    <div class="breadcrumb">
+      <a href="{{ url_for('dashboard') }}">Home</a>{{ icon('chevron') }}
+      <a href="{{ url_for('department', dept_code=dept.code) }}">{{ dept.name }}</a>{{ icon('chevron') }}
+      <a href="{{ url_for('register', form_code=form.code) }}">{{ form.title }}</a>{{ icon('chevron') }}
+      <span class="current">{{ 'Edit entry' if edit else 'New entry' }}</span>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <a class="btn btn-sm btn-secondary" href="{{ url_for('register', form_code=form.code) }}">{{ icon('archive') }}View register</a>
+  </div>
+</div>
+
+{% include "_rules_strip.html" %}
+
+<div class="card form-card">
+  <div class="doc-header">
+    <div>
+      <div class="doc-title">{{ form.title }}</div>
+      <div class="doc-purpose">{{ form.purpose }}</div>
+    </div>
+    <div style="text-align:right;">
+      <span class="doc-code">DR-{{ form.code }}</span>
+      {% if edit %}<div style="margin-top:6px; font-size:12px; color:var(--text-dim);">{{ record.doc_no }}</div>{% endif %}
+      <div style="margin-top:6px; font-size:12px; color:var(--text-dim);">
+        {{ 'Editing as' if edit else 'Entering as' }} <b style="color:var(--text);">{{ current_user.full_name or current_user.username }}</b>
+      </div>
+    </div>
+  </div>
+
+  <form method="post" enctype="multipart/form-data">
+    <div class="field" style="max-width:260px; margin-bottom:18px;">
+      <label>Status</label>
+      <select name="status">
+        {% for opt in form.status_options %}
+        <option value="{{ opt }}" {% if values.status == opt %}selected{% endif %}>{{ opt }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    {% for section_name, fields in grouped %}
+    <div class="form-section">
+      <div class="form-section-title">{{ section_name }}</div>
+      <div class="form-grid">
+        {% for f in fields %}
+        <div class="field {% if f.type == 'textarea' %}full{% endif %}">
+          <label>{{ f.label }}{% if f.required %} <span class="req">*</span>{% endif %}</label>
+          {% if f.type == 'photo' %}
+            {% if values.get(f.name) %}
+              <img class="photo-preview" src="{{ url_for('photo_file', relpath=values.get(f.name)) }}" alt="">
+            {% endif %}
+            <input type="file" name="{{ f.name }}" accept="image/*">
+          {% elif f.type == 'textarea' %}
+            <textarea name="{{ f.name }}">{{ values.get(f.name, '') }}</textarea>
+          {% elif f.type == 'select' %}
+            <select name="{{ f.name }}">
+              <option value="">— select —</option>
+              {% for opt in f.options %}
+              <option value="{{ opt }}" {% if values.get(f.name) == opt %}selected{% endif %}>{{ opt }}</option>
+              {% endfor %}
+            </select>
+          {% elif f.type == 'date' %}
+            <input type="date" name="{{ f.name }}" value="{{ (values.get(f.name) or '')[:10] }}">
+          {% elif f.type == 'number' %}
+            <input type="number" step="any" name="{{ f.name }}" value="{{ values.get(f.name, '') }}">
+          {% elif f.type == 'email' %}
+            <input type="email" name="{{ f.name }}" value="{{ values.get(f.name, '') }}">
+          {% elif f.type == 'tel' %}
+            <input type="tel" name="{{ f.name }}" value="{{ values.get(f.name, '') }}">
+          {% else %}
+            <input type="text" name="{{ f.name }}" value="{{ values.get(f.name, '') }}">
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+
+    <div class="form-section">
+      <div class="form-section-title">Details &amp; Notes</div>
+      <div class="form-grid">
+        <div class="field full">
+          <label>Notes</label>
+          <textarea name="notes">{{ values.get('notes', '') }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button type="submit" class="btn">{{ 'Save Changes' if edit else 'Submit & Save to Register' }}</button>
+      <a class="btn btn-secondary" href="{{ url_for('record_view', form_code=form.code, record_id=record.id) if edit else url_for('register', form_code=form.code) }}">Cancel</a>
+    </div>
+  </form>
+</div>
+
+{% endblock %}

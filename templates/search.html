@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Search · DHARANI 360{% endblock %}
+{% block content %}
+
+<div class="topbar">
+  <div>
+    <h1 class="dept-title">{{ icon('search') }}Search Everything</h1>
+    <div class="breadcrumb">
+      <a href="{{ url_for('dashboard') }}">Home</a>{{ icon('chevron') }}
+      <span>Applications</span>{{ icon('chevron') }}
+      <span class="current">Search Everything</span>
+    </div>
+    <div class="crumbs">Searches every register in the system - employees, agents, clients, properties, transactions, vendors and more.</div>
+  </div>
+  <form class="search-box" method="get">
+    <input type="text" name="q" value="{{ q }}" placeholder="Search doc no, name, property, client...">
+    <button type="submit">Search</button>
+  </form>
+</div>
+
+{% if q %}
+<div class="crumbs" style="margin-bottom:14px;">{{ results|length }} result(s) for &ldquo;{{ q }}&rdquo;</div>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Doc No.</th><th>Register</th><th>Department</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for r in results %}
+    <tr>
+      <td><a href="{{ url_for('record_view', form_code=r.form_code, record_id=r.record.id) }}">{{ r.record.doc_no }}</a></td>
+      <td>{{ r.form_title }}</td>
+      <td>{{ r.dept }}</td>
+      <td><span class="badge badge-{{ status_color(r.record.status) }}">{{ r.record.status or "—" }}</span></td>
+    </tr>
+  {% else %}
+    <tr><td colspan="4" class="empty-state">No matches found.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="empty-state">Type something above to search across every register in DHARANI 360.</div>
+{% endif %}
+
+{% endblock %}

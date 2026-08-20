@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign in · DHARANI 360</title>
+<link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="auth-body">
+<div class="auth-card">
+  <div class="auth-logo">
+    <img src="{{ url_for('static', filename='images/logo.png') }}" alt="DHARANI 360">
+    <div>
+      <div class="brand" style="font-size:22px;">DHARANI 360</div>
+      <div class="brand-sub" style="font-size:11.5px;">Realty Operations &amp; Compliance Suite</div>
+    </div>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="flash flash-{{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <form method="post">
+    <div class="field" style="margin-bottom:14px;">
+      <label for="email">Work email</label>
+      <input id="email" type="email" name="email" autocomplete="username"
+             placeholder="you@dharanis.ae" autofocus required>
+    </div>
+    <div class="field" style="margin-bottom:20px;">
+      <label for="password">Password</label>
+      <input id="password" type="password" name="password" autocomplete="current-password" required>
+    </div>
+    <button type="submit" class="btn" style="width:100%;">Sign In</button>
+  </form>
+
+  {% if supabase %}
+  <div class="auth-status auth-status-{{ 'ok' if supabase.ok else 'warn' }}">
+    <span class="dot" style="background: {{ 'var(--success)' if supabase.ok else 'var(--warning)' }};"></span>
+    {% if supabase.state == 'reachable' %}Secured by Supabase
+    {% elif supabase.state == 'not-configured' %}Supabase sign-in not configured yet
+    {% else %}Supabase unreachable &mdash; offline sign-in only{% endif %}
+  </div>
+  {% endif %}
+
+  <div class="auth-hint">
+    Sign in with your <b>@dharanis.ae</b> work email. Access is limited to authorised
+    accounts &mdash; if yours does not work, ask a director to check it in Users &amp; Access.
+  </div>
+</div>
+</body>
+</html>
