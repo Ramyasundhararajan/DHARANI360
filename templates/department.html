@@ -1,6 +1,26 @@
 {% extends "base.html" %}
 {% import "_ui.html" as ui %}
-{% block title %}{{ dept.name }} · DHARANI 360{% endblock %}
+{% block title %}{{ dept.name }} · DHARANI 360<script>
+(function () {
+  // Count up on arrival. Reduced-motion users get the final number at once.
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  Array.prototype.forEach.call(document.querySelectorAll('[data-count]'), function (el) {
+    var target = parseInt(el.getAttribute('data-count'), 10) || 0;
+    if (reduce || target === 0) { el.textContent = target; return; }
+    el.textContent = '0';                    // start from zero, not from blank
+    var start = null, dur = 800;
+    function step(ts) {
+      if (start === null) start = ts;
+      var p = Math.min((ts - start) / dur, 1);
+      el.textContent = Math.round(target * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  });
+})();
+</script>
+
+{% endblock %}
 {% block content %}
 
 <div class="topbar">
@@ -14,6 +34,11 @@
   </div>
   <div class="topbar-actions">
     <span class="app-header-date">{{ icon('calendar') }}{{ today_label }}</span>
+    {% if dept.code == 'PRJ' %}
+    {# The project board used to be its own sidebar entry. It belongs here,
+       beside the department whose records it actually shows. #}
+    <a class="btn btn-sm btn-secondary" href="{{ url_for('projects_kanban') }}">{{ icon('board') }}Project board</a>
+    {% endif %}
     <a class="btn btn-sm btn-secondary" href="{{ url_for('regulations', dept=dept.code) }}">{{ icon('shield') }}Rules</a>
   </div>
 </div>
@@ -26,26 +51,56 @@
   </div>
 </div>
 
-<div class="grid grid-icon-stats">
-  {{ ui.stat_tile(total, 'Records in this department', icon('archive'), 'teal') }}
-  {{ ui.stat_tile(forms|length, 'Forms / registers', icon('clipboard-list'), 'blue') }}
-  {{ ui.stat_tile(red|length, 'Urgent — expiring ≤30 days', icon('alert-triangle'), 'red' if red else 'green') }}
-  {{ ui.stat_tile(amber|length, 'Upcoming — within 90 days', icon('clock'), 'amber' if amber else 'green') }}
+{# The four numbers that say how this department is doing, counted up on
+   arrival so the eye lands on them before anything else. #}
+<div class="dept-counts">
+  <a class="dept-count tone-teal" href="{{ url_for('search', q=dept.name) }}">
+    <span class="dept-count-icon">{{ icon('archive') }}</span>
+    <b data-count="{{ total }}">{{ total }}</b>
+    <span class="dept-count-label">Records held</span>
+  </a>
+  <div class="dept-count tone-blue">
+    <span class="dept-count-icon">{{ icon('clipboard-list') }}</span>
+    <b data-count="{{ forms|length }}">{{ forms|length }}</b>
+    <span class="dept-count-label">Registers</span>
+  </div>
+  <a class="dept-count {{ 'tone-red' if red else 'tone-green' }}" href="{{ url_for('calendar') }}">
+    <span class="dept-count-icon">{{ icon('alert-triangle' if red else 'check-square') }}</span>
+    <b data-count="{{ red|length }}">{{ red|length }}</b>
+    <span class="dept-count-label">Urgent &mdash; due within 30 days</span>
+  </a>
+  <a class="dept-count {{ 'tone-amber' if amber else 'tone-green' }}" href="{{ url_for('calendar') }}">
+    <span class="dept-count-icon">{{ icon('clock') }}</span>
+    <b data-count="{{ amber|length }}">{{ amber|length }}</b>
+    <span class="dept-count-label">Coming up &mdash; within 90 days</span>
+  </a>
 </div>
 
 {% include "_rules_strip.html" %}
 
 {% if dept.procedure %}
-<div class="card">
-  {{ ui.card_head('How this department works', icon('git-branch'), url_for('regulations', dept=dept.code), 'Full library') }}
-  <ol class="proc-flow" style="list-style:none; padding:0; margin:0;">
+<div class="card proc-card">
+  <div class="proc-card-head">
+    <div>
+      <h2>{{ icon('git-branch') }}How this department works</h2>
+      <p>{{ dept.procedure|length }} step{{ 's' if dept.procedure|length != 1 else '' }},
+         in the order they happen. Follow it top to bottom and nothing gets missed.</p>
+    </div>
+    <a class="btn btn-sm btn-secondary" href="{{ url_for('regulations', dept=dept.code) }}">
+      {{ icon('shield') }}<span>The law behind it</span>
+    </a>
+  </div>
+
+  <ol class="proc-flow">
     {% for p in dept.procedure %}
     <li class="proc-step">
-      <span class="proc-num">{{ '%02d'|format(loop.index) }}</span>
+      <span class="proc-num" style="--dept: {{ dept.color }};">{{ loop.index }}</span>
       <div class="proc-body">
         <div class="proc-title">{{ p.step }}</div>
         <div class="proc-detail">{{ p.detail }}</div>
-        {% if p.law %}<div class="proc-law">{{ p.law }}</div>{% endif %}
+        {% if p.law %}
+        <div class="proc-law">{{ icon('shield') }}<span>{{ p.law }}</span></div>
+        {% endif %}
       </div>
     </li>
     {% endfor %}
@@ -118,26 +173,6 @@
   {% endif %}
 
 {% endfor %}
-</div>
-
-<div class="section-title">{{ icon('archive') }}<span>Forms &amp; Registers</span>
-  <span class="section-title-note">{{ forms|length }} register{{ '' if forms|length == 1 else 's' }}</span>
-</div>
-<div class="grid grid-cards">
-  {% for f in forms %}
-  <div class="card dept-card" style="border-left-color: {{ dept.color }};">
-    <div class="dept-name"><span class="dept-card-icon" style="color:{{ dept.color }};">{{ form_icon(f.code) }}</span>{{ f.title }}</div>
-    <div class="dept-desc">{{ f.purpose }}</div>
-    <div class="dept-meta" style="margin-bottom:12px;">
-      <span class="doc-code">DR-{{ f.code }}</span>
-      <span>{{ counts.get(f.code, 0) }} records</span>
-    </div>
-    <div class="btn-row" style="margin:0;">
-      <a class="btn btn-sm" href="{{ url_for('form_view', form_code=f.code) }}">+ New Entry</a>
-      <a class="btn btn-sm btn-secondary" href="{{ url_for('register', form_code=f.code) }}">View Register</a>
-    </div>
-  </div>
-  {% endfor %}
 </div>
 
 <div class="section-title">{{ icon('history') }}<span>Recent Activity in {{ dept.name }}</span></div>

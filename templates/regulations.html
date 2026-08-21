@@ -15,7 +15,6 @@
   </div>
   <div class="topbar-actions">
     <span class="app-header-date">{{ icon('calendar') }}{{ today_label }}</span>
-    {% if focus %}<a class="btn btn-sm btn-secondary" href="{{ url_for('regulations') }}">All departments</a>{% endif %}
     <button type="button" class="btn btn-sm btn-secondary" onclick="window.print()">{{ icon('printer') }}Print</button>
   </div>
 </div>
@@ -24,19 +23,20 @@
 <div class="reg-hero">
   <div class="reg-hero-body">
     <div class="reg-hero-eyebrow">Compliance Library &middot; UAE &amp; Dubai</div>
-    <div class="reg-hero-title">Rules &amp; Regulations</div>
+    <div class="reg-hero-title">{{ focus_dept.name if focus_dept else 'Rules &amp; Regulations' }}</div>
     <p class="reg-hero-sub">
-      Every department's own operating rules, and the UAE and Dubai law that sits behind them &mdash;
-      each obligation with the authority that enforces it, the article it comes from, the deadline it runs to,
-      the penalty for missing it, and a link to the source.
+      {% if focus_dept %}{{ focus_dept.desc if focus_dept.desc else '' }}
+      This department's own operating rules, and the UAE and Dubai law behind them &mdash; each
+      obligation with the authority that enforces it, the article it comes from, the deadline it
+      runs to and the penalty for missing it. Pick another department on the left.
+      {% endif %}
     </p>
   </div>
   <div class="reg-hero-stats">
-    <div class="reg-hero-stat"><b data-count="{{ total_obligations }}">0</b><span>Statutory obligations</span></div>
-    <div class="reg-hero-stat"><b data-count="{{ total_critical }}">0</b><span>Rated critical</span></div>
-    <div class="reg-hero-stat"><b data-count="{{ total_rules }}">0</b><span>Company rules</span></div>
-    <div class="reg-hero-stat"><b data-count="{{ authorities|length }}">0</b><span>Authorities</span></div>
-    <div class="reg-hero-stat"><b data-count="{{ visible_depts|length }}">0</b><span>Departments</span></div>
+    <div class="reg-hero-stat"><b data-count="{{ total_obligations }}">{{ total_obligations }}</b><span>Statutory obligations</span></div>
+    <div class="reg-hero-stat"><b data-count="{{ total_critical }}">{{ total_critical }}</b><span>Rated critical</span></div>
+    <div class="reg-hero-stat"><b data-count="{{ total_rules }}">{{ total_rules }}</b><span>Company rules</span></div>
+    <div class="reg-hero-stat"><b data-count="{{ authorities|length }}">{{ authorities|length }}</b><span>Authorities</span></div>
   </div>
 
   {% set sev_total = severity_totals.critical + severity_totals.high + severity_totals.medium %}
@@ -79,14 +79,9 @@
         <span class="reg-rail-count">{{ nav_depts|length }}</span>
       </div>
 
-      {% if focus %}
-      {# Focused on one department: the rail becomes cross-navigation, so every
-         entry is a link to that department's own view rather than an anchor. #}
+      {# Every entry switches the page to that department. This rail is the
+         only way across, which is why it lists them all and never collapses. #}
       <nav class="reg-rail-nav" id="regRailNav">
-        <a class="reg-rail-all" href="{{ url_for('regulations') }}">
-          {{ icon('board') }}<span class="reg-rail-name">All departments</span>
-          <b>{{ nav_depts|sum(attribute='total') }}</b>
-        </a>
         {% for d in nav_depts %}
         <a href="{{ url_for('regulations', dept=d.code) }}"
            class="{% if d.code == focus %}active{% endif %}">
@@ -96,22 +91,10 @@
         </a>
         {% endfor %}
       </nav>
-      {% else %}
-      {# Full library: in-page anchors, tracked by the scroll spy. #}
-      <nav class="reg-rail-nav" id="regRailNav">
-        {% for d in nav_depts %}
-        <a href="#dept-{{ d.code }}" data-target="dept-{{ d.code }}">
-          <span class="dot" style="background: {{ d.color }};"></span>
-          <span class="reg-rail-name">{{ d.name }}</span>
-          <b>{{ d.total }}</b>
-        </a>
-        {% endfor %}
-      </nav>
-      {% endif %}
 
       <div class="reg-rail-foot">
-        <span id="regMatchCount">{{ total_obligations }}</span> obligations shown
-        {% if focus %}<a class="reg-rail-back" href="{{ url_for('regulations') }}">Show all {{ nav_depts|sum(attribute='total') }} &rarr;</a>{% endif %}
+        <span id="regMatchCount">{{ total_obligations }}</span> shown in this department
+        <span class="reg-rail-total">{{ library_total }} across all {{ nav_depts|length }}</span>
       </div>
     </div>
   </aside>
@@ -426,6 +409,7 @@
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || target === 0) {
       el.textContent = target; return;
     }
+    el.textContent = '0';                    // start from zero, not from blank
     var start = null, dur = 900;
     function step(ts) {
       if (start === null) start = ts;

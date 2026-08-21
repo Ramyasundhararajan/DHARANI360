@@ -3534,3 +3534,216 @@ input[type=file] { max-width: 420px; }
    so it gets room to explain itself. */
 .field label svg { width: 15px; height: 15px; vertical-align: -3px; margin-right: 5px;
   color: var(--primary); }
+
+/* ============================================================================
+   HEADER CONTROLS — top right
+   ---------------------------------------------------------------------------
+   These were 32px glyphs with a `title` attribute: too small to hit reliably,
+   too faint to read, and unlabelled until the browser got round to showing a
+   tooltip a second later. They are now proper 38px buttons with their own
+   instant label, a visible current-page state and badges that carry a number
+   rather than a bare dot.
+   ========================================================================== */
+.app-header-actions { display: flex; align-items: center; gap: 4px; }
+
+.app-icon-btn {
+  width: 38px; height: 38px; border-radius: 9px;
+  color: #59677a;
+  transition: background .14s, color .14s, box-shadow .14s;
+}
+.app-icon-btn svg { width: 18px; height: 18px; }
+.app-icon-btn:hover,
+.app-icon-btn[aria-expanded="true"] {
+  background: var(--primary-soft); color: var(--primary);
+  box-shadow: inset 0 0 0 1px rgba(14, 116, 144, .18);
+}
+.app-icon-btn:active { transform: translateY(1px); }
+
+/* The page you are on is marked, so the row reads as navigation. */
+.app-icon-btn.is-current { color: var(--primary); background: var(--primary-soft); }
+.app-icon-btn.is-current::after {
+  content: ""; position: absolute; left: 50%; bottom: -1px; transform: translateX(-50%);
+  width: 16px; height: 2px; border-radius: 2px; background: var(--primary);
+}
+
+/* A hairline between "places to go" and "who you are". */
+.app-header-divider {
+  width: 1px; height: 22px; margin: 0 6px;
+  background: var(--line); flex-shrink: 0;
+}
+
+/* Own tooltip: appears at once, reads in the app's own type, and can say
+   something useful ("3 unread messages") rather than just the icon's name. */
+.app-icon-btn[data-tip]::before {
+  content: attr(data-tip);
+  position: absolute; top: calc(100% + 8px); right: 0;
+  padding: 5px 9px; border-radius: 6px; white-space: nowrap;
+  background: var(--dark); color: #fff; font-size: 11.5px; font-weight: 500;
+  opacity: 0; pointer-events: none; transform: translateY(-3px);
+  transition: opacity .14s, transform .14s; z-index: 60;
+}
+.app-icon-btn[data-tip]:hover::before,
+.app-icon-btn[data-tip]:focus-visible::before { opacity: 1; transform: translateY(0); }
+.app-icon-btn[aria-expanded="true"][data-tip]::before { opacity: 0; }
+
+/* Badges sit on the corner and stay legible against any header state. */
+.app-icon-btn .app-count {
+  top: 3px; right: 2px;
+  min-width: 17px; height: 17px; line-height: 17px;
+  font-size: 10.5px; letter-spacing: -.2px;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.app-icon-btn:hover .app-count { box-shadow: 0 0 0 2px var(--primary-soft); }
+
+/* The bell earns a heartbeat only when something is actually overdue. */
+.app-icon-btn.has-urgent .app-count { animation: dh-pulse 2.4s ease-in-out infinite; }
+
+/* The identity control matches the new button height. */
+.app-user { height: 38px; padding: 0 10px 0 3px; gap: 9px; }
+.app-user-avatar { width: 30px; height: 30px; font-size: 12px; }
+.app-user-name { font-size: 13px; font-weight: 600; color: var(--ink); }
+.app-user svg { width: 15px; height: 15px; color: var(--muted-2); }
+.app-user:hover { background: var(--line-3); }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+@media (max-width: 640px) {
+  .app-header-actions { gap: 0; }
+  .app-icon-btn { width: 40px; height: 40px; }
+  .app-icon-btn[data-tip]::before { display: none; }
+  .app-user-name { display: none; }
+  .app-header-divider { margin: 0 3px; }
+}
+
+/* Rules rail: the running total across the whole library, under the count
+   for the department you are reading. */
+.reg-rail-total { display: block; margin-top: 3px; font-size: 11px; color: var(--muted-2); }
+
+/* ============================================================================
+   DEPARTMENT OVERVIEW
+   ---------------------------------------------------------------------------
+   The four numbers first, then the procedure. The register cards that used to
+   sit at the bottom are gone: every register is already one click away in the
+   sidebar under this department, and listing them twice made the overview a
+   scroll rather than a summary.
+   ========================================================================== */
+.dept-counts {
+  display: grid; gap: 14px; margin-bottom: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
+}
+.dept-count {
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 18px 18px 16px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow);
+  color: inherit; text-decoration: none;
+  transition: transform .16s, box-shadow .16s, border-color .16s;
+}
+a.dept-count:hover {
+  transform: translateY(-2px); box-shadow: var(--shadow-md);
+  border-color: var(--tone, var(--primary)); text-decoration: none;
+}
+.dept-count::before {
+  content: ""; position: absolute; inset: 0 auto 0 0; width: 4px;
+  background: var(--tone, var(--primary));
+}
+.dept-count-icon {
+  display: grid; place-items: center;
+  width: 38px; height: 38px; border-radius: 10px; margin-bottom: 8px;
+  background: var(--tone-soft, var(--primary-soft)); color: var(--tone, var(--primary));
+}
+.dept-count-icon svg { width: 19px; height: 19px; }
+.dept-count b {
+  font-size: 34px; font-weight: 700; line-height: 1.05;
+  color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: -1px;
+}
+.dept-count-label { font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+
+.dept-count.tone-teal  { --tone: var(--primary);  --tone-soft: var(--primary-soft); }
+.dept-count.tone-blue  { --tone: var(--info);     --tone-soft: var(--info-soft); }
+.dept-count.tone-red   { --tone: var(--danger);   --tone-soft: var(--danger-soft); }
+.dept-count.tone-amber { --tone: var(--warning);  --tone-soft: var(--warning-soft); }
+.dept-count.tone-green { --tone: var(--success);  --tone-soft: var(--success-soft); }
+.dept-count.tone-red b { color: var(--danger-ink); }
+
+/* --- "How this department works" ---------------------------------------- */
+.proc-card { padding: 0; overflow: hidden; }
+.proc-card-head {
+  display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap;
+  padding: 18px 22px 16px; border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--line-3) 0%, var(--surface) 100%);
+}
+.proc-card-head h2 { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+.proc-card-head h2 svg { color: var(--primary); width: 17px; height: 17px; }
+.proc-card-head p { margin: 5px 0 0; font-size: 12.5px; color: var(--muted); max-width: 62ch; }
+.proc-card-head > a { margin-left: auto; }
+
+.proc-card .proc-flow {
+  list-style: none; margin: 0; padding: 20px 22px 22px;
+  display: grid; gap: 0;
+}
+.proc-card .proc-step {
+  position: relative;
+  gap: 16px; padding: 0 0 20px 0;
+}
+.proc-card .proc-step:last-child { padding-bottom: 0; }
+/* The line that makes it read as one sequence rather than a list. */
+.proc-card .proc-step::before {
+  content: ""; position: absolute; left: 15px; top: 34px; bottom: 2px;
+  width: 2px; background: var(--line);
+}
+.proc-card .proc-step:last-child::before { display: none; }
+.proc-card .proc-num {
+  width: 32px; height: 32px; font-size: 13px; z-index: 1;
+  background: var(--surface); color: var(--dept, var(--primary));
+  box-shadow: inset 0 0 0 2px var(--dept, var(--primary));
+}
+.proc-card .proc-title { font-size: 14px; margin-bottom: 3px; }
+.proc-card .proc-detail { font-size: 13px; max-width: 82ch; }
+.proc-card .proc-law {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 8px;
+  padding: 4px 10px; border-radius: var(--radius-pill);
+  background: var(--primary-soft); color: var(--primary-ink);
+  font-size: 11.5px; font-weight: 500;
+}
+.proc-card .proc-law svg { width: 13px; height: 13px; }
+
+/* Two columns of steps once there is room, so a fourteen-step procedure is
+   not a page of scrolling. */
+@media (min-width: 1280px) {
+  .proc-card .proc-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 34px; }
+  .proc-card .proc-step::before { display: none; }
+}
+@media (max-width: 560px) {
+  .proc-card-head { padding: 16px; }
+  .proc-card-head > a { margin-left: 0; }
+  .proc-card .proc-flow { padding: 16px; }
+  .dept-count b { font-size: 30px; }
+}
+
+/* The badge belongs on the corner of the button, not across the glyph. It sits
+   just outside the box with a ring in the header colour so it reads as a
+   separate object rather than damage to the icon underneath. */
+.app-icon-btn { overflow: visible; }
+.app-icon-btn .app-count {
+  top: -3px; right: -3px;
+  min-width: 16px; height: 16px; line-height: 16px; padding: 0 4px;
+  font-size: 10px; font-weight: 700;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.app-icon-btn:hover .app-count,
+.app-icon-btn.is-current .app-count { box-shadow: 0 0 0 2px var(--primary-soft); }
+.app-header { overflow: visible; }
+.app-header-actions { overflow: visible; }
+
+/* Keep the badge clear of the header's top edge on short bars. */
+.app-header-actions .menu-wrap { position: relative; }
+
+/* On a short header the badge would touch the top edge; nudge it inward. */
+@media (max-width: 640px) {
+  .app-icon-btn .app-count { top: 0; right: 0; }
+}

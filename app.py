@@ -2057,11 +2057,14 @@ def regulations():
     """
     allowed = auth.allowed_depts_for_current_user()
     accessible_depts = [d for d in DEPARTMENTS if d["code"] in allowed]
-    visible_depts = accessible_depts
 
+    # One department at a time. Stacking all seventeen produced a page nobody
+    # read to the bottom of; the rail on the left is how you move between them.
     focus = request.args.get("dept", "").strip().upper()
-    if focus and focus in allowed:
-        visible_depts = [d for d in visible_depts if d["code"] == focus]
+    if focus not in allowed:
+        focus = accessible_depts[0]["code"] if accessible_depts else ""
+    visible_depts = [d for d in accessible_depts if d["code"] == focus]
+    focus_dept = visible_depts[0] if visible_depts else None
 
     # The rail always lists every department the user can reach, even when the
     # page itself is focused on one. Filtering it to the focused department
@@ -2090,7 +2093,9 @@ def regulations():
         | {r["authority"] for d in visible_depts for r in (d.get("regulations") or [])}
     )
     return render_template("regulations.html", visible_depts=visible_depts,
-                            nav_depts=nav_depts,
+                            nav_depts=nav_depts, focus_dept=focus_dept,
+                            library_total=regulations_data.total_count(
+                                [d["code"] for d in accessible_depts]),
                             total_rules=total_rules, total_laws=total_laws,
                             authorities=authorities, focus=focus,
                             obligations=obligations, oblig_counts=oblig_counts,

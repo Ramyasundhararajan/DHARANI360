@@ -90,12 +90,6 @@
     <a class="nav-link top-link {% if request.endpoint=='files_manager' %}active{% endif %}" href="{{ url_for('files_manager') }}">
       {{ icon('archive') }}<span>File Manager</span>
     </a>
-    <a class="nav-link top-link {% if request.endpoint=='projects_kanban' %}active{% endif %}" href="{{ url_for('projects_kanban') }}">
-      {{ icon('check-square') }}<span>Kanban</span>
-    </a>
-    <a class="nav-link top-link {% if request.endpoint=='search' %}active{% endif %}" href="{{ url_for('search') }}">
-      {{ icon('search') }}<span>Search Everything</span>
-    </a>
 
     <div class="nav-section-title">Governance</div>
     <a class="nav-link top-link {% if request.endpoint=='regulations' %}active{% endif %}" href="{{ url_for('regulations') }}">
@@ -183,22 +177,40 @@
     <span class="app-header-spacer"></span>
     <span class="app-header-date">{{ icon('calendar') }}{{ today_label }}</span>
     <div class="app-header-actions">
-      <a class="app-icon-btn phone-only" href="{{ url_for('search') }}" title="Search">{{ icon('search') }}</a>
-      <a class="app-icon-btn" href="{{ url_for('calendar') }}" title="Calendar">{{ icon('calendar-check') }}</a>
-      <a class="app-icon-btn" href="{{ url_for('todos_page') }}" title="To Do">{{ icon('clipboard-list') }}</a>
-      <a class="app-icon-btn" href="{{ url_for('chat') }}" title="Chat">
-        {{ icon('mail') }}{% if chat_unread %}<span class="app-dot"></span>{% endif %}
+      <a class="app-icon-btn phone-only" href="{{ url_for('search') }}" data-tip="Search">
+        {{ icon('search') }}<span class="sr-only">Search</span>
+      </a>
+      <a class="app-icon-btn {% if request.endpoint=='calendar' %}is-current{% endif %}"
+         href="{{ url_for('calendar') }}" data-tip="Compliance calendar">
+        {{ icon('calendar-check') }}<span class="sr-only">Calendar</span>
+      </a>
+      <a class="app-icon-btn {% if request.endpoint=='todos_page' %}is-current{% endif %}"
+         href="{{ url_for('todos_page') }}" data-tip="My to-do list">
+        {{ icon('clipboard-list') }}<span class="sr-only">To do</span>
+      </a>
+      <a class="app-icon-btn {% if request.endpoint in ('chat',) %}is-current{% endif %}"
+         href="{{ url_for('chat') }}" data-tip="{{ chat_unread ~ ' unread message' ~ ('s' if chat_unread != 1 else '') if chat_unread else 'Chat' }}">
+        {{ icon('mail') }}
+        {% if chat_unread %}<span class="app-count app-count-red">{{ chat_unread }}</span>{% endif %}
+        <span class="sr-only">Chat</span>
       </a>
       {% if is_admin %}
-      <a class="app-icon-btn" href="{{ url_for('settings') }}" title="Settings">{{ icon('settings') }}</a>
+      <a class="app-icon-btn {% if request.endpoint=='settings' %}is-current{% endif %}"
+         href="{{ url_for('settings') }}" data-tip="Settings">
+        {{ icon('settings') }}<span class="sr-only">Settings</span>
+      </a>
       {% endif %}
+
 
       {% set notif_urgent = notifications | selectattr('tone', 'equalto', 'red') | list | length %}
       <div class="menu-wrap">
-        <button type="button" class="app-icon-btn" data-menu="notif-menu"
-                title="Notifications" aria-haspopup="true" aria-expanded="false">
+        <button type="button" class="app-icon-btn {{ 'has-urgent' if notif_urgent else '' }}"
+                data-menu="notif-menu"
+                data-tip="{{ (notifications|length ~ ' notification' ~ ('s' if notifications|length != 1 else '')) if notifications else 'Notifications' }}"
+                aria-haspopup="true" aria-expanded="false">
           {{ icon('bell') }}
           {% if notifications %}<span class="app-count {{ 'app-count-red' if notif_urgent else '' }}">{{ notifications|length }}</span>{% endif %}
+          <span class="sr-only">Notifications</span>
         </button>
         <div class="menu-panel menu-panel-wide" id="notif-menu" hidden>
           <div class="menu-head">
@@ -225,6 +237,8 @@
           <a class="menu-foot" href="{{ url_for('calendar') }}">Open the compliance calendar</a>
         </div>
       </div>
+
+      <span class="app-header-divider" aria-hidden="true"></span>
 
       <div class="menu-wrap">
         <button type="button" class="app-user" data-menu="profile-menu"
