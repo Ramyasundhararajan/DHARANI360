@@ -34,7 +34,8 @@
       <div class="call-loading" id="callLoading">
         <div class="call-spinner"></div>
         <b>Opening the room&hellip;</b>
-        <p>Your browser will ask for the camera and microphone. Say yes once and it will remember.</p>
+        <p>Your browser will ask for the camera and microphone. Say yes once and it will remember.
+           If a &ldquo;Join meeting&rdquo; button appears, press it.</p>
       </div>
     </div>
 
@@ -156,9 +157,12 @@
     userInfo: { displayName: NAME },
     configOverwrite: {
       startWithVideoMuted: !VIDEO,
-      prejoinPageEnabled: false,
+      startWithAudioMuted: false,
       disableDeepLinking: true,
-      startWithAudioMuted: false
+      // Jitsi renamed this. Send both spellings so the room opens straight
+      // into the call on old and new deployments alike.
+      prejoinPageEnabled: false,
+      prejoinConfig: { enabled: false }
     },
     interfaceConfigOverwrite: {
       SHOW_JITSI_WATERMARK: false,
@@ -168,11 +172,21 @@
     }
   });
 
+  // The overlay is only there to cover the blank moment before the room
+  // paints. Once the iframe has loaded, Jitsi owns the screen - leaving the
+  // overlay up hid half of its own "Join meeting" screen.
+  var loading = document.getElementById('callLoading');
+  function clearLoading() { if (loading) loading.hidden = true; }
+  var frame = api.getIFrame ? api.getIFrame() : null;
+  if (frame) frame.addEventListener('load', clearLoading);
+  setTimeout(clearLoading, 3500);
+
   api.addEventListener('videoConferenceJoined', function () {
-    document.getElementById('callLoading').hidden = true;
+    clearLoading();
     document.getElementById('callDot').classList.add('live');
-    started = Date.now();
+    started = Date.now();          // the clock starts when the call does
   });
+  api.addEventListener('participantJoined', clearLoading);
   api.addEventListener('readyToClose', function () {
     var f = document.getElementById('endForm');
     document.getElementById('endSeconds').value = elapsed();
