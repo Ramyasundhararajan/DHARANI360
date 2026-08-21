@@ -18,7 +18,7 @@ import io
 import csv
 import json
 import calendar as cal_mod
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 from datetime import date, datetime
 from flask import (Flask, render_template, request, redirect, url_for, flash,
                     Response, send_file, abort, g, make_response)
@@ -892,10 +892,13 @@ def profile():
     user = auth.current_user()
     if request.method == "POST":
         full_name = request.form.get("full_name", "").strip()
+        link, link_error = db.normalise_meeting_link(request.form.get("meeting_link", ""))
         if not full_name:
             flash("Your name cannot be empty.", "error")
+        elif link_error:
+            flash(link_error, "error")
         else:
-            db.update_user(user["id"], full_name=full_name)
+            db.update_user(user["id"], full_name=full_name, meeting_link=link)
             flash("Profile updated.", "success")
         return redirect(url_for("profile"))
 
@@ -1542,7 +1545,50 @@ def call_log_quick():
 #  Everything except the video room itself works with no internet connection.
 # ============================================================================
 
-MEET_HOST = os.environ.get("DHARANI_MEET_HOST", "meet.jit.si")
+# The video call itself happens in whichever provider the company is allowed
+# to use - Google Meet, Zoom, Teams, Webex. DHARANI 360 does not host the
+# video; it rings the person, hands out the link, times the call and writes it
+# into the register. That split matters in the UAE, where VoIP is restricted
+# to approved providers, so embedding one fixed service would simply not
+# connect.
+
+_PROVIDER_NAMES = {
+    "meet.google.com": "Google Meet",
+    "zoom.us": "Zoom",
+    "teams.microsoft.com": "Microsoft Teams",
+    "teams.live.com": "Microsoft Teams",
+    "webex.com": "Webex",
+    "whereby.com": "Whereby",
+    "meet.jit.si": "Jitsi Meet",
+}
+
+
+def _provider_name(url):
+    if not url:
+        return ""
+    host = urlparse(url).hostname or ""
+    host = host.lower()
+    for known, label in _PROVIDER_NAMES.items():
+        if host == known or host.endswith("." + known):
+            return label
+    return "the meeting"
+
+
+def _meeting_url_for(user, override=None):
+    """Which room this call happens in: a one-off link if one was typed,
+    otherwise the caller's own saved room. Returns (url, error)."""
+    if override:
+        url, err = db.normalise_meeting_link(override)
+        if err:
+            return None, err
+        if url:
+            return url, None
+    saved = (user.get("meeting_link") or "").strip()
+    if saved:
+        return saved, None
+    return None, ("Add your meeting room link on your profile first - your Google Meet, "
+                  "Zoom, Teams or Webex address. DHARANI 360 rings the person and logs "
+                  "the call; the video happens in your own meeting room.")
 
 
 def _abs(path):
@@ -1763,12 +1809,19 @@ def call_start(username):
         abort(404)
     db.expire_stale_calls()
     mode = "voice" if request.form.get("mode") == "voice" else "video"
+
+    meeting_url, err = _meeting_url_for(me, request.form.get("meeting_link"))
+    if err:
+        flash(err, "error")
+        return redirect(url_for("profile"))
+
     call = db.start_call(me["username"], other_user=username, mode=mode,
-                         subject=(request.form.get("subject") or "").strip()[:160])
+                         subject=(request.form.get("subject") or "").strip()[:160],
+                         meeting_url=meeting_url)
     db.send_chat(me["username"], username,
                  "{} call started".format("Video" if mode == "video" else "Voice"),
                  kind="call", meta={"call_id": call["id"], "mode": mode,
-                                    "room": call["room"], "status": "ringing"})
+                                    "status": "ringing"})
     return redirect(url_for("call_room", call_id=call["id"]))
 
 
@@ -1782,10 +1835,15 @@ def call_quick():
     if not name:
         flash("Who is the call with? Add a name so it can be logged.", "error")
         return redirect(url_for("calls"))
+    meeting_url, err = _meeting_url_for(me, request.form.get("meeting_link"))
+    if err:
+        flash(err, "error")
+        return redirect(url_for("profile"))
     call = db.start_call(me["username"], contact_name=name,
                          contact_number=(request.form.get("contact_number") or "").strip(),
                          mode="voice" if request.form.get("mode") == "voice" else "video",
-                         subject=(request.form.get("subject") or "").strip()[:160])
+                         subject=(request.form.get("subject") or "").strip()[:160],
+                         meeting_url=meeting_url)
     return redirect(url_for("call_room", call_id=call["id"]))
 
 
@@ -1807,13 +1865,12 @@ def call_room(call_id):
         other = db.get_user_by_username(
             call["other_user"] if call["started_by"] == me["username"] else call["started_by"])
     guest_link = _abs(url_for("call_guest", token=call["guest_token"]))
-    room_link = "https://{}/{}".format(MEET_HOST, call["room"])
     history = db.recent_calls_with(me["username"], call["other_user"] or "") if call["other_user"] else []
 
     return render_template("call_room.html", call=call, other=other, me=me,
-                            meet_host=MEET_HOST, guest_link=guest_link,
-                            room_link=room_link, history=history,
-                            display_name=_display_name(me))
+                            guest_link=guest_link, meeting_url=call.get("meeting_url") or "",
+                            provider=_provider_name(call.get("meeting_url")),
+                            history=history)
 
 
 @app.route("/call/<int:call_id>/end", methods=["POST"])
@@ -1884,7 +1941,9 @@ def call_guest(token):
         return render_template("error.html", code=410,
                                 message="That call has already finished."), 410
     host = db.get_user_by_username(call["started_by"])
-    return render_template("call_guest.html", call=call, meet_host=MEET_HOST,
+    return render_template("call_guest.html", call=call,
+                            meeting_url=call.get("meeting_url") or "",
+                            provider=_provider_name(call.get("meeting_url")),
                             host_name=(host["full_name"] if host else "DHARANI 360"))
 
 

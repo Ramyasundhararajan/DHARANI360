@@ -12,8 +12,8 @@
       <span class="current">In progress</span>
     </div>
     <div class="crumbs">
-      When you leave, this call writes itself into the Call Log register &mdash; who, how long,
-      and what came of it. You do not have to log it by hand.
+      The meeting opens in {{ provider or 'your meeting room' }}. Leave this tab open &mdash; it is
+      timing the call, and when you press End it writes the whole thing into the Call Log for you.
     </div>
   </div>
 </div>
@@ -23,34 +23,31 @@
   <section class="call-stage card" id="callStage">
     <div class="call-stage-head">
       <div class="call-who">
-        <span class="call-dot" id="callDot"></span>
+        <span class="call-dot live" id="callDot"></span>
         <b>{{ other.full_name if other else (call.contact_name or 'Guest') }}</b>
         <em>{{ ROLES[other.role].label if other and other.role in ROLES else (call.contact_number or 'outside the company') }}</em>
       </div>
       <div class="call-timer" id="callTimer">00:00</div>
     </div>
 
-    <div class="call-frame" id="callFrame">
-      <div class="call-loading" id="callLoading">
-        <div class="call-spinner"></div>
-        <b>Opening the room&hellip;</b>
-        <p>Your browser will ask for the camera and microphone. Say yes once and it will remember.
-           If a &ldquo;Join meeting&rdquo; button appears, press it.</p>
-      </div>
-    </div>
-
-    <div class="call-offline" id="callOffline" hidden>
-      {{ icon('alert-triangle') }}
-      <div>
-        <b>The video room could not load.</b>
-        <p>
-          The call room needs an internet connection &mdash; the rest of DHARANI 360 does not.
-          You can still log this call by hand, or open the room directly:
-        </p>
-        <a class="btn btn-sm btn-secondary" href="{{ room_link }}" target="_blank" rel="noopener">
-          {{ icon('link') }}<span>Open the room in a new tab</span>
-        </a>
-      </div>
+    <div class="call-launch">
+      {% if meeting_url %}
+      <div class="call-launch-icon">{{ icon('video') }}</div>
+      <h2>Your meeting room is ready</h2>
+      <p>
+        {{ provider }} is opening in a new tab. If your browser blocked it, use the button below.
+        {% if other %}{{ other.full_name }} is being rung now and gets the same link.{% endif %}
+      </p>
+      <a class="btn btn-lg" id="joinBtn" href="{{ meeting_url }}" target="_blank" rel="noopener">
+        {{ icon('video') }}<span>Open the meeting</span>
+      </a>
+      <div class="call-launch-url">{{ meeting_url }}</div>
+      {% else %}
+      <div class="call-launch-icon call-launch-warn">{{ icon('alert-triangle') }}</div>
+      <h2>No meeting room set</h2>
+      <p>Add your Google Meet, Zoom, Teams or Webex link on your profile and every call will use it.</p>
+      <a class="btn" href="{{ url_for('profile') }}">{{ icon('user') }}<span>Set it on my profile</span></a>
+      {% endif %}
     </div>
 
     <div class="call-controls no-print">
@@ -67,8 +64,8 @@
     <div class="card call-invite">
       <h2>{{ icon('share') }}Invite someone else</h2>
       <p class="field-hint">
-        Anyone with this link can join &mdash; a client, an owner, a lawyer. No account, nothing
-        to install. Treat it like a key: send it to the person, not to a group.
+        Send this to a client, an owner or a lawyer. It opens a page carrying your meeting link
+        &mdash; no account, nothing to install. Treat it like a key: send it to the person, not to a group.
       </p>
       <div class="call-link-row">
         <input type="text" readonly value="{{ guest_link }}" id="guestLink" class="call-link">
@@ -106,31 +103,27 @@
   </aside>
 </div>
 
-<script src="https://{{ meet_host }}/external_api.js"
-        onerror="document.getElementById('callOffline').hidden=false;document.getElementById('callLoading').hidden=true;document.getElementById('callStage').classList.add('is-offline');"></script>
 <script>
 (function () {
-  var ROOM = {{ call.room|tojson }};
-  var HOST = {{ meet_host|tojson }};
-  var NAME = {{ display_name|tojson }};
-  var VIDEO = {{ (call.mode != 'voice')|tojson }};
   var END_URL = {{ url_for('call_end', call_id=call.id)|tojson }};
+  var MEETING = {{ (meeting_url or '')|tojson }};
 
   var started = Date.now();
   var ended = false;
   var timerEl = document.getElementById('callTimer');
+  var secEl = document.getElementById('endSeconds');
+
   setInterval(function () {
     var s = Math.floor((Date.now() - started) / 1000);
     timerEl.textContent = ('0' + Math.floor(s / 60)).slice(-2) + ':' + ('0' + (s % 60)).slice(-2);
-    var sec = document.getElementById('endSeconds');
-    if (sec) sec.value = s;
+    if (secEl) secEl.value = s;
   }, 1000);
 
   function elapsed() { return Math.floor((Date.now() - started) / 1000); }
 
-  // If the tab is closed without pressing End, still log the call. sendBeacon
-  // survives the page going away; fetch usually does not.
-  function logOnExit() {
+  // Closing this tab without pressing End should still log the call.
+  // sendBeacon survives the page going away; fetch usually does not.
+  window.addEventListener('pagehide', function () {
     if (ended) return;
     ended = true;
     try {
@@ -139,60 +132,14 @@
       fd.append('quiet', '1');
       navigator.sendBeacon(END_URL, fd);
     } catch (e) { /* nothing more we can do from a closing page */ }
-  }
-  window.addEventListener('pagehide', logOnExit);
+  });
   document.getElementById('endForm').addEventListener('submit', function () { ended = true; });
 
-  if (typeof JitsiMeetExternalAPI === 'undefined') {
-    document.getElementById('callOffline').hidden = false;
-    document.getElementById('callLoading').hidden = true;
-    document.getElementById('callStage').classList.add('is-offline');
-    return;
+  // Open the meeting once, automatically. A pop-up blocker may stop that,
+  // which is why the button is on the page and not only in this script.
+  if (MEETING) {
+    try { window.open(MEETING, '_blank', 'noopener'); } catch (e) { /* the button covers it */ }
   }
-
-  var api = new JitsiMeetExternalAPI(HOST, {
-    roomName: ROOM,
-    parentNode: document.getElementById('callFrame'),
-    width: '100%', height: '100%',
-    userInfo: { displayName: NAME },
-    configOverwrite: {
-      startWithVideoMuted: !VIDEO,
-      startWithAudioMuted: false,
-      disableDeepLinking: true,
-      // Jitsi renamed this. Send both spellings so the room opens straight
-      // into the call on old and new deployments alike.
-      prejoinPageEnabled: false,
-      prejoinConfig: { enabled: false }
-    },
-    interfaceConfigOverwrite: {
-      SHOW_JITSI_WATERMARK: false,
-      DEFAULT_BACKGROUND: '#0b2b33',
-      TOOLBAR_BUTTONS: ['microphone', 'camera', 'desktop', 'chat', 'raisehand',
-                        'tileview', 'fullscreen', 'settings', 'hangup']
-    }
-  });
-
-  // The overlay is only there to cover the blank moment before the room
-  // paints. Once the iframe has loaded, Jitsi owns the screen - leaving the
-  // overlay up hid half of its own "Join meeting" screen.
-  var loading = document.getElementById('callLoading');
-  function clearLoading() { if (loading) loading.hidden = true; }
-  var frame = api.getIFrame ? api.getIFrame() : null;
-  if (frame) frame.addEventListener('load', clearLoading);
-  setTimeout(clearLoading, 3500);
-
-  api.addEventListener('videoConferenceJoined', function () {
-    clearLoading();
-    document.getElementById('callDot').classList.add('live');
-    started = Date.now();          // the clock starts when the call does
-  });
-  api.addEventListener('participantJoined', clearLoading);
-  api.addEventListener('readyToClose', function () {
-    var f = document.getElementById('endForm');
-    document.getElementById('endSeconds').value = elapsed();
-    ended = true;
-    f.submit();
-  });
 
   document.querySelectorAll('[data-copy]').forEach(function (b) {
     b.addEventListener('click', function () {
@@ -201,11 +148,11 @@
       var was = span.textContent;
       var done = function () { span.textContent = 'Copied'; setTimeout(function () { span.textContent = was; }, 1500); };
       if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(t).then(done, function () { fallback(t, done); });
-      } else { fallback(t, done); }
+        navigator.clipboard.writeText(t).then(done, function () { fallback(done); });
+      } else { fallback(done); }
     });
   });
-  function fallback(t, done) {
+  function fallback(done) {
     var i = document.getElementById('guestLink');
     i.select(); i.setSelectionRange(0, 99999);
     try { document.execCommand('copy'); done(); } catch (e) { /* user can copy by hand */ }

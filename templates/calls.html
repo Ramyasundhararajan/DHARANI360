@@ -97,13 +97,21 @@
           <span>What is it about? <em>(optional)</em></span>
           <input type="text" name="subject" maxlength="160" placeholder="e.g. Marina 2-bed viewing follow-up">
         </label>
+        <label>
+          <span>Meeting link <em>(leave blank to use your own room)</em></span>
+          <input type="text" name="meeting_link" maxlength="400"
+                 placeholder="{{ current_user.meeting_link or 'https://meet.google.com/abc-defg-hij' }}">
+        </label>
         <div class="call-start-actions">
           <button type="submit" name="mode" value="video" class="btn">{{ icon('video') }}<span>Video room</span></button>
           <button type="submit" name="mode" value="voice" class="btn btn-secondary">{{ icon('phone-call') }}<span>Voice only</span></button>
         </div>
         <p class="field-hint">
-          You get a private link to send them on WhatsApp or email. They join in a browser &mdash;
-          no account, nothing to download.
+          You get a private link to send them on WhatsApp or email. It opens a page carrying your
+          meeting room &mdash; they join in a browser with no account and nothing to download.
+          {% if not current_user.meeting_link %}
+          <a href="{{ url_for('profile') }}">Set your meeting room link first</a>.
+          {% endif %}
         </p>
       </form>
     </div>

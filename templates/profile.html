@@ -77,9 +77,20 @@
             <input type="text" value="{{ role_label }}" disabled>
             <div class="field-hint">Decides which departments you can open.</div>
           </div>
+          <div class="field full">
+            <label>{{ icon('video') }} My meeting room link</label>
+            <input type="text" name="meeting_link" value="{{ u.meeting_link or '' }}"
+                   placeholder="https://meet.google.com/abc-defg-hij   or   https://zoom.us/j/1234567890">
+            <div class="field-hint">
+              Paste your own Google Meet, Zoom, Microsoft Teams, Webex or Whereby room &mdash; the one you
+              already use. Every call you start opens this room, and the person you are calling gets
+              the same link automatically. DHARANI 360 does the ringing, the invitation and the
+              logging; the video happens in your own provider, which is what keeps it working here.
+            </div>
+          </div>
         </div>
         <div class="btn-row">
-          <button type="submit" class="btn">Save Name</button>
+          <button type="submit" class="btn">Save Details</button>
           <a class="btn btn-secondary" href="{{ url_for('change_password') }}">{{ icon('lock') }}Change Password</a>
         </div>
       </form>

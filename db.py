@@ -95,6 +95,11 @@ def init_db():
     # into created_by on every record, and rewriting history is not worth it.
     if "email" not in user_cols:
         cur.execute('ALTER TABLE users ADD COLUMN email TEXT')
+    # Each person's own meeting room - a Google Meet, Zoom, Teams or Webex
+    # link they paste once. DHARANI 360 rings, invites and logs; the video
+    # itself happens in the provider the company is allowed to use.
+    if "meeting_link" not in user_cols:
+        cur.execute('ALTER TABLE users ADD COLUMN meeting_link TEXT')
     cur.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email '
                 'ON users (email COLLATE NOCASE) WHERE email IS NOT NULL')
 
@@ -204,6 +209,9 @@ def init_db():
         record_id INTEGER,
         status TEXT
     )""")
+    call_cols = {row["name"] for row in cur.execute("PRAGMA table_info(call_sessions)").fetchall()}
+    if "meeting_url" not in call_cols:
+        cur.execute("ALTER TABLE call_sessions ADD COLUMN meeting_url TEXT")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_call_live ON call_sessions (status, other_user, id)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_call_guest ON call_sessions (guest_token)")
 
@@ -800,10 +808,12 @@ def create_user(username, password_hash, full_name, role, must_change_password=T
     return new_id
 
 
-def update_user(user_id, full_name=None, role=None, active=None):
+def update_user(user_id, full_name=None, role=None, active=None, meeting_link=None):
     sets, values = [], []
     if full_name is not None:
         sets.append("full_name = ?"); values.append(full_name)
+    if meeting_link is not None:
+        sets.append("meeting_link = ?"); values.append(meeting_link or None)
     if role is not None:
         sets.append("role = ?"); values.append(role)
     if active is not None:
@@ -1720,8 +1730,41 @@ def _room_name(seed):
         (seed + "|" + uuid.uuid4().hex).encode("utf-8")).hexdigest()[:26]
 
 
+MEETING_HOSTS = (
+    "meet.google.com", "zoom.us", "teams.microsoft.com", "teams.live.com",
+    "webex.com", "whereby.com", "meet.jit.si",
+)
+
+
+def normalise_meeting_link(raw):
+    """Accept a meeting link, or say why it was refused.
+
+    Only real meeting providers are allowed. The link is opened for staff and
+    for guests, so letting any address through would turn this field into a
+    way to push arbitrary links at people through a trusted screen.
+    Returns (url, error).
+    """
+    from urllib.parse import urlparse
+    raw = (raw or "").strip()
+    if not raw:
+        return "", None
+    if not raw.lower().startswith(("http://", "https://")):
+        raw = "https://" + raw
+    try:
+        parts = urlparse(raw)
+    except ValueError:
+        return None, "That does not look like a web address."
+    host = (parts.hostname or "").lower()
+    if not host:
+        return None, "That does not look like a web address."
+    if not any(host == h or host.endswith("." + h) for h in MEETING_HOSTS):
+        return None, ("Use a meeting link from Google Meet, Zoom, Microsoft Teams, "
+                      "Webex or Whereby. That address is not one of them.")
+    return parts._replace(scheme="https").geturl(), None
+
+
 def start_call(started_by, other_user=None, contact_name=None, contact_number=None,
-               mode="video", subject=""):
+               mode="video", subject="", meeting_url=""):
     """Open a call session and return the full row."""
     now = datetime.utcnow().isoformat(timespec="seconds")
     room = _room_name("{}|{}|{}".format(started_by, other_user or contact_name or "guest", now))
@@ -1729,10 +1772,11 @@ def start_call(started_by, other_user=None, contact_name=None, contact_number=No
     conn = get_conn()
     cur = conn.execute(
         "INSERT INTO call_sessions (room, mode, started_by, other_user, contact_name, "
-        "contact_number, guest_token, subject, started_at, status) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "contact_number, guest_token, subject, started_at, status, meeting_url) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (room, mode, started_by, other_user, contact_name, contact_number, token,
-         subject, now, CALL_STATUS_RINGING if other_user else CALL_STATUS_LIVE))
+         subject, now, CALL_STATUS_RINGING if other_user else CALL_STATUS_LIVE,
+         meeting_url or None))
     cid = cur.lastrowid
     conn.commit()
     conn.close()
@@ -1780,7 +1824,15 @@ def end_call(call_id, seconds=None, outcome="", status=None):
         except (TypeError, ValueError):
             seconds = 0
     seconds = max(0, min(int(seconds or 0), 60 * 60 * 12))
-    final = status or (CALL_STATUS_ENDED if call["answered_at"] else CALL_STATUS_MISSED)
+    # The video happens in Google Meet or Zoom, so this system cannot see
+    # whether anyone spoke. Two things stand in for that: the other person
+    # opening the call screen, and the caller having stayed on the line long
+    # enough for it to have been a real conversation. Without the second test
+    # every call to a client came out as "Missed", which is worse than useless
+    # in a register somebody may later have to rely on.
+    ANSWERED_AFTER = 15          # seconds
+    really_happened = bool(call["answered_at"]) or seconds >= ANSWERED_AFTER
+    final = status or (CALL_STATUS_ENDED if really_happened else CALL_STATUS_MISSED)
     conn = get_conn()
     conn.execute("UPDATE call_sessions SET status = ?, ended_at = ?, duration_seconds = ?, "
                  "outcome = ? WHERE id = ?",

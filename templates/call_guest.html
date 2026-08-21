@@ -18,60 +18,30 @@
     </div>
   </header>
 
-  <div class="guest-card" id="guestGate">
+  <div class="guest-card">
+    {% if meeting_url %}
     <h1>Join the call</h1>
-    <p>Type the name you would like the others to see, then join. Nothing is installed and no
-       account is needed.</p>
-    <label for="guestName">Your name</label>
-    <input type="text" id="guestName" maxlength="60" placeholder="e.g. Ahmed Al Marri"
-           value="{{ call.contact_name or '' }}" autocomplete="name">
-    <button type="button" class="btn" id="guestJoin">Join now</button>
-    <p class="guest-note">
-      Your browser will ask permission for the camera and microphone. This link is private &mdash;
-      please do not forward it.
+    {% if call.subject %}<p class="guest-subject">{{ call.subject }}</p>{% endif %}
+    <p>
+      The meeting is in {{ provider }}. Press the button and it opens in this browser &mdash;
+      no account and nothing to install.
     </p>
-  </div>
-
-  <div class="guest-stage" id="guestStage" hidden></div>
-
-  <div class="guest-card" id="guestOffline" hidden>
-    <h1>The room could not load</h1>
-    <p>This device could not reach the call service. Check the internet connection and open this
-       link again, or join the room directly:</p>
-    <a class="btn" href="https://{{ meet_host }}/{{ call.room }}" target="_blank" rel="noopener">Open the room</a>
+    <a class="btn btn-lg" href="{{ meeting_url }}" target="_blank" rel="noopener">Join the meeting</a>
+    <p class="guest-note">
+      If the button does nothing, copy this address into your browser:<br>
+      <span class="guest-url">{{ meeting_url }}</span>
+    </p>
+    <p class="guest-note">
+      This link is private &mdash; please do not forward it.
+    </p>
+    {% else %}
+    <h1>This call has no meeting room yet</h1>
+    <p>
+      Ask {{ host_name }} to set their meeting link in DHARANI 360 and send you a fresh invitation.
+    </p>
+    {% endif %}
   </div>
 </div>
 
-<script src="https://{{ meet_host }}/external_api.js"
-        onerror="document.getElementById('guestOffline').hidden=false;document.getElementById('guestGate').hidden=true;"></script>
-<script>
-(function () {
-  var btn = document.getElementById('guestJoin');
-  btn.addEventListener('click', function () {
-    var name = (document.getElementById('guestName').value || 'Guest').trim().slice(0, 60);
-    if (typeof JitsiMeetExternalAPI === 'undefined') {
-      document.getElementById('guestOffline').hidden = false;
-      document.getElementById('guestGate').hidden = true;
-      return;
-    }
-    document.getElementById('guestGate').hidden = true;
-    var stage = document.getElementById('guestStage');
-    stage.hidden = false;
-    new JitsiMeetExternalAPI({{ meet_host|tojson }}, {
-      roomName: {{ call.room|tojson }},
-      parentNode: stage,
-      width: '100%', height: '100%',
-      userInfo: { displayName: name },
-      configOverwrite: { prejoinPageEnabled: false, prejoinConfig: { enabled: false },
-                         disableDeepLinking: true,
-                         startWithVideoMuted: {{ (call.mode == 'voice')|tojson }} },
-      interfaceConfigOverwrite: { SHOW_JITSI_WATERMARK: false, DEFAULT_BACKGROUND: '#0b2b33' }
-    });
-  });
-  document.getElementById('guestName').addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') btn.click();
-  });
-})();
-</script>
 </body>
 </html>
