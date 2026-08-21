@@ -170,3 +170,52 @@ This matters: running `setup_signin.py` on its own against a fresh database
 disables every account it does not recognise — including the built-in
 administrator — and leaves the system with nobody able to get in. `bootstrap.py`
 enforces the right order and puts the administrator back if anything goes wrong.
+
+---
+
+## Part 4 — A shareable demo link, free, updated by `git push`
+
+For showing clients without buying a domain and without leaving the office PC
+switched on. **Render's free plan**, deployed straight from the GitHub repo.
+
+**One-time setup, about five minutes**
+
+1. Go to <https://render.com> and sign in **with GitHub**.
+2. **New → Web Service** → pick the `DHARANI360` repository.
+3. Render finds `render.yaml` and fills everything in. Click **Create**.
+4. First build takes 3-5 minutes. You get a permanent address:
+   `https://dharani360.onrender.com`
+
+**Updating it afterwards is just:**
+
+```
+git add -A
+git commit -m "what changed"
+git push
+```
+
+Render notices the push and redeploys on its own. No dashboard, no clicking.
+
+**Signing in to the demo**
+
+The five work-email accounts are created automatically on every boot.
+Sign in with any of them, password `Dharani360`.
+
+**Know what you are showing**
+
+| | |
+|---|---|
+| Address | permanent, and free |
+| Data | **wiped on every restart and redeploy** - the free plan has no disk |
+| Contents | `start-render.sh` re-seeds on boot: the team, 33 demo records, chat and call history |
+| Expiry dates | written relative to today, so the compliance calendar always opens with one overdue, one urgent and several further out |
+| Sleeping | after 15 minutes idle; the next visit takes about 50 seconds to wake |
+
+That data reset is a feature for a demo - every client sees the same clean
+system - and a reason never to keep real records there. Real records stay on
+the office PC behind Cloudflare Tunnel.
+
+**Removing the demo records from a real installation**
+
+They are all tagged `[demo]` in their Notes. Search for `[demo]` and delete,
+or just do not run `demo_data.py`.

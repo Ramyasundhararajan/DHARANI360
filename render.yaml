@@ -1,0 +1,36 @@
+# Deploy DHARANI 360 as a free demo on Render.
+# ---------------------------------------------------------------------------
+# Render reads this file automatically when you connect the GitHub repo, so
+# there is nothing to configure by hand in the dashboard.
+#
+# What this gives you:
+#   * a permanent address, https://dharani360.onrender.com
+#   * a fresh deploy every time you `git push` - no clicking
+#
+# What it does NOT give you, and you should know before showing clients:
+#   * the free plan has no permanent disk. The database and any uploaded
+#     files are wiped whenever the service restarts, which happens on every
+#     deploy and after it sleeps. That is why start.sh re-seeds on boot -
+#     a demo that always opens on clean sample data is a feature here, but
+#     it is not somewhere to keep real records.
+#   * it sleeps after 15 minutes idle; the first visit then takes ~50s.
+#
+# For real use, keep running it on the office PC through Cloudflare Tunnel.
+
+services:
+  - type: web
+    name: dharani360
+    runtime: python
+    plan: free
+    region: singapore              # closest Render region to the UAE
+    buildCommand: pip install -r requirements.txt
+    startCommand: bash start-render.sh
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.4"
+      # Signs session cookies. Render generates one and keeps it, so people
+      # are not signed out on every deploy.
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEMO_MODE
+        value: "1"
