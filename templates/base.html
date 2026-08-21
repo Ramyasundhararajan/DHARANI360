@@ -359,6 +359,41 @@
 
 /* A register can have more columns than the screen. Say so - and only when it
    is actually true, so the hint never appears on a table that already fits. */
+/* ---------------------------------------------------------------- motion --
+   One reveal observer for the whole app: cards, tiles and rows fade up as
+   they come into view, once each, and never on a machine set to reduced
+   motion. Everything starts visible in the markup, so if this script never
+   runs the page still reads perfectly. */
+(function () {
+  if (!('IntersectionObserver' in window)) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  var SELECTOR = '.card, .stat-tile, .dept-card, .note-card, .todo-card, ' +
+                 '.reg-rule, .list-row, .kanban-col, .doc-card';
+  var seen = new WeakSet();
+
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      e.target.classList.add('dh-in');
+      io.unobserve(e.target);
+    });
+  }, { rootMargin: '0px 0px -40px 0px', threshold: 0.04 });
+
+  function watch(root) {
+    Array.prototype.forEach.call((root || document).querySelectorAll(SELECTOR), function (el, i) {
+      if (seen.has(el)) return;
+      seen.add(el);
+      // Stagger only the first handful, or a long register looks like a wave.
+      if (i < 8) el.style.setProperty('--dh-delay', (i * 45) + 'ms');
+      el.classList.add('dh-reveal');
+      io.observe(el);
+    });
+  }
+  watch(document);
+  document.documentElement.classList.add('dh-motion');
+})();
+
 function markScrollableTables() {
   document.querySelectorAll('.table-wrap').forEach(function (wrap) {
     var over = wrap.scrollWidth > wrap.clientWidth + 4;

@@ -54,25 +54,66 @@
 {# The four numbers that say how this department is doing, counted up on
    arrival so the eye lands on them before anything else. #}
 <div class="dept-counts">
-  <a class="dept-count tone-teal" href="{{ url_for('search', q=dept.name) }}">
+  {# Each tile pops in, counts up, and opens a small panel on hover or focus
+     showing what the number is actually made of. #}
+  <a class="dept-count tone-teal" style="--i:0" href="{{ url_for('search', q=dept.name) }}">
     <span class="dept-count-icon">{{ icon('archive') }}</span>
     <b data-count="{{ total }}">{{ total }}</b>
     <span class="dept-count-label">Records held</span>
+    <span class="dept-count-pop">
+      <span class="dept-pop-head">Where they sit</span>
+      {% for f in forms|sort(attribute='code') if counts.get(f.code, 0) > 0 %}
+      {% if loop.index <= 6 %}
+      <span class="dept-pop-row"><i>{{ f.title }}</i><b>{{ counts.get(f.code, 0) }}</b></span>
+      {% endif %}
+      {% else %}
+      <span class="dept-pop-empty">No records yet. Use + New Entry on any register.</span>
+      {% endfor %}
+    </span>
   </a>
-  <div class="dept-count tone-blue">
+
+  <div class="dept-count tone-blue" style="--i:1" tabindex="0">
     <span class="dept-count-icon">{{ icon('clipboard-list') }}</span>
     <b data-count="{{ forms|length }}">{{ forms|length }}</b>
     <span class="dept-count-label">Registers</span>
+    <span class="dept-count-pop">
+      <span class="dept-pop-head">Registers in this department</span>
+      {% for f in forms %}
+      {% if loop.index <= 8 %}
+      <span class="dept-pop-row"><i>{{ f.title }}</i><b>{{ counts.get(f.code, 0) }}</b></span>
+      {% endif %}
+      {% endfor %}
+      {% if forms|length > 8 %}
+      <span class="dept-pop-more">and {{ forms|length - 8 }} more in the sidebar</span>
+      {% endif %}
+    </span>
   </div>
-  <a class="dept-count {{ 'tone-red' if red else 'tone-green' }}" href="{{ url_for('calendar') }}">
+
+  <a class="dept-count {{ 'tone-red' if red else 'tone-green' }}" style="--i:2" href="{{ url_for('calendar') }}">
     <span class="dept-count-icon">{{ icon('alert-triangle' if red else 'check-square') }}</span>
     <b data-count="{{ red|length }}">{{ red|length }}</b>
     <span class="dept-count-label">Urgent &mdash; due within 30 days</span>
+    <span class="dept-count-pop">
+      <span class="dept-pop-head">Needs attention now</span>
+      {% for i in red[:6] %}
+      <span class="dept-pop-row"><i>{{ i.doc_no }} &middot; {{ i.form_title }}</i>
+        <b class="{{ 'is-late' if i.days_left < 0 }}">{{ i.days_left }}d</b></span>
+      {% endfor %}
+      {% if not red %}<span class="dept-pop-empty">Nothing overdue or due this month.</span>{% endif %}
+    </span>
   </a>
-  <a class="dept-count {{ 'tone-amber' if amber else 'tone-green' }}" href="{{ url_for('calendar') }}">
+
+  <a class="dept-count {{ 'tone-amber' if amber else 'tone-green' }}" style="--i:3" href="{{ url_for('calendar') }}">
     <span class="dept-count-icon">{{ icon('clock') }}</span>
     <b data-count="{{ amber|length }}">{{ amber|length }}</b>
     <span class="dept-count-label">Coming up &mdash; within 90 days</span>
+    <span class="dept-count-pop">
+      <span class="dept-pop-head">On the horizon</span>
+      {% for i in amber[:6] %}
+      <span class="dept-pop-row"><i>{{ i.doc_no }} &middot; {{ i.form_title }}</i><b>{{ i.days_left }}d</b></span>
+      {% endfor %}
+      {% if not amber %}<span class="dept-pop-empty">Nothing due in the next three months.</span>{% endif %}
+    </span>
   </a>
 </div>
 

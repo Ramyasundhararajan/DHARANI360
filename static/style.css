@@ -72,7 +72,7 @@
   --radius-pill: 500px;
   --shadow:      0 1px 2px rgba(17, 24, 39, .04);
   --shadow-md:   0 4px 16px rgba(17, 24, 39, .08);
-  --sidebar-w:   252px;
+  --sidebar-w:   282px;   /* wide enough for a register name to breathe */
   --topbar-h:    52px;
   --gutter:      24px;
 
@@ -3657,7 +3657,9 @@ a.dept-count:hover {
   background: var(--tone-soft, var(--primary-soft)); color: var(--tone, var(--primary));
 }
 .dept-count-icon svg { width: 19px; height: 19px; }
-.dept-count b {
+/* Direct child only: the breakdown panel below has its own <b> elements, and
+   an unscoped rule rendered "-6d" at 34px inside the popover. */
+.dept-count > b {
   font-size: 34px; font-weight: 700; line-height: 1.05;
   color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: -1px;
 }
@@ -3668,7 +3670,7 @@ a.dept-count:hover {
 .dept-count.tone-red   { --tone: var(--danger);   --tone-soft: var(--danger-soft); }
 .dept-count.tone-amber { --tone: var(--warning);  --tone-soft: var(--warning-soft); }
 .dept-count.tone-green { --tone: var(--success);  --tone-soft: var(--success-soft); }
-.dept-count.tone-red b { color: var(--danger-ink); }
+.dept-count.tone-red > b { color: var(--danger-ink); }
 
 /* --- "How this department works" ---------------------------------------- */
 .proc-card { padding: 0; overflow: hidden; }
@@ -3746,4 +3748,372 @@ a.dept-count:hover {
 /* On a short header the badge would touch the top edge; nudge it inward. */
 @media (max-width: 640px) {
   .app-icon-btn .app-count { top: 0; right: 0; }
+}
+
+/* ============================================================================
+   SIDEBAR — register names in full
+   ---------------------------------------------------------------------------
+   Names were cut mid-word ("Attendance Exception Fo…", "Confidentiality / IP
+   Ackno…"), which is the one thing a navigation list must not do: you cannot
+   choose between two things you cannot read. The rail is wider and a long name
+   now wraps onto a second line instead of being truncated.
+   ========================================================================== */
+.nav-sub-link {
+  align-items: flex-start;
+  padding-top: 7px; padding-bottom: 7px;
+  line-height: 1.35;
+}
+.nav-sub-link svg { margin-top: 1px; }
+.nav-sub-link span {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+.nav-sub-link .nav-count { margin-top: 1px; align-self: flex-start; }
+.nav-sub-link.active::before { top: 14px; transform: none; }
+
+/* Department headers can hold a long name on one line now, but wrap if not. */
+.dept-summary-label { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.3; }
+
+/* The hover nudge moved text, which made a wrapped label reflow. Shift the
+   whole row instead. */
+.nav-link:hover, .nav-sub-link:hover, .dept-summary:hover { padding-left: 10px; transform: translateX(3px); }
+.nav-link, .nav-sub-link, .dept-summary { transition: background .14s ease, color .14s ease, transform .14s ease; }
+
+/* ============================================================================
+   SLIDE VIEW — Rules & Regulations
+   ---------------------------------------------------------------------------
+   Twelve obligation cards stacked vertically made the library a page nobody
+   reached the bottom of. The cards now sit on a horizontal track you page
+   through: arrows, dots, arrow keys, or a swipe. Everything stays on one
+   screen, and the filter still works because hiding a card simply removes it
+   from the track.
+   ========================================================================== */
+.reg-slider {
+  position: relative;
+  overflow-x: auto; overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 -2px 4px;         /* let card shadows breathe without clipping */
+  padding: 2px;
+  border-radius: var(--radius);
+}
+.reg-slider::-webkit-scrollbar { display: none; }
+.reg-slider:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+
+.reg-slider-track {
+  display: flex !important;
+  gap: 14px;
+  align-items: stretch;
+}
+.reg-slider-track > * {
+  flex: 0 0 calc((100% - 28px) / 3);
+  scroll-snap-align: start;
+  min-width: 0;
+}
+.reg-slider-track > [hidden] { display: none !important; }
+
+@media (max-width: 1500px) { .reg-slider-track > * { flex-basis: calc((100% - 14px) / 2); } }
+@media (max-width: 1000px) { .reg-slider-track > * { flex-basis: 100%; } }
+
+/* A hint that there is more to the right, and none once you reach the end. */
+.reg-slider::after {
+  content: ""; position: sticky; top: 0; right: 0;
+  display: block; width: 0;
+}
+.reg-slider:not(.at-end) { mask-image: linear-gradient(to right, #000 88%, rgba(0,0,0,.35) 100%); }
+.reg-slider.at-end { mask-image: none; }
+
+/* --- the controls, in the panel heading --------------------------------- */
+.reg-panel-head { display: flex; align-items: center; gap: 14px; }
+.reg-panel-head > span:first-child { min-width: 0; }
+
+.slider-nav { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.slider-nav[hidden] { display: none; }
+.slider-btn {
+  width: 30px; height: 30px; border-radius: 50%;
+  display: grid; place-items: center;
+  border: 1px solid var(--line); background: var(--surface); color: var(--muted);
+  cursor: pointer; transition: background .14s, color .14s, border-color .14s, transform .14s;
+}
+.slider-btn:hover:not(:disabled) {
+  background: var(--primary); border-color: var(--primary); color: #fff;
+  transform: scale(1.06);
+}
+.slider-btn:disabled { opacity: .35; cursor: default; }
+.slider-btn svg { width: 15px; height: 15px; }
+.slider-btn[data-slide="prev"] svg { transform: rotate(90deg); }
+.slider-btn[data-slide="next"] svg { transform: rotate(-90deg); }
+.slider-pos {
+  font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums;
+  min-width: 34px; text-align: center;
+}
+.slider-pos b { color: var(--ink); }
+.slider-pos i { font-style: normal; }
+
+.slider-dots { display: flex; justify-content: center; gap: 7px; margin: 2px 0 20px; }
+.slider-dots[hidden] { display: none; }
+.slider-dot {
+  width: 7px; height: 7px; padding: 0; border: 0; border-radius: 50%;
+  background: var(--line); cursor: pointer;
+  transition: background .18s, width .18s;
+}
+.slider-dot:hover { background: var(--muted-2); }
+.slider-dot.active { background: var(--primary); width: 20px; border-radius: 4px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .reg-slider { scroll-behavior: auto; }
+  .slider-btn:hover:not(:disabled) { transform: none; }
+}
+
+/* Inside the slider a card is a fixed-height panel, so a whole page of them
+   fits on screen without scrolling. The full text is one click away in the
+   detail modal, which is where a long obligation belongs anyway. */
+.reg-slider .reg-rule {
+  height: 100%;
+  padding: 15px 17px;
+}
+.reg-slider .reg-clamp { -webkit-line-clamp: 3; }
+.reg-slider .reg-rule-body { margin: 9px 0 11px; font-size: 12.8px; }
+.reg-slider .reg-oblig { margin-top: auto; }
+.reg-slider .reg-mini { padding: 8px 10px; }
+.reg-slider .reg-rule-title { font-size: 13.5px; }
+.reg-slider .reg-law-ref { margin: 7px 0; padding: 7px 9px; font-size: 11px; }
+.reg-slider .reg-rule-foot { margin-top: 10px; padding-top: 9px; }
+.reg-slider .reg-rules-grid-tight .reg-rule-detail {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; overflow: hidden;
+}
+
+/* --- the two-tab switch on a department's rules ------------------------- */
+.reg-tabs {
+  display: flex; gap: 6px; margin: 18px 0 14px;
+  border-bottom: 1px solid var(--line);
+}
+.reg-tab {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 16px; border: 0; background: none; cursor: pointer;
+  font-size: 13px; font-weight: 600; color: var(--muted);
+  border-bottom: 2px solid transparent; border-radius: 6px 6px 0 0;
+  transition: color .16s, background .16s, border-color .16s;
+}
+.reg-tab svg { width: 15px; height: 15px; }
+.reg-tab b {
+  min-width: 20px; padding: 1px 6px; border-radius: var(--radius-pill);
+  background: var(--line-3); color: var(--muted); font-size: 11px;
+}
+.reg-tab:hover { color: var(--primary); background: var(--primary-soft); }
+.reg-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+.reg-tab.active b { background: var(--primary); color: #fff; }
+
+.reg-tabpanel[hidden] { display: none; }
+.reg-tabpanel.tab-in { animation: tabIn .28s cubic-bezier(.2,.7,.3,1) both; }
+@keyframes tabIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* A tighter hero, so the department's rules start above the fold. */
+.reg-hero { padding: 26px 30px; }
+.reg-hero-title { font-size: 27px; }
+.reg-hero-sub { font-size: 13px; line-height: 1.6; }
+.reg-hero-stat b { font-size: 27px; }
+.reg-hero-meter { margin-top: 16px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .reg-tabpanel.tab-in { animation: none; }
+}
+@media (max-width: 640px) {
+  .reg-tab { padding: 9px 11px; font-size: 12.5px; }
+  .reg-tab span { display: none; }
+  .reg-tab.active span { display: inline; }
+}
+
+/* Authority badges now live in the banner, small and on one line. */
+.reg-hero-auth { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.reg-hero-auth .reg-chip-auth {
+  background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.22);
+  color: #eaf4f6; font-size: 11px; padding: 3px 9px 3px 3px;
+}
+.reg-hero-auth .auth-mark img { background: #fff; border-radius: 3px; }
+
+.reg-open-dept {
+  display: inline-flex; align-items: center; gap: 8px;
+  margin: 16px 0 0; padding: 8px 14px;
+  border: 1px solid var(--line); border-radius: var(--radius-pill);
+  background: var(--surface); font-size: 12.5px; font-weight: 600; color: var(--primary);
+  transition: background .14s, border-color .14s, transform .14s;
+}
+.reg-open-dept:hover { background: var(--primary-soft); border-color: var(--primary);
+  text-decoration: none; transform: translateX(2px); }
+.reg-open-dept svg:last-child { width: 13px; height: 13px; transform: rotate(-90deg); }
+
+/* A shorter obligation card - the full text is one click away in the modal. */
+.reg-slider .reg-clamp { -webkit-line-clamp: 2; }
+.reg-slider .reg-oblig { grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 0; }
+.reg-slider .reg-mini-note { font-size: 11.5px; }
+.reg-slider .reg-rule-body { margin: 8px 0 10px; }
+
+/* ============================================================================
+   DEPARTMENT COUNTS — the pop
+   ---------------------------------------------------------------------------
+   Each tile springs in, staggered, and the number counts up. Hovering (or
+   tabbing to) a tile opens a small panel saying what the number is made of,
+   so "8 urgent" answers "which eight?" without leaving the page.
+   ========================================================================== */
+.dept-count {
+  animation: countPop .5s cubic-bezier(.2,1.25,.4,1) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+@keyframes countPop {
+  0%   { opacity: 0; transform: translateY(14px) scale(.94); }
+  100% { opacity: 1; transform: none; }
+}
+.dept-count > b { animation: numPop .45s cubic-bezier(.2,1.3,.35,1) both;
+  animation-delay: calc(var(--i, 0) * 70ms + 180ms); }
+@keyframes numPop {
+  0%   { transform: scale(.75); opacity: .3; }
+  60%  { transform: scale(1.08); }
+  100% { transform: none; opacity: 1; }
+}
+.dept-count-icon { animation: iconPop .5s cubic-bezier(.2,1.4,.4,1) both;
+  animation-delay: calc(var(--i, 0) * 70ms + 90ms); }
+@keyframes iconPop {
+  0%   { transform: scale(.5) rotate(-12deg); opacity: 0; }
+  100% { transform: none; opacity: 1; }
+}
+
+/* a soft wash that sweeps across on hover */
+.dept-count::after {
+  content: ""; position: absolute; inset: 0;
+  background: radial-gradient(420px 120px at var(--mx, 50%) 0%,
+              color-mix(in srgb, var(--tone) 12%, transparent), transparent 70%);
+  opacity: 0; transition: opacity .25s; pointer-events: none;
+}
+.dept-count:hover::after, .dept-count:focus-visible::after { opacity: 1; }
+.dept-count:hover .dept-count-icon { transform: scale(1.06) rotate(-3deg); }
+.dept-count-icon { transition: transform .25s cubic-bezier(.2,1.3,.4,1); }
+.dept-count:hover > b { color: var(--tone); transition: color .2s; }
+
+/* --- the breakdown panel ------------------------------------------------- */
+.dept-count { overflow: visible; }
+.dept-count-pop {
+  position: absolute; left: 12px; right: 12px; top: calc(100% - 6px);
+  z-index: 30;
+  display: flex; flex-direction: column; gap: 1px;
+  padding: 12px 13px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius-lg); box-shadow: 0 14px 34px rgba(11,43,51,.18);
+  opacity: 0; visibility: hidden; transform: translateY(-6px) scale(.98);
+  transition: opacity .18s, transform .18s, visibility .18s;
+  pointer-events: none;
+}
+.dept-count:hover .dept-count-pop,
+.dept-count:focus-visible .dept-count-pop,
+.dept-count:focus-within .dept-count-pop {
+  opacity: 1; visibility: visible; transform: none;
+}
+.dept-pop-head {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase;
+  color: var(--muted-2); margin-bottom: 6px;
+}
+.dept-pop-row {
+  display: flex; align-items: baseline; gap: 10px; justify-content: space-between;
+  padding: 4px 0; border-top: 1px solid var(--line-3); font-size: 12px;
+}
+.dept-pop-row:nth-of-type(2) { border-top: 0; }
+.dept-pop-row i {
+  font-style: normal; color: var(--ink); min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dept-pop-row b { color: var(--muted); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.dept-pop-row b.is-late { color: var(--danger); }
+.dept-pop-empty, .dept-pop-more { font-size: 11.5px; color: var(--muted-2); padding-top: 4px; }
+
+@media (max-width: 900px) { .dept-count-pop { display: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .dept-count, .dept-count > b, .dept-count-icon { animation: none; }
+  .dept-count-pop { transition: none; }
+}
+
+/* The breakdown rows keep their own, small type. */
+.dept-pop-row b { font-size: 12px; font-weight: 600; letter-spacing: 0; line-height: 1.4; }
+.dept-count-pop { max-height: 300px; overflow-y: auto; }
+
+/* ============================================================================
+   MOTION LAYER
+   ---------------------------------------------------------------------------
+   Restrained on purpose: this is a compliance system, not a landing page.
+   Things arrive, respond to the pointer, and settle. Nothing loops, nothing
+   bounces twice, and the whole layer switches off for anyone who has asked
+   their machine for reduced motion.
+   ========================================================================== */
+
+/* Reveal. The class is added by script, so with JS off nothing is hidden. */
+.dh-motion .dh-reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity .45s cubic-bezier(.2,.7,.3,1), transform .45s cubic-bezier(.2,.7,.3,1);
+  transition-delay: var(--dh-delay, 0ms);
+  will-change: opacity, transform;
+}
+.dh-motion .dh-reveal.dh-in { opacity: 1; transform: none; will-change: auto; }
+
+/* Cards lift toward the pointer. */
+.card { transition: box-shadow .2s ease, transform .2s ease, border-color .2s ease; }
+.card:hover { box-shadow: var(--shadow-md); }
+.dept-card:hover, .note-card:hover, .doc-card:hover { transform: translateY(-2px); }
+
+/* Buttons acknowledge the press instead of just changing colour. */
+.btn { transition: background .15s, border-color .15s, color .15s, transform .12s, box-shadow .15s; }
+.btn:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(11,43,51,.14); }
+.btn:active { transform: translateY(0); box-shadow: none; }
+.btn-secondary:hover { box-shadow: 0 2px 8px rgba(11,43,51,.08); }
+
+/* Flash messages slide down rather than appearing mid-sentence. */
+.flash { animation: flashIn .32s cubic-bezier(.2,.9,.3,1) both; }
+@keyframes flashIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* The sidebar's active rail grows into place. */
+.nav-sub-link.active::before { animation: railGrow .3s cubic-bezier(.2,1.2,.4,1) both; }
+@keyframes railGrow { from { height: 0; opacity: 0; } to { height: 16px; opacity: 1; } }
+
+/* Badges and status pills settle in. */
+.badge { transition: transform .16s ease, box-shadow .16s ease; }
+
+/* Table rows respond without shifting the layout. */
+.table-wrap tbody tr { transition: background .16s ease; }
+
+/* Menus open with a small drop rather than a jump. */
+.menu-panel:not([hidden]) { animation: menuIn .18s cubic-bezier(.2,.9,.3,1) both; }
+@keyframes menuIn {
+  from { opacity: 0; transform: translateY(-6px) scale(.985); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* The share and record modals arrive the same way. */
+.share-panel { animation: modalIn .24s cubic-bezier(.2,1.05,.35,1) both; }
+@keyframes modalIn {
+  from { opacity: 0; transform: translateY(12px) scale(.97); }
+  to   { opacity: 1; transform: none; }
+}
+.share-backdrop { animation: fadeIn .2s ease both; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* Icon buttons and links in the header lift a hair. */
+.app-icon-btn:hover svg { transform: translateY(-1px); }
+.app-icon-btn svg { transition: transform .16s ease; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dh-motion .dh-reveal { opacity: 1; transform: none; transition: none; }
+  .card:hover, .dept-card:hover, .note-card:hover, .doc-card:hover,
+  .btn:hover, .app-icon-btn:hover svg { transform: none; }
+  .flash, .menu-panel:not([hidden]), .share-panel, .share-backdrop,
+  .nav-sub-link.active::before { animation: none; }
 }

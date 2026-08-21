@@ -15,6 +15,11 @@
   </div>
   <div class="topbar-actions">
     <span class="app-header-date">{{ icon('calendar') }}{{ today_label }}</span>
+    {% if focus_dept %}
+    <a class="btn btn-sm btn-secondary" href="{{ url_for('department', dept_code=focus_dept.code) }}">
+      {{ icon('board') }}<span>Open department</span>
+    </a>
+    {% endif %}
     <button type="button" class="btn btn-sm btn-secondary" onclick="window.print()">{{ icon('printer') }}Print</button>
   </div>
 </div>
@@ -31,6 +36,19 @@
       runs to and the penalty for missing it. Pick another department on the left.
       {% endif %}
     </p>
+    {% if focus_dept and dept_marks[focus_dept.code] %}
+    <div class="reg-hero-auth">
+      {% for m in dept_marks[focus_dept.code] %}
+      {% set logo = authority_logo(m.key) %}
+      <span class="reg-chip reg-chip-auth" title="{{ m.name }}">
+        <span class="auth-mark">
+          {% if logo %}<img src="{{ url_for('static', filename='images/authorities/' ~ logo) }}" alt="">
+          {% else %}<span class="auth-mono" style="background: {{ m.color }};">{{ m.abbr }}</span>{% endif %}
+        </span>{% if logo %}{{ m.abbr }}{% endif %}
+      </span>
+      {% endfor %}
+    </div>
+    {% endif %}
   </div>
   <div class="reg-hero-stats">
     <div class="reg-hero-stat"><b data-count="{{ total_obligations }}">{{ total_obligations }}</b><span>Statutory obligations</span></div>
@@ -109,38 +127,39 @@
   {% set oc = oblig_counts[d.code] %}
   <section class="reg-dept" id="dept-{{ d.code }}" data-dept="{{ d.name|lower }} {{ d.code|lower }}">
 
-    <div class="reg-dept-head" style="--dept: {{ d.color }};">
-      <span class="reg-dept-icon" style="background: {{ d.color }};">{{ dept_icon(d.code) }}</span>
-      <div class="reg-dept-titles">
-        <h2>{{ d.name }}</h2>
-        <div class="reg-dept-desc">{{ d.desc }}</div>
-        {% if dept_marks[d.code] %}
-        <div class="reg-authorities">
-          {% for m in dept_marks[d.code] %}
-          {% set logo = authority_logo(m.key) %}
-          <span class="reg-chip reg-chip-auth" title="{{ m.name }}">
-            <span class="auth-mark">
-              {% if logo %}<img src="{{ url_for('static', filename='images/authorities/' ~ logo) }}" alt="">
-              {% else %}<span class="auth-mono" style="background: {{ m.color }};">{{ m.abbr }}</span>{% endif %}
-            </span>{{ m.name }}
-          </span>
-          {% endfor %}
-        </div>
-        {% endif %}
-      </div>
-      <div class="reg-dept-counts">
-        {% if oc.critical %}<span class="badge badge-RED">{{ oc.critical }} critical</span>{% endif %}
-        {% if oc.high %}<span class="badge badge-AMBER">{{ oc.high }} high</span>{% endif %}
-        {% if oc.medium %}<span class="badge badge-BLUE">{{ oc.medium }} medium</span>{% endif %}
-        <span class="reg-count-pill">{{ (d.rules or [])|length }} company rules</span>
-        <a class="btn btn-sm btn-secondary no-print" href="{{ url_for('department', dept_code=d.code) }}">Open department</a>
-      </div>
+    {# The name, the description, the counts and the authorities were all
+       repeated here from the banner above. On a one-department page that was
+       the same information twice and a screen and a half of scrolling. The
+       authorities moved into the banner; the rest is gone. #}
+
+    <div class="reg-tabs no-print" role="tablist">
+      {% if obligations[d.code] %}
+      <button type="button" class="reg-tab active" role="tab" data-tab="law-{{ d.code }}">
+        {{ icon('shield') }}<span>UAE &amp; Dubai law</span><b>{{ obligations[d.code]|length }}</b>
+      </button>
+      {% endif %}
+      {% if d.rules %}
+      <button type="button" class="reg-tab {% if not obligations[d.code] %}active{% endif %}"
+              role="tab" data-tab="own-{{ d.code }}">
+        {{ icon('board') }}<span>Our own rules</span><b>{{ d.rules|length }}</b>
+      </button>
+      {% endif %}
     </div>
 
     {# ------------------------------------- statutory obligations ------- #}
     {% if obligations[d.code] %}
-    <div class="reg-panel-head">UAE &amp; Dubai statutory obligations</div>
-    <div class="reg-rules-grid">
+    <div class="reg-tabpanel" id="law-{{ d.code }}">
+    <div class="reg-panel-head">
+      <span>What the law requires of {{ d.name }}</span>
+      <div class="slider-nav no-print" data-nav-for="oblig-{{ d.code }}">
+        <button type="button" class="slider-btn" data-slide="prev" aria-label="Previous">{{ icon('chevron') }}</button>
+        <span class="slider-pos"><b>1</b>/<i>1</i></span>
+        <button type="button" class="slider-btn" data-slide="next" aria-label="Next">{{ icon('chevron') }}</button>
+      </div>
+    </div>
+    <div class="reg-slider" data-slider id="oblig-{{ d.code }}" tabindex="0"
+         aria-label="Statutory obligations, use the arrow keys to move">
+    <div class="reg-rules-grid reg-slider-track">
       {% for r in obligations[d.code] %}
       <article class="reg-rule reg-rule-open" tabindex="0" role="button"
                aria-label="Open full detail for {{ r.title }}"
@@ -226,12 +245,25 @@
       </article>
       {% endfor %}
     </div>
+    </div>
+    <div class="slider-dots no-print" data-dots-for="oblig-{{ d.code }}"></div>
+    </div>
     {% endif %}
 
     {# ------------------------------------------- company rules --------- #}
     {% if d.rules %}
-    <div class="reg-panel-head">Company operating rules</div>
-    <div class="reg-rules-grid reg-rules-grid-tight">
+    <div class="reg-tabpanel" id="own-{{ d.code }}" {% if obligations[d.code] %}hidden{% endif %}>
+    <div class="reg-panel-head">
+      <span>How {{ d.name }} works here</span>
+      <div class="slider-nav no-print" data-nav-for="rules-{{ d.code }}">
+        <button type="button" class="slider-btn" data-slide="prev" aria-label="Previous">{{ icon('chevron') }}</button>
+        <span class="slider-pos"><b>1</b>/<i>1</i></span>
+        <button type="button" class="slider-btn" data-slide="next" aria-label="Next">{{ icon('chevron') }}</button>
+      </div>
+    </div>
+    <div class="reg-slider" data-slider id="rules-{{ d.code }}" tabindex="0"
+         aria-label="Company operating rules, use the arrow keys to move">
+    <div class="reg-rules-grid reg-rules-grid-tight reg-slider-track">
       {% for r in d.rules %}
       <div class="reg-rule" data-severity="company" data-search="{{ (r.title ~ ' ' ~ r.detail)|lower }}">
         <div class="reg-rule-title">
@@ -241,6 +273,9 @@
         <div class="reg-rule-detail">{{ r.detail }}</div>
       </div>
       {% endfor %}
+    </div>
+    </div>
+    <div class="slider-dots no-print" data-dots-for="rules-{{ d.code }}"></div>
     </div>
     {% endif %}
 
@@ -388,6 +423,8 @@
     if (counter) {
       counter.textContent = document.querySelectorAll('.reg-rule-open:not([hidden])').length;
     }
+    // Fewer cards means fewer pages - remeasure rather than leave dead dots.
+    if (window.dhRefreshSliders) window.dhRefreshSliders();
   }
 
   search.addEventListener('input', apply);
@@ -401,6 +438,124 @@
       el.classList.toggle('active', el === a);
     });
     apply();
+  });
+
+  /* ------------------------------------------------- sliders ---------- *
+   * The library used to be one very long scroll. Each set of cards is now a
+   * horizontal track you page through: arrows, dots, arrow keys, and a swipe
+   * on a touch screen. Filtering hides cards, so the page count is measured
+   * again every time the filter runs rather than once at load.             */
+  var sliders = Array.prototype.slice.call(document.querySelectorAll('[data-slider]'));
+
+  function pageWidth(sl) { return sl.clientWidth; }
+
+  function pages(sl) {
+    return Math.max(1, Math.ceil((sl.scrollWidth - 2) / Math.max(1, pageWidth(sl))));
+  }
+
+  function current(sl) {
+    return Math.min(pages(sl) - 1, Math.round(sl.scrollLeft / Math.max(1, pageWidth(sl))));
+  }
+
+  function paint(sl) {
+    var total = pages(sl), at = current(sl);
+    var nav = document.querySelector('[data-nav-for="' + sl.id + '"]');
+    var dots = document.querySelector('[data-dots-for="' + sl.id + '"]');
+
+    if (nav) {
+      nav.hidden = total < 2;
+      nav.querySelector('.slider-pos b').textContent = at + 1;
+      nav.querySelector('.slider-pos i').textContent = total;
+      nav.querySelector('[data-slide="prev"]').disabled = at === 0;
+      nav.querySelector('[data-slide="next"]').disabled = at >= total - 1;
+    }
+    if (dots) {
+      dots.hidden = total < 2;
+      if (dots.childElementCount !== total) {
+        dots.innerHTML = '';
+        for (var i = 0; i < total; i++) {
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'slider-dot';
+          b.setAttribute('aria-label', 'Go to page ' + (i + 1));
+          b.dataset.page = i;
+          dots.appendChild(b);
+        }
+      }
+      Array.prototype.forEach.call(dots.children, function (d, i) {
+        d.classList.toggle('active', i === at);
+      });
+    }
+    sl.classList.toggle('at-start', at === 0);
+    sl.classList.toggle('at-end', at >= total - 1);
+  }
+
+  function go(sl, dir) {
+    sl.scrollBy({ left: dir * pageWidth(sl), behavior: 'smooth' });
+  }
+
+  sliders.forEach(function (sl) {
+    var nav = document.querySelector('[data-nav-for="' + sl.id + '"]');
+    var dots = document.querySelector('[data-dots-for="' + sl.id + '"]');
+    if (nav) {
+      nav.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-slide]');
+        if (b) go(sl, b.getAttribute('data-slide') === 'next' ? 1 : -1);
+      });
+    }
+    if (dots) {
+      dots.addEventListener('click', function (e) {
+        var d = e.target.closest('.slider-dot');
+        if (d) sl.scrollTo({ left: pageWidth(sl) * Number(d.dataset.page), behavior: 'smooth' });
+      });
+    }
+    sl.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowRight') { go(sl, 1); e.preventDefault(); }
+      if (e.key === 'ArrowLeft')  { go(sl, -1); e.preventDefault(); }
+    });
+    var tick;
+    sl.addEventListener('scroll', function () {
+      clearTimeout(tick);
+      tick = setTimeout(function () { paint(sl); }, 60);
+    }, { passive: true });
+    paint(sl);
+  });
+
+  /* -------------------------------------------------- tabs ------------ */
+  Array.prototype.forEach.call(document.querySelectorAll('.reg-tabs'), function (bar) {
+    bar.addEventListener('click', function (e) {
+      var tab = e.target.closest('.reg-tab');
+      if (!tab) return;
+      Array.prototype.forEach.call(bar.querySelectorAll('.reg-tab'), function (t) {
+        var panel = document.getElementById(t.getAttribute('data-tab'));
+        var on = t === tab;
+        t.classList.toggle('active', on);
+        t.setAttribute('aria-selected', on ? 'true' : 'false');
+        if (panel) {
+          panel.hidden = !on;
+          if (on) {
+            panel.classList.remove('tab-in');
+            void panel.offsetWidth;          // restart the entrance animation
+            panel.classList.add('tab-in');
+          }
+        }
+      });
+      // A slider inside a hidden panel measures as zero - remeasure on show.
+      if (window.dhRefreshSliders) window.dhRefreshSliders();
+    });
+  });
+
+  window.dhRefreshSliders = function () {
+    // Wait for layout to settle after cards were hidden or a panel was shown,
+    // otherwise the page count is measured against the old track width.
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        sliders.forEach(function (sl) { sl.scrollLeft = 0; paint(sl); });
+      });
+    });
+  };
+  window.addEventListener('resize', function () {
+    sliders.forEach(paint);
   });
 
   /* -------------------------------------------------- count-up -------- */
@@ -423,7 +578,7 @@
   /* -------------------------------------------- reveal on scroll ------ */
   if ('IntersectionObserver' in window &&
       !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    var cards = document.querySelectorAll('.reg-rule, .reg-law-card, .reg-dept-head');
+    var cards = document.querySelectorAll('.reg-rule, .reg-law-card');
     Array.prototype.forEach.call(cards, function (c) { c.classList.add('reg-reveal'); });
     var io = new IntersectionObserver(function (entries) {
       entries.forEach(function (en) {
