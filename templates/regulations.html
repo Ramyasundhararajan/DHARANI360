@@ -447,14 +447,37 @@
    * again every time the filter runs rather than once at load.             */
   var sliders = Array.prototype.slice.call(document.querySelectorAll('[data-slider]'));
 
-  function pageWidth(sl) { return sl.clientWidth; }
+  /* Measure from the slides themselves rather than from scrollWidth: the gap
+     between cards is counted in scrollWidth but not in clientWidth, which made
+     twelve cards report as thirteen pages. */
+  function slides(sl) {
+    return Array.prototype.filter.call(
+      sl.querySelectorAll('.reg-slider-track > *'),
+      function (el) { return !el.hidden && el.offsetParent !== null; });
+  }
+
+  function step(sl) {
+    var list = slides(sl);
+    if (!list.length) return sl.clientWidth || 1;
+    var w = list[0].getBoundingClientRect().width;
+    var gap = list.length > 1
+      ? list[1].getBoundingClientRect().left - list[0].getBoundingClientRect().right
+      : 0;
+    return Math.max(1, w + Math.max(0, gap));
+  }
+
+  function perPage(sl) {
+    return Math.max(1, Math.round((sl.clientWidth + 14) / step(sl)));
+  }
+
+  function pageWidth(sl) { return step(sl) * perPage(sl); }
 
   function pages(sl) {
-    return Math.max(1, Math.ceil((sl.scrollWidth - 2) / Math.max(1, pageWidth(sl))));
+    return Math.max(1, Math.ceil(slides(sl).length / perPage(sl)));
   }
 
   function current(sl) {
-    return Math.min(pages(sl) - 1, Math.round(sl.scrollLeft / Math.max(1, pageWidth(sl))));
+    return Math.min(pages(sl) - 1, Math.round(sl.scrollLeft / pageWidth(sl)));
   }
 
   function paint(sl) {

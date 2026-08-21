@@ -15,15 +15,18 @@
 
 <div class="doc-page">
 
-<!-- jump chips: the page is long by design, so make it navigable -->
-<nav class="doc-jump" aria-label="Sections">
-  <a href="#doc-idea">The one idea</a>
-  <a href="#doc-day">Your day</a>
-  <a href="#doc-rules">The rules</a>
-  <a href="#doc-howto">How do I…</a>
-  <a href="#doc-depts">Departments</a>
-  <a href="#doc-tools">Tools</a>
-  <a href="#doc-mistakes">Mistakes</a>
+<!-- One section at a time. The guide was three screens of scrolling; nobody
+     reads a manual that way. Each chip swaps the panel below it. -->
+<nav class="doc-jump" role="tablist" aria-label="Guide sections">
+  <button type="button" class="active" role="tab" data-doc-tab="doc-idea">The one idea</button>
+  <button type="button" role="tab" data-doc-tab="doc-day">Your day</button>
+  <button type="button" role="tab" data-doc-tab="doc-rules">The rules</button>
+  <button type="button" role="tab" data-doc-tab="doc-howto">How do I…</button>
+  <button type="button" role="tab" data-doc-tab="doc-depts">Departments</button>
+  <button type="button" role="tab" data-doc-tab="doc-tools">Tools</button>
+  <button type="button" role="tab" data-doc-tab="doc-mistakes">Mistakes</button>
+  <button type="button" role="tab" data-doc-tab="doc-absent">Not here</button>
+  <button type="button" role="tab" data-doc-tab="doc-data">Your data</button>
 </nav>
 
 <!-- ---------------------------------------------------------------- search -->
@@ -73,7 +76,7 @@
 </div>
 
 <!-- --------------------------------------------------------- daily habits -->
-<div class="doc-section" id="doc-day" data-doc>
+<div class="doc-section" id="doc-day" data-doc hidden>
   <div class="section-title">Your day — four habits</div>
   <div class="doc-habits">
     <div class="doc-habit">
@@ -103,7 +106,7 @@
 </div>
 
 <!-- ------------------------------------------------------------ the rules -->
-<div class="doc-section" id="doc-rules" data-doc>
+<div class="doc-section" id="doc-rules" data-doc hidden>
   <div class="section-title">The rules everyone follows</div>
   <div class="doc-rules">
     {% for n, t, d in [
@@ -128,7 +131,7 @@
 </div>
 
 <!-- --------------------------------------------------------- how to do X -->
-<div class="doc-section" id="doc-howto" data-doc>
+<div class="doc-section" id="doc-howto" data-doc hidden>
   <div class="section-title">How do I…</div>
   <div class="doc-howto">
     {% for q, a in [
@@ -158,7 +161,7 @@
 </div>
 
 <!-- ------------------------------------------------------- your workspace -->
-<div class="doc-section" id="doc-depts" data-doc>
+<div class="doc-section" id="doc-depts" data-doc hidden>
   <div class="section-title">Your departments</div>
   <p class="doc-lead">
     You can open {{ visible_depts|length }} department{{ '' if visible_depts|length == 1 else 's' }}.
@@ -179,7 +182,7 @@
 </div>
 
 <!-- ---------------------------------------------------------- the tools -->
-<div class="doc-section" id="doc-tools" data-doc>
+<div class="doc-section" id="doc-tools" data-doc hidden>
   <div class="section-title">Tools you can use anywhere</div>
   <div class="doc-tools">
     {% for ep, ic, name, desc in [
@@ -203,7 +206,7 @@
 </div>
 
 <!-- ----------------------------------------------------------- mistakes -->
-<div class="doc-section" id="doc-mistakes" data-doc>
+<div class="doc-section" id="doc-mistakes" data-doc hidden>
   <div class="section-title">Mistakes to avoid</div>
   <div class="doc-mistakes">
     {% for bad, cost, fix in [
@@ -227,7 +230,7 @@
 </div>
 
 <!-- ------------------------------------------------ what is not here, why -->
-<div class="doc-section" id="doc-absent" data-doc>
+<div class="doc-section" id="doc-absent" data-doc hidden>
   <div class="section-title">What is deliberately not here</div>
   <div class="doc-absent">
     <div>
@@ -250,7 +253,7 @@
 </div>
 
 <!-- ------------------------------------------------------------- privacy -->
-<div class="doc-section" id="doc-data" data-doc>
+<div class="doc-section" id="doc-data" data-doc hidden>
   <div class="doc-note">
     <b>Where your data lives.</b> Everything is stored in one database file on this computer.
     Nothing is sent anywhere else, and no external service sees your records. That also means the
@@ -271,25 +274,65 @@
   if (!input) return;
   var sections = [].slice.call(document.querySelectorAll('[data-doc]'));
 
+  var tabs = [].slice.call(document.querySelectorAll('[data-doc-tab]'));
+  var activeId = tabs.length ? tabs[0].getAttribute('data-doc-tab') : null;
+
+  function showTab(id) {
+    activeId = id;
+    tabs.forEach(function (t) {
+      var on = t.getAttribute('data-doc-tab') === id;
+      t.classList.toggle('active', on);
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    sections.forEach(function (sec) {
+      sec.hidden = sec.id !== id;
+      if (!sec.hidden) {
+        sec.classList.remove('doc-in');
+        void sec.offsetWidth;              // restart the entrance
+        sec.classList.add('doc-in');
+      }
+    });
+    if (none) none.hidden = true;
+  }
+
+  tabs.forEach(function (t) {
+    t.addEventListener('click', function () {
+      input.value = '';
+      if (clear) clear.hidden = true;
+      showTab(t.getAttribute('data-doc-tab'));
+    });
+  });
+
   function apply() {
     var q = input.value.trim().toLowerCase();
     if (clear) clear.hidden = !q;
+
+    // Nothing typed: back to whichever tab is selected.
+    if (!q) { showTab(activeId); return; }
+
+    // Searching looks across the whole guide, not only the open tab.
     var shown = 0;
     sections.forEach(function (sec) {
-      var hit = !q || sec.textContent.toLowerCase().indexOf(q) !== -1;
+      var hit = sec.textContent.toLowerCase().indexOf(q) !== -1;
       sec.hidden = !hit;
-      if (hit) shown++;
-      // Open any collapsed question that matches, or the answer stays hidden.
-      if (q && hit) {
+      if (hit) {
+        shown++;
         sec.querySelectorAll('details').forEach(function (d) {
           d.open = d.textContent.toLowerCase().indexOf(q) !== -1;
         });
       }
     });
+    tabs.forEach(function (t) {
+      var sec = document.getElementById(t.getAttribute('data-doc-tab'));
+      t.classList.toggle('muted', !!sec && sec.hidden);
+      t.classList.remove('active');
+    });
     if (none) none.hidden = shown !== 0;
   }
   input.addEventListener('input', apply);
   if (clear) clear.addEventListener('click', function () { input.value = ''; apply(); input.focus(); });
+
+  showTab(activeId);
 })();
 </script>
 

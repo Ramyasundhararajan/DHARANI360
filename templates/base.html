@@ -359,6 +359,20 @@
 
 /* A register can have more columns than the screen. Say so - and only when it
    is actually true, so the hint never appears on a table that already fits. */
+/* The rail is long. Whatever page you are on, bring that entry into view so
+   you never arrive somewhere and have to hunt down the sidebar to see where
+   you are. */
+(function () {
+  var rail = document.getElementById('app-sidebar');
+  if (!rail) return;
+  var here = rail.querySelector('.nav-sub-link.active, .nav-link.active');
+  if (!here) return;
+  var r = here.getBoundingClientRect(), rr = rail.getBoundingClientRect();
+  if (r.top < rr.top + 60 || r.bottom > rr.bottom - 60) {
+    rail.scrollTop += (r.top - rr.top) - rail.clientHeight / 2.6;
+  }
+})();
+
 /* ---------------------------------------------------------------- motion --
    One reveal observer for the whole app: cards, tiles and rows fade up as
    they come into view, once each, and never on a machine set to reduced

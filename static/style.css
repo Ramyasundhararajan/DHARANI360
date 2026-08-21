@@ -4117,3 +4117,188 @@ a.dept-count:hover {
   .flash, .menu-panel:not([hidden]), .share-panel, .share-backdrop,
   .nav-sub-link.active::before { animation: none; }
 }
+
+/* ============================================================================
+   USER GUIDE — one section at a time
+   ---------------------------------------------------------------------------
+   The guide was 2,600px of scrolling. The chips along the top are now tabs:
+   one section on screen, the rest a click away. Searching still looks across
+   the whole guide, because when you are hunting for something you do not know
+   which section it is in.
+   ========================================================================== */
+.doc-jump { gap: 7px; margin: 2px 0 16px; }
+.doc-jump button {
+  padding: 7px 14px; border-radius: 999px; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--line-2);
+  font-size: 12.5px; font-weight: 600; color: var(--muted);
+  transition: background .16s, color .16s, border-color .16s, transform .16s;
+}
+.doc-jump button:hover {
+  border-color: var(--primary); color: var(--primary);
+  background: var(--primary-soft); transform: translateY(-1px);
+}
+.doc-jump button.active {
+  background: var(--primary); border-color: var(--primary); color: #fff;
+  box-shadow: 0 3px 10px rgba(14,116,144,.24);
+}
+.doc-jump button.muted { opacity: .38; }
+
+.doc-section[hidden] { display: none; }
+.doc-section.doc-in { animation: docIn .3s cubic-bezier(.2,.75,.3,1) both; }
+@keyframes docIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+.doc-page .doc-section { margin-bottom: 0; }
+
+/* ============================================================================
+   SIDEBAR — fit more before it has to scroll
+   ========================================================================== */
+.nav-link, .nav-sub-link { padding-top: 7px; padding-bottom: 7px; }
+/* Denser: seventeen departments plus the applications is a lot of rail. Every
+   pixel saved here is one less turn of the wheel to reach Marketing. */
+.nav-section-title { margin: 10px 10px 3px; font-size: 10.5px; }
+.dept-summary { padding-top: 7px; padding-bottom: 7px; margin: 0 10px; }
+.nav-link, .nav-sub-link { margin-top: 0; margin-bottom: 0; }
+.sidebar { padding-bottom: 20px; }
+.sidebar::-webkit-scrollbar { width: 8px; }
+.sidebar::-webkit-scrollbar-thumb { background: #cfdde0; border-radius: 4px; }
+.sidebar::-webkit-scrollbar-thumb:hover { background: #b3c8cd; }
+
+/* ============================================================================
+   SLIDE VIEW — one card at a time
+   ---------------------------------------------------------------------------
+   Three narrow cards side by side meant three clamped paragraphs. One wide
+   card per slide gives the obligation room to be read, and paging is a
+   deliberate act rather than a scan.
+   ========================================================================== */
+.reg-slider-track > * { flex: 0 0 100%; }
+@media (max-width: 1500px) { .reg-slider-track > * { flex-basis: 100%; } }
+@media (max-width: 1000px) { .reg-slider-track > * { flex-basis: 100%; } }
+
+/* With the whole width to itself the card lays out in two columns: the
+   requirement on the left, the practical detail on the right. */
+@media (min-width: 900px) {
+  .reg-slider .reg-rule {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    grid-template-areas:
+      "title  title"
+      "auth   auth"
+      "body   side"
+      "foot   foot";
+    column-gap: 30px; row-gap: 0;
+    padding: 22px 26px;
+  }
+  .reg-slider .reg-rule-title    { grid-area: title; }
+  .reg-slider .reg-law-authority { grid-area: auth; }
+  .reg-slider .reg-rule-body     { grid-area: body; align-self: start; }
+  .reg-slider .reg-law-ref       { grid-area: side; align-self: start; margin-top: 0; }
+  .reg-slider .reg-oblig         { grid-area: side; align-self: start; margin-top: 74px; }
+  .reg-slider .reg-rule-foot     { grid-area: foot; }
+  .reg-slider .reg-clamp         { -webkit-line-clamp: 6; }
+  .reg-slider .reg-rule-body     { font-size: 13.5px; line-height: 1.65; }
+  .reg-slider .reg-rule-title    { font-size: 16px; margin-bottom: 4px; }
+  .reg-slider .reg-oblig         { grid-template-columns: 1fr 1fr; }
+}
+
+/* The company-rules cards are short, so they still pair up nicely. */
+@media (min-width: 900px) {
+  .reg-rules-grid-tight.reg-slider-track > * { flex-basis: calc((100% - 14px) / 2); }
+}
+
+/* ============================================================================
+   DEPARTMENT OVERVIEW — two columns
+   ---------------------------------------------------------------------------
+   Everything that answers "how does this department work" runs down the left.
+   Everything that answers "what needs me today" sits in a rail on the right,
+   where it is visible on arrival instead of buried under the procedure.
+   ========================================================================== */
+.dept-split { display: grid; gap: 16px; align-items: start; }
+@media (min-width: 1180px) {
+  .dept-split { grid-template-columns: minmax(0, 1fr) 340px; }
+}
+@media (min-width: 1700px) {
+  .dept-split { grid-template-columns: minmax(0, 1fr) 380px; }
+}
+.dept-main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.dept-main > * { margin-bottom: 0 !important; }
+.dept-rail { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+.dept-rail-card { padding: 0; overflow: hidden; }
+.dept-rail-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 14px 16px; border-bottom: 1px solid var(--line);
+  font-size: 13px; font-weight: 600; color: var(--ink);
+  background: linear-gradient(180deg, var(--line-3), var(--surface));
+}
+.dept-rail-head svg { width: 16px; height: 16px; color: var(--primary); }
+.dept-rail-head b {
+  margin-left: auto; min-width: 22px; padding: 1px 8px;
+  border-radius: var(--radius-pill); background: var(--primary); color: #fff;
+  font-size: 11px; text-align: center;
+}
+.dept-rail-card .field-hint { padding: 16px; margin: 0; }
+
+/* --- an expiry row ------------------------------------------------------- */
+.dept-due {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 16px; border-top: 1px solid var(--line-3);
+  color: inherit; transition: background .14s;
+}
+.dept-due:first-of-type { border-top: 0; }
+.dept-due:hover { background: var(--primary-soft); text-decoration: none; }
+.dept-due-days {
+  flex-shrink: 0; min-width: 46px; padding: 6px 0;
+  border-radius: 8px; text-align: center;
+  font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.dept-due-days i { font-style: normal; font-size: 10px; font-weight: 600; opacity: .7; }
+.dept-due-days.is-red   { background: var(--danger-soft);  color: var(--danger-ink); }
+.dept-due-days.is-amber { background: var(--warning-soft); color: var(--warning-ink); }
+.dept-due-body { display: flex; flex-direction: column; min-width: 0; }
+.dept-due-body b { font-size: 12.5px; color: var(--ink); }
+.dept-due-body em {
+  font-style: normal; font-size: 11.5px; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* --- a recent-activity row ---------------------------------------------- */
+.dept-recent {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px; border-top: 1px solid var(--line-3);
+  color: inherit; transition: background .14s;
+}
+.dept-recent:first-of-type { border-top: 0; }
+.dept-recent:hover { background: var(--primary-soft); text-decoration: none; }
+.dept-recent-body { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.dept-recent-body b { font-size: 12.5px; color: var(--ink); }
+.dept-recent-body em {
+  font-style: normal; font-size: 11px; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dept-recent-when { flex-shrink: 0; font-size: 11px; color: var(--muted-2); }
+
+.dept-rail-more {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 11px; border-top: 1px solid var(--line);
+  font-size: 12px; font-weight: 600; color: var(--primary);
+  background: var(--line-3);
+}
+.dept-rail-more:hover { background: var(--primary-soft); text-decoration: none; }
+.dept-rail-more svg { width: 13px; height: 13px; transform: rotate(-90deg); }
+
+/* On a laptop the rail drops under the main column; the numbers stay first. */
+@media (max-width: 1179px) {
+  .dept-rail { flex-direction: row; flex-wrap: wrap; }
+  .dept-rail > * { flex: 1 1 320px; }
+}
+
+/* Four tiles should read 4-across or 2×2, never 3 + a lonely one. */
+@media (max-width: 1179px) and (min-width: 620px) {
+  .dept-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1180px) {
+  .dept-counts { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
