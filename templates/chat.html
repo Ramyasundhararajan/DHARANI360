@@ -2,6 +2,16 @@
 {% block title %}Chat · DHARANI 360{% endblock %}
 {% block content %}
 
+{% macro person_avatar(u, cls='') %}
+<div class="chat-avatar {{ cls }}">
+  {% if u.photo_path %}
+    <img src="{{ url_for('photo_file', relpath=u.photo_path) }}" alt="">
+  {% else %}
+    {{ (u.full_name or u.username)[:1]|upper }}
+  {% endif %}
+</div>
+{% endmacro %}
+
 <div class="topbar">
   <div>
     <h1 class="dept-title">{{ icon('mail') }}Chat</h1>
@@ -11,14 +21,15 @@
       <span class="current">Chat</span>
     </div>
     <div class="crumbs">
-      Internal messages between colleagues. Everything stays in this system's own database on this
-      computer &mdash; no message is sent anywhere else.
+      Messages, files, shared records and calls between colleagues. Text and files stay in this
+      system's own database &mdash; only the video room itself uses the internet.
     </div>
   </div>
 </div>
 
-<div class="chat-shell">
+<div class="chat-shell {% if active %}has-active{% endif %}">
 
+  {# ------------------------------------------------------------- rail -- #}
   <aside class="chat-rail">
     <div class="chat-rail-head">
       <b>Chats</b>
@@ -35,13 +46,7 @@
       <a class="chat-person {% if active and active.username == c.username %}active{% endif %}"
          href="{{ url_for('chat', username=c.username) }}"
          data-name="{{ (c.full_name or c.username)|lower }}">
-        <div class="chat-avatar">
-          {% if c.photo_path %}
-            <img src="{{ url_for('photo_file', relpath=c.photo_path) }}" alt="">
-          {% else %}
-            {{ (c.full_name or c.username)[:1]|upper }}
-          {% endif %}
-        </div>
+        {{ person_avatar(c) }}
         <div class="chat-person-body">
           <div class="chat-person-top">
             <span class="chat-person-name">{{ c.full_name or c.username }}</span>
@@ -54,9 +59,6 @@
             </span>
             {% if c.unread %}<span class="chat-unread">{{ c.unread }}</span>{% endif %}
           </div>
-          <div class="chat-person-meta">
-            {{ icon('phone') }}<span>{{ c.call_count }} call{{ 's' if c.call_count != 1 else '' }} logged</span>
-          </div>
         </div>
       </a>
       {% else %}
@@ -65,30 +67,61 @@
     </div>
   </aside>
 
+  {# ----------------------------------------------------------- thread -- #}
   <section class="chat-main">
     {% if active %}
+    <a class="chat-back no-print" href="{{ url_for('chat') }}">{{ icon('chevron') }}All chats</a>
     <header class="chat-head">
-      <div class="chat-avatar chat-avatar-lg">
-        {% if active.photo_path %}
-          <img src="{{ url_for('photo_file', relpath=active.photo_path) }}" alt="">
-        {% else %}
-          {{ (active.full_name or active.username)[:1]|upper }}
-        {% endif %}
-      </div>
-      <div>
+      {{ person_avatar(active, 'chat-avatar-lg') }}
+      <div class="chat-head-text">
         <div class="chat-head-name">{{ active.full_name or active.username }}</div>
         <div class="chat-head-sub">
           {{ ROLES[active.role].label if active.role in ROLES else active.role }}
           &middot; {{ active.call_count }} call{{ 's' if active.call_count != 1 else '' }} logged
         </div>
       </div>
-      <a class="btn btn-sm btn-secondary no-print" href="{{ url_for('calls') }}">{{ icon('phone') }}<span>Call log</span></a>
+      <div class="chat-head-actions no-print">
+        <form method="post" action="{{ url_for('call_start', username=active.username) }}">
+          <input type="hidden" name="mode" value="voice">
+          <button class="icon-btn icon-btn-call" type="submit" title="Voice call">{{ icon('phone-call') }}</button>
+        </form>
+        <form method="post" action="{{ url_for('call_start', username=active.username) }}">
+          <input type="hidden" name="mode" value="video">
+          <button class="btn btn-sm" type="submit">{{ icon('video') }}<span>Video call</span></button>
+        </form>
+      </div>
     </header>
 
     <div class="chat-thread" id="chatThread">
       {% for m in thread %}
       <div class="chat-msg {% if m.from_user == me.username %}mine{% endif %}">
-        <div class="chat-bubble">{{ m.body }}</div>
+
+        {% if m.kind == 'file' %}
+          <a class="chat-file" href="{{ url_for('chat_file', message_id=m.id) }}">
+            <span class="chat-file-icon">{{ icon('file-text') }}</span>
+            <span class="chat-file-text">
+              <b>{{ m.attach_name }}</b>
+              <em>{{ ((m.attach_size or 0) / 1024)|round|int }} KB &middot; tap to download</em>
+            </span>
+          </a>
+          {% if m.body and m.body != m.attach_name %}<div class="chat-bubble">{{ m.body }}</div>{% endif %}
+
+        {% elif m.kind == 'share' %}
+          <a class="chat-share" href="{{ m.share.url or '#' }}">
+            <span class="chat-share-badge">{{ m.share.badge or 'Record' }}</span>
+            <b>{{ m.share.title }}</b>
+            {% if m.share.detail %}<em>{{ m.share.detail }}</em>{% endif %}
+            <span class="chat-share-open">{{ icon('link') }}Open</span>
+          </a>
+          {% if m.body and m.body != m.share.title %}<div class="chat-bubble">{{ m.body }}</div>{% endif %}
+
+        {% elif m.kind == 'call' %}
+          <div class="chat-call">{{ icon('phone-call') }}<span>{{ m.body }}</span></div>
+
+        {% else %}
+          <div class="chat-bubble">{{ m.body }}</div>
+        {% endif %}
+
         <div class="chat-stamp">{{ (m.created_at or '')[11:16] }}</div>
       </div>
       {% else %}
@@ -98,16 +131,78 @@
       {% endfor %}
     </div>
 
-    <form class="chat-composer no-print" method="post"
-          action="{{ url_for('chat_send', username=active.username) }}">
-      <input type="text" name="body" id="chatBody" placeholder="Type your message..."
-             autocomplete="off" required maxlength="4000">
-      <button type="submit" class="btn" title="Send">{{ icon('share') }}<span>Send</span></button>
-    </form>
+    <div class="chat-composer-wrap no-print">
+      <form class="chat-attach" method="post" enctype="multipart/form-data"
+            action="{{ url_for('chat_attach', username=active.username) }}" id="chatAttachForm">
+        <label class="icon-btn chat-clip" title="Attach a file or photo">
+          {{ icon('paperclip') }}
+          <input type="file" name="file" id="chatFileInput" hidden>
+        </label>
+      </form>
+      <form class="chat-composer" method="post"
+            action="{{ url_for('chat_send', username=active.username) }}">
+        <input type="text" name="body" id="chatBody" placeholder="Type your message..."
+               autocomplete="off" required maxlength="4000">
+        <button type="submit" class="btn" title="Send">{{ icon('send') }}<span>Send</span></button>
+      </form>
+    </div>
     {% else %}
     <div class="card empty-state">Select a colleague on the left to start a conversation.</div>
     {% endif %}
   </section>
+
+  {# ------------------------------------------------------------ panel -- #}
+  {% if active %}
+  <aside class="chat-panel no-print">
+    <div class="chat-panel-id">
+      {{ person_avatar(active, 'chat-avatar-xl') }}
+      <b>{{ active.full_name or active.username }}</b>
+      <em>{{ ROLES[active.role].label if active.role in ROLES else active.role }}</em>
+      {% if active.email %}<a class="chat-panel-mail" href="mailto:{{ active.email }}">{{ active.email }}</a>{% endif %}
+    </div>
+
+    <div class="chat-panel-block">
+      <div class="chat-panel-head">{{ icon('phone') }}Recent calls</div>
+      {% for c in panel_calls %}
+      <div class="chat-panel-row">
+        <span class="chat-panel-row-main">
+          {{ icon('phone-outgoing' if c.started_by == me.username else 'phone-incoming') }}
+          {{ 'Video' if c.mode != 'voice' else 'Voice' }}
+          {% if c.status == 'missed' %}<i class="chat-miss">missed</i>{% endif %}
+        </span>
+        <span class="chat-panel-row-side">
+          {{ (c.started_at or '')[5:10] }}{% if c.duration_seconds %} &middot; {{ (c.duration_seconds // 60) }}m{% endif %}
+        </span>
+      </div>
+      {% else %}
+      <p class="field-hint">No calls yet with this colleague.</p>
+      {% endfor %}
+    </div>
+
+    <div class="chat-panel-block">
+      <div class="chat-panel-head">{{ icon('paperclip') }}Files in this chat</div>
+      {% for f in panel_files %}
+      <a class="chat-panel-row chat-panel-link" href="{{ url_for('chat_file', message_id=f.id) }}">
+        <span class="chat-panel-row-main">{{ icon('file-text') }}{{ f.attach_name }}</span>
+        <span class="chat-panel-row-side">{{ ((f.attach_size or 0) / 1024)|round|int }} KB</span>
+      </a>
+      {% else %}
+      <p class="field-hint">Nothing sent yet. Use the paperclip beside the message box.</p>
+      {% endfor %}
+    </div>
+
+    <div class="chat-panel-block">
+      <div class="chat-panel-head">{{ icon('share') }}Records shared</div>
+      {% for sm in panel_shared %}
+      <a class="chat-panel-row chat-panel-link" href="{{ sm.share.url or '#' }}">
+        <span class="chat-panel-row-main">{{ icon('file-text') }}{{ sm.share.title }}</span>
+      </a>
+      {% else %}
+      <p class="field-hint">Use the Share button on any record to send it here.</p>
+      {% endfor %}
+    </div>
+  </aside>
+  {% endif %}
 </div>
 
 <script>
@@ -125,11 +220,53 @@
     });
   }
 
+  // Choosing a file sends it straight away - one action, not two.
+  var fileInput = document.getElementById('chatFileInput');
+  if (fileInput) {
+    fileInput.addEventListener('change', function () {
+      if (fileInput.files && fileInput.files.length) {
+        document.getElementById('chatAttachForm').submit();
+      }
+    });
+  }
+
   {% if active %}
-  // Poll for replies so a message from a colleague appears without a reload.
-  // Deliberately modest (6s) - this is one computer, not a chat service.
   var POLL_URL = {{ url_for('chat_messages_json', username=active.username)|tojson }};
   var lastId = {{ (thread[-1].id if thread else 0)|tojson }};
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined && text !== null) n.textContent = text;   // never innerHTML
+    return n;
+  }
+
+  function render(m) {
+    var wrap = el('div', 'chat-msg' + (m.mine ? ' mine' : ''));
+    if (m.kind === 'file' && m.file) {
+      var a = el('a', 'chat-file');
+      a.href = m.file.url;
+      var t = el('span', 'chat-file-text');
+      t.appendChild(el('b', null, m.file.name));
+      t.appendChild(el('em', null, Math.round((m.file.size || 0) / 1024) + ' KB · tap to download'));
+      a.appendChild(t);
+      wrap.appendChild(a);
+    } else if (m.kind === 'share' && m.meta) {
+      var s = el('a', 'chat-share');
+      s.href = m.meta.url || '#';
+      s.appendChild(el('span', 'chat-share-badge', m.meta.badge || 'Record'));
+      s.appendChild(el('b', null, m.meta.title || ''));
+      if (m.meta.detail) s.appendChild(el('em', null, m.meta.detail));
+      wrap.appendChild(s);
+      if (m.body && m.body !== m.meta.title) wrap.appendChild(el('div', 'chat-bubble', m.body));
+    } else if (m.kind === 'call') {
+      wrap.appendChild(el('div', 'chat-call', m.body));
+    } else {
+      wrap.appendChild(el('div', 'chat-bubble', m.body));
+    }
+    wrap.appendChild(el('div', 'chat-stamp', m.at));
+    return wrap;
+  }
 
   setInterval(function () {
     fetch(POLL_URL, {credentials: 'same-origin'})
@@ -140,23 +277,12 @@
         if (newest.id === lastId) return;
         var atBottom = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 60;
         thread.innerHTML = '';
-        data.messages.forEach(function (m) {
-          var wrap = document.createElement('div');
-          wrap.className = 'chat-msg' + (m.mine ? ' mine' : '');
-          var bubble = document.createElement('div');
-          bubble.className = 'chat-bubble';
-          bubble.textContent = m.body;          // textContent, never innerHTML
-          var stamp = document.createElement('div');
-          stamp.className = 'chat-stamp';
-          stamp.textContent = m.at;
-          wrap.appendChild(bubble); wrap.appendChild(stamp);
-          thread.appendChild(wrap);
-        });
+        data.messages.forEach(function (m) { thread.appendChild(render(m)); });
         lastId = newest.id;
         if (atBottom) thread.scrollTop = thread.scrollHeight;
       })
       .catch(function () { /* offline or server restarting - try again next tick */ });
-  }, 6000);
+  }, 5000);
   {% endif %}
 })();
 </script>

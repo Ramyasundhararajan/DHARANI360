@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% block title %}Call · DHARANI 360{% endblock %}
+{% block content %}
+
+<div class="topbar">
+  <div>
+    <h1 class="dept-title">{{ icon('video') if call.mode != 'voice' else icon('phone-call') }}
+      {{ 'Video call' if call.mode != 'voice' else 'Voice call' }}</h1>
+    <div class="breadcrumb">
+      <a href="{{ url_for('dashboard') }}">Home</a>{{ icon('chevron') }}
+      <a href="{{ url_for('calls') }}">Calls</a>{{ icon('chevron') }}
+      <span class="current">In progress</span>
+    </div>
+    <div class="crumbs">
+      When you leave, this call writes itself into the Call Log register &mdash; who, how long,
+      and what came of it. You do not have to log it by hand.
+    </div>
+  </div>
+</div>
+
+<div class="call-shell">
+
+  <section class="call-stage card" id="callStage">
+    <div class="call-stage-head">
+      <div class="call-who">
+        <span class="call-dot" id="callDot"></span>
+        <b>{{ other.full_name if other else (call.contact_name or 'Guest') }}</b>
+        <em>{{ ROLES[other.role].label if other and other.role in ROLES else (call.contact_number or 'outside the company') }}</em>
+      </div>
+      <div class="call-timer" id="callTimer">00:00</div>
+    </div>
+
+    <div class="call-frame" id="callFrame">
+      <div class="call-loading" id="callLoading">
+        <div class="call-spinner"></div>
+        <b>Opening the room&hellip;</b>
+        <p>Your browser will ask for the camera and microphone. Say yes once and it will remember.</p>
+      </div>
+    </div>
+
+    <div class="call-offline" id="callOffline" hidden>
+      {{ icon('alert-triangle') }}
+      <div>
+        <b>The video room could not load.</b>
+        <p>
+          The call room needs an internet connection &mdash; the rest of DHARANI 360 does not.
+          You can still log this call by hand, or open the room directly:
+        </p>
+        <a class="btn btn-sm btn-secondary" href="{{ room_link }}" target="_blank" rel="noopener">
+          {{ icon('link') }}<span>Open the room in a new tab</span>
+        </a>
+      </div>
+    </div>
+
+    <div class="call-controls no-print">
+      <form method="post" action="{{ url_for('call_end', call_id=call.id) }}" id="endForm">
+        <input type="hidden" name="seconds" id="endSeconds" value="0">
+        <input type="text" name="outcome" class="call-outcome" maxlength="200"
+               placeholder="What came of it? e.g. &quot;Viewing booked for Saturday 11am&quot;">
+        <button type="submit" class="btn btn-danger">{{ icon('phone-off') }}<span>End &amp; log the call</span></button>
+      </form>
+    </div>
+  </section>
+
+  <aside class="call-side">
+    <div class="card call-invite">
+      <h2>{{ icon('share') }}Invite someone else</h2>
+      <p class="field-hint">
+        Anyone with this link can join &mdash; a client, an owner, a lawyer. No account, nothing
+        to install. Treat it like a key: send it to the person, not to a group.
+      </p>
+      <div class="call-link-row">
+        <input type="text" readonly value="{{ guest_link }}" id="guestLink" class="call-link">
+        <button type="button" class="btn btn-sm" data-copy="{{ guest_link }}">{{ icon('copy') }}<span>Copy</span></button>
+      </div>
+      <div class="call-invite-actions">
+        <a class="btn btn-sm btn-secondary" target="_blank" rel="noopener"
+           href="https://wa.me/?text={{ ('Join my DHARANI 360 call: ' ~ guest_link)|urlencode }}">
+          {{ icon('phone') }}<span>WhatsApp</span>
+        </a>
+        <a class="btn btn-sm btn-secondary"
+           href="mailto:?subject=Call%20invitation&body={{ ('Join my DHARANI 360 call:%0D%0A%0D%0A' ~ guest_link)|safe }}">
+          {{ icon('mail') }}<span>Email</span>
+        </a>
+      </div>
+      <div class="call-qr">
+        <img src="{{ url_for('qr_svg', d=url_for('call_guest', token=call.guest_token), s=4) }}"
+             alt="QR code for the guest link" width="132" height="132">
+        <span class="field-hint">Or let them scan this with a phone camera.</span>
+      </div>
+    </div>
+
+    {% if history %}
+    <div class="card call-history">
+      <h2>{{ icon('history') }}Earlier calls</h2>
+      {% for h in history %}
+      <div class="call-history-row">
+        <span>{{ icon('phone-outgoing' if h.started_by == me.username else 'phone-incoming') }}
+          {{ (h.started_at or '')[:10] }}</span>
+        <b>{% if h.status == 'missed' %}missed{% elif h.duration_seconds %}{{ (h.duration_seconds // 60) }}m {{ h.duration_seconds % 60 }}s{% else %}&mdash;{% endif %}</b>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </aside>
+</div>
+
+<script src="https://{{ meet_host }}/external_api.js"
+        onerror="document.getElementById('callOffline').hidden=false;document.getElementById('callLoading').hidden=true;document.getElementById('callStage').classList.add('is-offline');"></script>
+<script>
+(function () {
+  var ROOM = {{ call.room|tojson }};
+  var HOST = {{ meet_host|tojson }};
+  var NAME = {{ display_name|tojson }};
+  var VIDEO = {{ (call.mode != 'voice')|tojson }};
+  var END_URL = {{ url_for('call_end', call_id=call.id)|tojson }};
+
+  var started = Date.now();
+  var ended = false;
+  var timerEl = document.getElementById('callTimer');
+  setInterval(function () {
+    var s = Math.floor((Date.now() - started) / 1000);
+    timerEl.textContent = ('0' + Math.floor(s / 60)).slice(-2) + ':' + ('0' + (s % 60)).slice(-2);
+    var sec = document.getElementById('endSeconds');
+    if (sec) sec.value = s;
+  }, 1000);
+
+  function elapsed() { return Math.floor((Date.now() - started) / 1000); }
+
+  // If the tab is closed without pressing End, still log the call. sendBeacon
+  // survives the page going away; fetch usually does not.
+  function logOnExit() {
+    if (ended) return;
+    ended = true;
+    try {
+      var fd = new FormData();
+      fd.append('seconds', elapsed());
+      fd.append('quiet', '1');
+      navigator.sendBeacon(END_URL, fd);
+    } catch (e) { /* nothing more we can do from a closing page */ }
+  }
+  window.addEventListener('pagehide', logOnExit);
+  document.getElementById('endForm').addEventListener('submit', function () { ended = true; });
+
+  if (typeof JitsiMeetExternalAPI === 'undefined') {
+    document.getElementById('callOffline').hidden = false;
+    document.getElementById('callLoading').hidden = true;
+    document.getElementById('callStage').classList.add('is-offline');
+    return;
+  }
+
+  var api = new JitsiMeetExternalAPI(HOST, {
+    roomName: ROOM,
+    parentNode: document.getElementById('callFrame'),
+    width: '100%', height: '100%',
+    userInfo: { displayName: NAME },
+    configOverwrite: {
+      startWithVideoMuted: !VIDEO,
+      prejoinPageEnabled: false,
+      disableDeepLinking: true,
+      startWithAudioMuted: false
+    },
+    interfaceConfigOverwrite: {
+      SHOW_JITSI_WATERMARK: false,
+      DEFAULT_BACKGROUND: '#0b2b33',
+      TOOLBAR_BUTTONS: ['microphone', 'camera', 'desktop', 'chat', 'raisehand',
+                        'tileview', 'fullscreen', 'settings', 'hangup']
+    }
+  });
+
+  api.addEventListener('videoConferenceJoined', function () {
+    document.getElementById('callLoading').hidden = true;
+    document.getElementById('callDot').classList.add('live');
+    started = Date.now();
+  });
+  api.addEventListener('readyToClose', function () {
+    var f = document.getElementById('endForm');
+    document.getElementById('endSeconds').value = elapsed();
+    ended = true;
+    f.submit();
+  });
+
+  document.querySelectorAll('[data-copy]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var t = b.getAttribute('data-copy');
+      var span = b.querySelector('span');
+      var was = span.textContent;
+      var done = function () { span.textContent = 'Copied'; setTimeout(function () { span.textContent = was; }, 1500); };
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(t).then(done, function () { fallback(t, done); });
+      } else { fallback(t, done); }
+    });
+  });
+  function fallback(t, done) {
+    var i = document.getElementById('guestLink');
+    i.select(); i.setSelectionRange(0, 99999);
+    try { document.execCommand('copy'); done(); } catch (e) { /* user can copy by hand */ }
+  }
+})();
+</script>
+
+{% endblock %}

@@ -172,6 +172,83 @@ RECORDS = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# The everyday surfaces - notes, to-dos, a shared record and a finished call.
+# Without these the demo opens on a wall of "nothing here yet", which reads as
+# a broken system rather than a new one.
+# ---------------------------------------------------------------------------
+
+DEMO_NOTES = [
+    ("Call DET about the trade licence before Thursday.", "red"),
+    ("Marina 2-bed: owner wants AED 2.35m, buyer offered 2.20m.", "amber"),
+    ("Ask Khalida for the new Ejari template.", "blue"),
+    ("Emiratisation report is due at the end of the quarter.", "green"),
+    ("Chamber of Commerce card is in the top drawer.", "blue"),
+]
+
+DEMO_TODOS = [
+    ("Chase the signed MOU from Rashid Property Co", "In Progress"),
+    ("Upload the stamped trade licence to COR-002", "To Do"),
+    ("Reconcile August commission with the bank statement", "To Do"),
+    ("Book the DLD training slot for Baqeer", "Done"),
+]
+
+DEMO_CHAT = [
+    ("ramya", "khalidaamyn", "Trade licence is overdue - can you start the renewal today?"),
+    ("khalidaamyn", "ramya", "On it. I have the DET portal open now."),
+    ("khalidaamyn", "ramya", "Payment done, receipt is attached to the record."),
+    ("ramya", "baqeer", "Log the Marina viewing as soon as you are out of it, please."),
+    ("baqeer", "ramya", "Will do - logging today's now."),
+]
+
+
+def _seed_workspace():
+    made = 0
+    users = {u["username"]: u for u in db.list_users()}
+
+    owner = users.get("ramya") or (list(users.values())[0] if users else None)
+    if owner:
+        existing = {n["text"] for n in db.list_notes(owner["id"])}
+        for text, colour in DEMO_NOTES:
+            if text not in existing:
+                db.add_note(owner["id"], text, colour)
+                made += 1
+        have = {t["text"] for t in db.list_todos(owner["id"])}
+        for text, status in DEMO_TODOS:
+            if text not in have:
+                db.add_todo(owner["id"], text, status=status)
+                made += 1
+
+    for sender, target, body in DEMO_CHAT:
+        if sender in users and target in users:
+            db.send_chat(sender, target, body)
+            made += 1
+
+    # One record already shared into a conversation, so the Share feature is
+    # visible on the demo rather than only described.
+    if "ramya" in users and "khalidaamyn" in users:
+        try:
+            rows, _ = db.get_records("COR-002")
+            if rows:
+                r = rows[0]
+                db.send_chat("ramya", "khalidaamyn",
+                             "This is the one that expires first - please start here.",
+                             kind="share",
+                             meta={"kind": "record", "form_code": "COR-002",
+                                   "record_id": r["id"], "badge": "DR-COR-002",
+                                   "title": "{} - Licence & Permit Register".format(r.get("doc_no")),
+                                   "detail": "Trade Licence - Dept. of Economy & Tourism",
+                                   "dept": "COR",
+                                   "url": "/record/COR-002/{}".format(r["id"])})
+                made += 1
+        except Exception:
+            pass
+
+    print("\n  Workspace: {} notes, {} to-dos, {} messages and 1 shared record."
+          .format(len(DEMO_NOTES), len(DEMO_TODOS), len(DEMO_CHAT)))
+    return made
+
+
 def already_seeded():
     """True if demo records are present, so a second run does nothing."""
     try:
@@ -215,6 +292,8 @@ def main():
     for code in sorted(by_form):
         title = FORMS_BY_CODE[code]["title"] if code in FORMS_BY_CODE else code
         print("    {:<10} {:<38} {:>2}".format(code, title[:38], by_form[code]))
+
+    made += _seed_workspace()
 
     print("\n  {} records created.".format(made))
     if skipped:

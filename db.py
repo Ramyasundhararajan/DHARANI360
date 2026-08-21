@@ -9,11 +9,13 @@ functions driven purely by the form metadata - so adding a 77th form
 to forms_data.py is enough; nothing here needs to change.
 """
 import sqlite3
+import hashlib
+import json
 import os
 import csv
 import io
 import uuid
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 
 from forms_data import (FORMS, FORMS_BY_CODE, DEPARTMENTS, table_name,
                          FIELD_TO_FORMS, linkable_fields)
@@ -26,6 +28,8 @@ UPLOADS_DIR = os.path.join(INSTANCE_DIR, "uploads")
 os.makedirs(UPLOADS_DIR, exist_ok=True)
 PHOTOS_DIR = os.path.join(INSTANCE_DIR, "photos")
 os.makedirs(PHOTOS_DIR, exist_ok=True)
+CHAT_DIR = os.path.join(INSTANCE_DIR, "chatfiles")
+os.makedirs(CHAT_DIR, exist_ok=True)
 PHOTO_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 MAX_PHOTO_BYTES = 15 * 1024 * 1024  # 15MB - a phone photo is often 5-10MB
 
@@ -164,6 +168,45 @@ def init_db():
     )""")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_chat_pair ON chat_messages (from_user, to_user, id)")
 
+    # A message is no longer only text. "kind" says what it carries and "meta"
+    # holds the JSON payload for the richer kinds, so one table still drives
+    # the whole conversation:
+    #   text   - what somebody typed
+    #   file   - an attachment; attach_* columns are filled
+    #   share  - a record, register or call handed to a colleague
+    #   call   - a call was started, joined, missed or ended
+    chat_cols = {row["name"] for row in cur.execute("PRAGMA table_info(chat_messages)").fetchall()}
+    for col, decl in (("kind", "TEXT"), ("meta", "TEXT"), ("attach_name", "TEXT"),
+                      ("attach_stored", "TEXT"), ("attach_size", "INTEGER"),
+                      ("delivered_at", "TEXT")):
+        if col not in chat_cols:
+            cur.execute("ALTER TABLE chat_messages ADD COLUMN {} {}".format(col, decl))
+    cur.execute("UPDATE chat_messages SET kind = 'text' WHERE kind IS NULL")
+
+    # A call is a live thing with a start and an end. It is kept apart from the
+    # SAL-009 Call Log register on purpose: this table is the running session,
+    # the register is the permanent record written when the call finishes.
+    cur.execute("""CREATE TABLE IF NOT EXISTS call_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        room TEXT NOT NULL,
+        mode TEXT,
+        started_by TEXT NOT NULL,
+        other_user TEXT,
+        contact_name TEXT,
+        contact_number TEXT,
+        guest_token TEXT,
+        subject TEXT,
+        started_at TEXT,
+        answered_at TEXT,
+        ended_at TEXT,
+        duration_seconds INTEGER,
+        outcome TEXT,
+        record_id INTEGER,
+        status TEXT
+    )""")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_call_live ON call_sessions (status, other_user, id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_call_guest ON call_sessions (guest_token)")
+
     cur.execute("""CREATE TABLE IF NOT EXISTS holidays (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
@@ -235,6 +278,21 @@ def insert_record(form_code, data, created_by="Admin"):
     conn.commit()
     conn.close()
     return doc_no
+
+
+def record_id_for_doc(form_code, doc_no):
+    """Row id for a document number. insert_record() returns the doc_no, which
+    is what people read; this is what url_for() needs."""
+    if not doc_no:
+        return None
+    conn = get_conn()
+    try:
+        row = conn.execute("SELECT id FROM {} WHERE doc_no = ?".format(table_name(form_code)),
+                           (doc_no,)).fetchone()
+    except sqlite3.Error:
+        row = None
+    conn.close()
+    return row["id"] if row else None
 
 
 def update_record(form_code, record_id, data):
@@ -1528,14 +1586,72 @@ def delete_library_file(file_id):
 # Internal chat between colleagues
 # ============================================================================
 
-def send_chat(from_user, to_user, body):
+def send_chat(from_user, to_user, body, kind="text", meta=None,
+              attach=None):
+    """Write one message. Every richer kind still lands in this one table so
+    the conversation reads in order: text, file, shared record, call."""
     conn = get_conn()
-    conn.execute(
-        "INSERT INTO chat_messages (from_user, to_user, body, created_at) VALUES (?, ?, ?, ?)",
-        (from_user, to_user, body, datetime.utcnow().isoformat(timespec="seconds"))
+    cur = conn.execute(
+        "INSERT INTO chat_messages (from_user, to_user, body, created_at, kind, meta, "
+        "attach_name, attach_stored, attach_size) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (from_user, to_user, body, datetime.utcnow().isoformat(timespec="seconds"),
+         kind, json.dumps(meta) if meta else None,
+         (attach or {}).get("name"), (attach or {}).get("stored"), (attach or {}).get("size"))
     )
+    mid = cur.lastrowid
     conn.commit()
     conn.close()
+    return mid
+
+
+ALLOWED_CHAT_EXTENSIONS = ALLOWED_ATTACHMENT_EXTENSIONS | {"webp", "heic", "zip", "ppt", "pptx"}
+MAX_CHAT_BYTES = 20 * 1024 * 1024
+
+
+def send_chat_file(from_user, to_user, file_storage, caption=""):
+    """Attach a document or photo to a conversation.
+
+    Returns (message_id, error). The same extension whitelist and size cap as
+    record attachments apply, because a file dropped into chat is just as much
+    company data as one attached to a record.
+    """
+    name = os.path.basename((file_storage.filename or "").strip())
+    if not name:
+        return None, "No file was chosen."
+    ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+    if ext not in ALLOWED_CHAT_EXTENSIONS:
+        return None, ("That file type is not allowed here. Use "
+                      + ", ".join(sorted(ALLOWED_CHAT_EXTENSIONS)) + ".")
+    blob = file_storage.read()
+    if not blob:
+        return None, "That file is empty."
+    if len(blob) > MAX_CHAT_BYTES:
+        return None, "That file is larger than 20 MB. Send a smaller copy."
+    stored = "{}.{}".format(uuid.uuid4().hex, ext)
+    with open(os.path.join(CHAT_DIR, stored), "wb") as fh:
+        fh.write(blob)
+    mid = send_chat(from_user, to_user, caption or name, kind="file",
+                    attach={"name": name, "stored": stored, "size": len(blob)})
+    return mid, None
+
+
+def chat_file_path(msg):
+    """Resolve an attachment, refusing anything that escapes the chat folder."""
+    stored = msg.get("attach_stored") if isinstance(msg, dict) else msg["attach_stored"]
+    if not stored:
+        return None
+    path = os.path.realpath(os.path.join(CHAT_DIR, stored))
+    root = os.path.realpath(CHAT_DIR)
+    if not (path == root or path.startswith(root + os.sep)):
+        return None
+    return path if os.path.exists(path) else None
+
+
+def get_chat_message(message_id):
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM chat_messages WHERE id = ?", (message_id,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
 
 
 def chat_thread(user_a, user_b, limit=200):
@@ -1583,6 +1699,136 @@ def chat_unread_total(username):
     ).fetchone()[0]
     conn.close()
     return n
+
+
+# ---------------------------------------------------------------- live calls --
+# A call has two halves. This table is the live session - who rang whom, which
+# room, when it was answered, when it ended. When the call finishes the details
+# are written once into the SAL-009 Call Log register, which is the permanent
+# record. The session row stays as the link between the two.
+
+CALL_STATUS_RINGING = "ringing"
+CALL_STATUS_LIVE = "live"
+CALL_STATUS_ENDED = "ended"
+CALL_STATUS_MISSED = "missed"
+
+
+def _room_name(seed):
+    """A room name nobody can guess. The room is the only thing protecting the
+    call, so it is a long random token, never the two usernames."""
+    return "dharani360-" + hashlib.sha256(
+        (seed + "|" + uuid.uuid4().hex).encode("utf-8")).hexdigest()[:26]
+
+
+def start_call(started_by, other_user=None, contact_name=None, contact_number=None,
+               mode="video", subject=""):
+    """Open a call session and return the full row."""
+    now = datetime.utcnow().isoformat(timespec="seconds")
+    room = _room_name("{}|{}|{}".format(started_by, other_user or contact_name or "guest", now))
+    token = uuid.uuid4().hex[:20]
+    conn = get_conn()
+    cur = conn.execute(
+        "INSERT INTO call_sessions (room, mode, started_by, other_user, contact_name, "
+        "contact_number, guest_token, subject, started_at, status) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (room, mode, started_by, other_user, contact_name, contact_number, token,
+         subject, now, CALL_STATUS_RINGING if other_user else CALL_STATUS_LIVE))
+    cid = cur.lastrowid
+    conn.commit()
+    conn.close()
+    return get_call(cid)
+
+
+def get_call(call_id):
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM call_sessions WHERE id = ?", (call_id,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def get_call_by_token(token):
+    if not token:
+        return None
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM call_sessions WHERE guest_token = ?", (token,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def answer_call(call_id):
+    conn = get_conn()
+    conn.execute("UPDATE call_sessions SET status = ?, answered_at = COALESCE(answered_at, ?) "
+                 "WHERE id = ? AND status IN (?, ?)",
+                 (CALL_STATUS_LIVE, datetime.utcnow().isoformat(timespec="seconds"),
+                  call_id, CALL_STATUS_RINGING, CALL_STATUS_LIVE))
+    conn.commit()
+    conn.close()
+    return get_call(call_id)
+
+
+def end_call(call_id, seconds=None, outcome="", status=None):
+    """Close the session. Duration is taken from the browser when it is given,
+    otherwise measured from the timestamps, so a closed laptop still logs."""
+    call = get_call(call_id)
+    if not call or call["status"] == CALL_STATUS_ENDED:
+        return call
+    now = datetime.utcnow()
+    if seconds is None:
+        base = call["answered_at"] or call["started_at"]
+        try:
+            seconds = int((now - datetime.fromisoformat(base)).total_seconds())
+        except (TypeError, ValueError):
+            seconds = 0
+    seconds = max(0, min(int(seconds or 0), 60 * 60 * 12))
+    final = status or (CALL_STATUS_ENDED if call["answered_at"] else CALL_STATUS_MISSED)
+    conn = get_conn()
+    conn.execute("UPDATE call_sessions SET status = ?, ended_at = ?, duration_seconds = ?, "
+                 "outcome = ? WHERE id = ?",
+                 (final, now.isoformat(timespec="seconds"), seconds, outcome, call_id))
+    conn.commit()
+    conn.close()
+    return get_call(call_id)
+
+
+def attach_call_record(call_id, record_id):
+    conn = get_conn()
+    conn.execute("UPDATE call_sessions SET record_id = ? WHERE id = ?", (record_id, call_id))
+    conn.commit()
+    conn.close()
+
+
+def incoming_calls_for(username, max_age_seconds=75):
+    """Calls ringing this person right now. Anything older than about a minute
+    has stopped ringing in real life, so it is not shown as live."""
+    cutoff = (datetime.utcnow() - timedelta(seconds=max_age_seconds)).isoformat(timespec="seconds")
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM call_sessions WHERE other_user = ? AND status = ? AND started_at >= ? "
+        "ORDER BY id DESC LIMIT 3", (username, CALL_STATUS_RINGING, cutoff)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def expire_stale_calls(max_age_seconds=90):
+    """A call nobody answered becomes a missed call rather than ringing forever."""
+    cutoff = (datetime.utcnow() - timedelta(seconds=max_age_seconds)).isoformat(timespec="seconds")
+    conn = get_conn()
+    rows = conn.execute("SELECT id FROM call_sessions WHERE status = ? AND started_at < ?",
+                        (CALL_STATUS_RINGING, cutoff)).fetchall()
+    conn.close()
+    for r in rows:
+        end_call(r["id"], seconds=0, status=CALL_STATUS_MISSED)
+    return len(rows)
+
+
+def recent_calls_with(username, other, limit=6):
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM call_sessions WHERE (started_by = ? AND other_user = ?) "
+        "OR (started_by = ? AND other_user = ?) ORDER BY id DESC LIMIT ?",
+        (username, other, other, username, limit)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
 
 
 def count_calls_for(contact_name):

@@ -14,9 +14,11 @@
   </div>
 </div>
 
-<div class="card" style="max-width:640px; margin-bottom:20px;">
-  <form method="post" action="{{ url_for('note_add') }}" class="todo-add-row">
-    <input type="text" name="text" placeholder="Write a note..." required>
+<div class="notes-layout">
+<div class="card notes-composer">
+  <div class="notes-composer-title">{{ icon('edit') }}New note</div>
+  <form method="post" action="{{ url_for('note_add') }}" class="notes-composer-form">
+    <textarea name="text" rows="3" placeholder="Write a note..." required></textarea>
     <select name="color">
       <option value="blue">Blue</option>
       <option value="green">Green</option>
@@ -35,8 +37,9 @@
     <div class="note-meta">{{ n.created_at[:16].replace("T", " ") if n.created_at else "" }}</div>
   </div>
   {% else %}
-  <div class="empty-state">No notes yet — add one above.</div>
+  <div class="empty-state">No notes yet. Write one on the left and it appears here.</div>
   {% endfor %}
+</div>
 </div>
 
 {% endblock %}

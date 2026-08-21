@@ -1,0 +1,157 @@
+{# The one share dialog used everywhere: record pages, register pages, call pages.
+   Requires: share_kind, share_form_code, share_record_id (may be none),
+             share_title, share_url, colleagues (list of user rows).
+   Renders a trigger button plus a modal. Include once per page. #}
+
+<div class="share-wrap no-print">
+  <button type="button" class="btn btn-secondary" data-share-open>
+    {{ icon('share') }}<span>Share</span>
+  </button>
+</div>
+
+<div class="share-modal" id="shareModal" hidden>
+  <div class="share-backdrop" data-share-close></div>
+  <div class="share-panel" role="dialog" aria-modal="true" aria-labelledby="shareHeading">
+    <header class="share-head">
+      <div>
+        <h2 id="shareHeading">Share this {{ share_kind }}</h2>
+        <p class="share-sub">{{ share_title }}</p>
+      </div>
+      <button type="button" class="icon-btn" data-share-close aria-label="Close">{{ icon('close') }}</button>
+    </header>
+
+    <div class="share-tabs" role="tablist">
+      <button type="button" class="share-tab active" data-share-tab="inside" role="tab">Inside the company</button>
+      <button type="button" class="share-tab" data-share-tab="outside" role="tab">Outside the company</button>
+    </div>
+
+    {# ---------------------------------------------------------- inside -- #}
+    <section class="share-body" data-share-pane="inside">
+      <form method="post" action="{{ url_for('share_send') }}">
+        <input type="hidden" name="kind" value="{{ share_kind }}">
+        <input type="hidden" name="form_code" value="{{ share_form_code or '' }}">
+        <input type="hidden" name="record_id" value="{{ share_record_id or '' }}">
+        <input type="hidden" name="next" value="{{ request.full_path }}">
+
+        <label class="share-label">Send to</label>
+        <div class="share-people">
+          {% for c in share_colleagues %}
+          <label class="share-person">
+            <input type="checkbox" name="to" value="{{ c.username }}">
+            <span class="share-person-avatar">
+              {% if c.photo_path %}<img src="{{ url_for('photo_file', relpath=c.photo_path) }}" alt="">
+              {% else %}{{ (c.full_name or c.username)[:1]|upper }}{% endif %}
+            </span>
+            <span class="share-person-text">
+              <b>{{ c.full_name or c.username }}</b>
+              <em>{{ ROLES[c.role].label if c.role in ROLES else c.role }}</em>
+            </span>
+          </label>
+          {% else %}
+          <p class="field-hint">No other colleagues have accounts yet.</p>
+          {% endfor %}
+        </div>
+
+        <label class="share-label" for="shareNote">Add a note <em>(optional)</em></label>
+        <textarea id="shareNote" name="note" rows="2" maxlength="500"
+                  placeholder="Why are you sending this? e.g. &quot;Expires next month - please start the renewal.&quot;"></textarea>
+
+        <p class="field-hint">
+          It arrives in their chat and on their notification bell. Anyone without access to this
+          department is skipped automatically.
+        </p>
+        <button type="submit" class="btn">{{ icon('share') }}<span>Send</span></button>
+      </form>
+    </section>
+
+    {# --------------------------------------------------------- outside -- #}
+    <section class="share-body" data-share-pane="outside" hidden>
+      <div class="share-outside">
+        <div class="share-qr">
+          <img src="{{ url_for('qr_svg', d=share_url, s=5) }}" alt="QR code for this page" width="180" height="180">
+          <p class="field-hint">Point a phone camera at this to open the page. It only works for people who can reach this system.</p>
+        </div>
+
+        <div class="share-outside-actions">
+          {% if share_pdf_url %}
+          <a class="share-action" href="{{ share_pdf_url }}">
+            {{ icon('file-text') }}
+            <span><b>Download a PDF</b><em>A branded sheet you can email or send on WhatsApp</em></span>
+          </a>
+          {% endif %}
+          <button type="button" class="share-action" data-share-copy="{{ share_abs_url }}">
+            {{ icon('link') }}
+            <span><b>Copy the link</b><em>{{ share_abs_url }}</em></span>
+          </button>
+          <a class="share-action" target="_blank" rel="noopener"
+             href="https://wa.me/?text={{ (share_title ~ ' - ' ~ share_abs_url)|urlencode }}">
+            {{ icon('phone') }}
+            <span><b>Send on WhatsApp</b><em>Opens WhatsApp with the link ready</em></span>
+          </a>
+          <a class="share-action"
+             href="mailto:?subject={{ share_title|urlencode }}&body={{ ('Shared from DHARANI 360:%0D%0A%0D%0A' ~ share_title ~ '%0D%0A' ~ share_abs_url)|safe }}">
+            {{ icon('mail') }}
+            <span><b>Email the link</b><em>Opens your mail app</em></span>
+          </a>
+        </div>
+      </div>
+      <p class="field-hint share-warn">
+        {{ icon('shield') }}
+        A link only opens for someone who can reach this system and has an account. To send the
+        contents to a client, use the PDF.
+      </p>
+    </section>
+  </div>
+</div>
+
+<script>
+(function () {
+  var modal = document.getElementById('shareModal');
+  if (!modal) return;
+  function open()  { modal.hidden = false; document.body.classList.add('modal-open'); }
+  function close() { modal.hidden = true;  document.body.classList.remove('modal-open'); }
+
+  document.querySelectorAll('[data-share-open]').forEach(function (b) {
+    b.addEventListener('click', open);
+  });
+  modal.querySelectorAll('[data-share-close]').forEach(function (b) {
+    b.addEventListener('click', close);
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !modal.hidden) close();
+  });
+
+  modal.querySelectorAll('[data-share-tab]').forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      var want = tab.getAttribute('data-share-tab');
+      modal.querySelectorAll('[data-share-tab]').forEach(function (t) {
+        t.classList.toggle('active', t === tab);
+      });
+      modal.querySelectorAll('[data-share-pane]').forEach(function (p) {
+        p.hidden = p.getAttribute('data-share-pane') !== want;
+      });
+    });
+  });
+
+  modal.querySelectorAll('[data-share-copy]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var text = btn.getAttribute('data-share-copy');
+      var done = function () {
+        var was = btn.querySelector('b').textContent;
+        btn.querySelector('b').textContent = 'Copied';
+        setTimeout(function () { btn.querySelector('b').textContent = was; }, 1600);
+      };
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(done, function () { legacy(text, done); });
+      } else { legacy(text, done); }
+    });
+  });
+  function legacy(text, done) {
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) { /* nothing to do */ }
+    document.body.removeChild(ta);
+  }
+})();
+</script>

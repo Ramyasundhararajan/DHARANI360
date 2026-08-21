@@ -71,24 +71,27 @@
 </div>
 {% endfor %}
 
-<div class="widget-grid">
-{% for panel in other_panels %}
-
-  {% if panel.type == 'funnel' %}
-  <div class="card funnel-card" style="grid-column: 1 / -1;">
-    {{ ui.card_head(panel.title, icon('git-branch')) }}
-    <div class="funnel">
-      {% for stage in panel.stages %}
-      <div class="funnel-stage">
-        <div class="funnel-count">{{ stage.count }}</div>
-        <div class="funnel-label">{{ stage.label }}</div>
-      </div>
-      {% if not loop.last %}<div class="funnel-arrow">{{ icon('chevron') }}</div>{% endif %}
-      {% endfor %}
+{# The funnel is always full width, so it sits outside the grid. Keeping it
+   inside threw off the "is this card a lonely remainder?" counting below. #}
+{% for panel in other_panels if panel.type == 'funnel' %}
+<div class="card funnel-card">
+  {{ ui.card_head(panel.title, icon('git-branch')) }}
+  <div class="funnel">
+    {% for stage in panel.stages %}
+    <div class="funnel-stage">
+      <div class="funnel-count">{{ stage.count }}</div>
+      <div class="funnel-label">{{ stage.label }}</div>
     </div>
+    {% if not loop.last %}<div class="funnel-arrow">{{ icon('chevron') }}</div>{% endif %}
+    {% endfor %}
   </div>
+</div>
+{% endfor %}
 
-  {% elif panel.type == 'breakdown' %}
+<div class="widget-grid">
+{% for panel in other_panels if panel.type != 'funnel' %}
+
+  {% if panel.type == 'breakdown' %}
   <div class="card">
     {{ ui.card_head(panel.title, icon('trending-up')) }}
     {% if panel.bars %}

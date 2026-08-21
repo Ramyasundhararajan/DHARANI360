@@ -30,10 +30,11 @@
       <div class="profile-name">{{ emp.full_name if emp else (current_user.full_name or current_user.username) }}</div>
       {% if emp %}
       <div class="profile-meta">
-        <span>{{ emp.position or "—" }}</span>
-        <span>{{ emp.department or "—" }}</span>
-        <span>{{ emp.email or "—" }}</span>
-        <span>{{ emp.phone or "—" }}</span>
+        {# Only show what is actually filled in - four em-dashes in a row read
+           as a broken page rather than as missing data. #}
+        {% for bit in [emp.position, emp.department, emp.email, emp.phone] if bit %}
+        <span>{{ bit }}</span>
+        {% endfor %}
       </div>
       <div class="profile-tags">
         <span class="badge badge-{{ status_color(emp.status) }}">{{ emp.status or "—" }}</span>

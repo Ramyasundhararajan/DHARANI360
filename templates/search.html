@@ -20,7 +20,8 @@
 
 {% if q %}
 <div class="crumbs" style="margin-bottom:14px;">{{ results|length }} result(s) for &ldquo;{{ q }}&rdquo;</div>
-<div class="table-wrap">
+  <div class="table-scroll-hint">{{ icon('chevron') }}<span>Swipe the table sideways to see every column.</span></div>
+<div class="table-wrap table-sparse">
 <table>
   <thead><tr><th>Doc No.</th><th>Register</th><th>Department</th><th>Status</th></tr></thead>
   <tbody>

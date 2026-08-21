@@ -18,11 +18,14 @@ import io
 import csv
 import json
 import calendar as cal_mod
+from urllib.parse import urljoin
 from datetime import date, datetime
 from flask import (Flask, render_template, request, redirect, url_for, flash,
-                    Response, send_file, abort, g)
+                    Response, send_file, abort, g, make_response)
 
 import db
+import pdfout
+import qrgen
 import auth
 import icons
 import insights
@@ -126,6 +129,12 @@ def inject_globals():
         "forms_for_dept": forms_for_dept,
         "nav_counts": counts,
         "chat_unread": db.chat_unread_total(user["username"]) if user else 0,
+        # Everyone you could share something with. Available everywhere so the
+        # Share dialog can be dropped into any page without its route having to
+        # know about sharing at all.
+        "share_colleagues": ([u for u in db.list_users()
+                              if u["username"] != user["username"] and u.get("active", 1)]
+                             if user else []),
         "notifications": _notifications(user) if user else [],
         "today_label": date.today().strftime("%d %b %Y"),
         # _rules_strip.html is included from register, form and department
@@ -1092,8 +1101,36 @@ def chat(username=None):
     elif colleagues:
         return redirect(url_for("chat", username=colleagues[0]["username"]))
 
+    # The right-hand panel: what this conversation has actually produced.
+    files, shared = [], []
+    calls_with = []
+    if active:
+        for m in thread:
+            if m.get("kind") == "file":
+                files.append(m)
+            elif m.get("kind") == "share":
+                try:
+                    m["share"] = json.loads(m["meta"] or "{}")
+                except (TypeError, ValueError):
+                    m["share"] = {}
+                shared.append(m)
+            elif m.get("kind") == "share":
+                pass
+        files.reverse()
+        shared.reverse()
+        db.expire_stale_calls()
+        calls_with = db.recent_calls_with(me["username"], active["username"])
+
+    for m in thread:
+        if m.get("kind") == "share" and "share" not in m:
+            try:
+                m["share"] = json.loads(m["meta"] or "{}")
+            except (TypeError, ValueError):
+                m["share"] = {}
+
     return render_template("chat.html", colleagues=colleagues, active=active,
-                            thread=thread, me=me)
+                            thread=thread, me=me, panel_files=files[:12],
+                            panel_shared=shared[:12], panel_calls=calls_with)
 
 
 @app.route("/chat/<username>/send", methods=["POST"])
@@ -1118,11 +1155,22 @@ def chat_messages_json(username):
         abort(404)
     thread = db.chat_thread(me["username"], username)
     db.mark_chat_read(me["username"], username)
-    return {"messages": [
-        {"id": m["id"], "mine": m["from_user"] == me["username"],
-         "body": m["body"], "at": (m["created_at"] or "")[11:16]}
-        for m in thread
-    ]}
+    out = []
+    for m in thread:
+        item = {"id": m["id"], "mine": m["from_user"] == me["username"],
+                "body": m["body"], "at": (m["created_at"] or "")[11:16],
+                "kind": m.get("kind") or "text"}
+        if item["kind"] == "file":
+            item["file"] = {"name": m["attach_name"],
+                            "size": m["attach_size"] or 0,
+                            "url": url_for("chat_file", message_id=m["id"])}
+        elif item["kind"] in ("share", "call"):
+            try:
+                item["meta"] = json.loads(m["meta"] or "{}")
+            except (TypeError, ValueError):
+                item["meta"] = {}
+        out.append(item)
+    return {"messages": out}
 
 
 @app.route("/meetings/add", methods=["POST"])
@@ -1478,6 +1526,463 @@ def call_log_quick():
     db.insert_record("SAL-009", data, created_by=user["full_name"] or user["username"])
     flash("Call logged for {}.".format(data["contact_name"]), "success")
     return redirect(url_for("calls", view=request.form.get("return_view", "all")))
+
+
+
+# ============================================================================
+#  CALLING, CHAT FILES AND SHARING
+#  --------------------------------------------------------------------------
+#  Three jobs that all come down to the same thing: moving one fact from the
+#  person who has it to the person who needs it, and leaving a record behind.
+#
+#    * a call happens in a private room and writes itself into SAL-009
+#    * a file dropped into chat is stored under instance/chatfiles
+#    * a share puts a record into a colleague's conversation and their bell
+#
+#  Everything except the video room itself works with no internet connection.
+# ============================================================================
+
+MEET_HOST = os.environ.get("DHARANI_MEET_HOST", "meet.jit.si")
+
+
+def _abs(path):
+    """Absolute URL for a path on this server - what goes in a QR or an email."""
+    return urljoin(request.url_root, path.lstrip("/"))
+
+
+def _display_name(user):
+    return (user.get("full_name") or user.get("username") or "").strip()
+
+
+def _share_subject(kind, form_code=None, record_id=None):
+    """Resolve what is being shared into a title, a line of detail and a link.
+
+    Returns None when the thing does not exist or the person may not see it,
+    so one function guards every share route.
+    """
+    if kind == "record":
+        form = FORMS_BY_CODE.get(form_code)
+        if not form:
+            return None
+        if not can_access_dept(auth.current_user()["role"], form["dept"]):
+            return None
+        rec = db.get_record(form_code, record_id)
+        if not rec:
+            return None
+        dept = DEPARTMENTS_BY_CODE.get(form["dept"], {})
+        bits = []
+        for f in form["fields"][:3]:
+            v = rec.get(f["name"])
+            if v not in (None, ""):
+                bits.append("{}: {}".format(f["label"], v))
+        return {
+            "kind": "record", "form_code": form_code, "record_id": record_id,
+            "title": "{} - {}".format(rec.get("doc_no") or form["code"], form["title"]),
+            "detail": " | ".join(bits)[:190] or dept.get("name", ""),
+            "badge": "DR-" + form["code"], "dept": form["dept"],
+            "status": rec.get("status") or "",
+            "url": url_for("record_view", form_code=form_code, record_id=record_id),
+        }
+    if kind == "register":
+        form = FORMS_BY_CODE.get(form_code)
+        if not form:
+            return None
+        if not can_access_dept(auth.current_user()["role"], form["dept"]):
+            return None
+        rows, total = db.get_records(form_code)
+        return {
+            "kind": "register", "form_code": form_code, "record_id": None,
+            "title": form["title"],
+            "detail": "{} record{} in this register".format(total, "" if total == 1 else "s"),
+            "badge": "DR-" + form["code"], "dept": form["dept"], "status": "",
+            "url": url_for("register", form_code=form_code),
+        }
+    return None
+
+
+@app.route("/qr.svg")
+@auth.login_required
+def qr_svg():
+    """A QR code for one of this system's own pages.
+
+    Only addresses on this server are encoded. That is deliberate: it keeps
+    DHARANI 360 from being used to dress up somebody else's link as ours.
+    """
+    target = request.args.get("d", "").strip()
+    if not target:
+        abort(400)
+    if not target.startswith(("/", request.url_root)):
+        abort(400)
+    if target.startswith("/"):
+        target = _abs(target)
+    try:
+        svg = qrgen.qr_svg(target, scale=int(request.args.get("s", 6)),
+                            dark="#0b2b33", light="#ffffff",
+                            title="Opens this page in DHARANI 360")
+    except qrgen.QRError:
+        abort(400)
+    resp = make_response(svg)
+    resp.headers["Content-Type"] = "image/svg+xml"
+    resp.headers["Cache-Control"] = "private, max-age=300"
+    return resp
+
+
+@app.route("/share", methods=["POST"])
+@auth.login_required
+def share_send():
+    """Hand a record or a register to one or more colleagues.
+
+    It lands in their conversation as a card and, because it is an unread
+    message, on their notification bell. Nothing leaves this system.
+    """
+    me = auth.current_user()
+    kind = request.form.get("kind", "record")
+    form_code = request.form.get("form_code") or None
+    record_id = request.form.get("record_id", type=int)
+    note = (request.form.get("note") or "").strip()[:500]
+    targets = [t for t in request.form.getlist("to") if t and t != me["username"]]
+    back = request.form.get("next") or request.referrer or url_for("dashboard")
+
+    subject = _share_subject(kind, form_code, record_id)
+    if not subject:
+        flash("That item could not be shared - it may have been deleted.", "error")
+        return redirect(back)
+    if not targets:
+        flash("Choose at least one colleague to share with.", "error")
+        return redirect(back)
+
+    allowed = {u["username"] for u in db.list_users() if u.get("active", 1)}
+    sent = []
+    for username in targets:
+        if username not in allowed:
+            continue
+        target = db.get_user_by_username(username)
+        if target and not can_access_dept(target["role"], subject.get("dept") or ""):
+            flash("{} does not have access to {} - not shared with them."
+                  .format(target["full_name"] or username,
+                          DEPARTMENTS_BY_CODE.get(subject.get("dept"), {}).get("name", "that department")),
+                  "warning")
+            continue
+        db.send_chat(me["username"], username, note or subject["title"],
+                     kind="share", meta=subject)
+        sent.append(target["full_name"] if target else username)
+
+    if sent:
+        flash("Shared with {}. It is in their chat now.".format(", ".join(sent)), "success")
+    return redirect(back)
+
+
+@app.route("/chat/<username>/attach", methods=["POST"])
+@auth.login_required
+def chat_attach(username):
+    """Send a document or a photo inside a conversation."""
+    me = auth.current_user()
+    if not db.get_user_by_username(username) or username == me["username"]:
+        abort(404)
+    fs = request.files.get("file")
+    if not fs:
+        flash("No file was chosen.", "error")
+        return redirect(url_for("chat", username=username))
+    _mid, err = db.send_chat_file(me["username"], username, fs,
+                                  caption=(request.form.get("caption") or "").strip()[:300])
+    if err:
+        flash(err, "error")
+    return redirect(url_for("chat", username=username))
+
+
+@app.route("/chat/file/<int:message_id>")
+@auth.login_required
+def chat_file(message_id):
+    """Download a chat attachment - only the two people in the conversation."""
+    me = auth.current_user()["username"]
+    msg = db.get_chat_message(message_id)
+    if not msg or msg["kind"] != "file":
+        abort(404)
+    if me not in (msg["from_user"], msg["to_user"]):
+        abort(403)
+    path = db.chat_file_path(msg)
+    if not path:
+        abort(404)
+    return send_file(path, as_attachment=True,
+                     download_name=msg["attach_name"] or "attachment")
+
+
+# ------------------------------------------------------------------- calls --
+
+def _call_can_see(call, user):
+    return user["username"] in (call["started_by"], call["other_user"] or "")
+
+
+def _log_call_to_register(call, logged_by):
+    """Write a finished call into DR-SAL-009 so it joins the permanent history."""
+    if call.get("record_id"):
+        return call["record_id"]
+    minutes = round((call.get("duration_seconds") or 0) / 60.0, 1)
+    started = call.get("started_at") or ""
+    other = call.get("contact_name")
+    if not other and call.get("other_user"):
+        u = db.get_user_by_username(call["other_user"])
+        other = (u["full_name"] if u else call["other_user"])
+    direction = "Outgoing" if call["started_by"] == logged_by else "Incoming"
+    if call.get("status") == db.CALL_STATUS_MISSED:
+        direction = "Missed"
+    data = {
+        "call_direction": direction,
+        "call_type": "Video Call" if call.get("mode") != "voice" else "Voice Call",
+        "contact_name": other or "Unknown",
+        "contact_number": call.get("contact_number") or "",
+        "call_date": (started[:10] or date.today().isoformat()),
+        "call_time": started[11:16],
+        "duration_minutes": minutes,
+        "outcome": call.get("outcome") or ("No answer" if call.get("status") == db.CALL_STATUS_MISSED
+                                           else "Completed"),
+        "summary": call.get("subject") or "",
+        "agent_name": logged_by,
+        "status": "Logged",
+        "notes": "[in-app call]",
+    }
+    try:
+        doc_no = db.insert_record("SAL-009", data, created_by=logged_by)
+    except Exception:
+        return None
+    # insert_record hands back the document number; the row id is what the
+    # call-detail URL needs.
+    rid = db.record_id_for_doc("SAL-009", doc_no)
+    if rid:
+        db.attach_call_record(call["id"], rid)
+    return rid
+
+
+@app.route("/call/start/<username>", methods=["POST"])
+@auth.login_required
+def call_start(username):
+    """Ring a colleague. Creates the room and drops a card in their chat."""
+    me = auth.current_user()
+    target = db.get_user_by_username(username)
+    if not target or username == me["username"] or not target.get("active", 1):
+        abort(404)
+    db.expire_stale_calls()
+    mode = "voice" if request.form.get("mode") == "voice" else "video"
+    call = db.start_call(me["username"], other_user=username, mode=mode,
+                         subject=(request.form.get("subject") or "").strip()[:160])
+    db.send_chat(me["username"], username,
+                 "{} call started".format("Video" if mode == "video" else "Voice"),
+                 kind="call", meta={"call_id": call["id"], "mode": mode,
+                                    "room": call["room"], "status": "ringing"})
+    return redirect(url_for("call_room", call_id=call["id"]))
+
+
+@app.route("/call/quick", methods=["POST"])
+@auth.login_required
+def call_quick():
+    """Open a room for somebody outside the company - a client, an owner, a
+    lawyer. They join with the guest link; no account, nothing to install."""
+    me = auth.current_user()
+    name = (request.form.get("contact_name") or "").strip()
+    if not name:
+        flash("Who is the call with? Add a name so it can be logged.", "error")
+        return redirect(url_for("calls"))
+    call = db.start_call(me["username"], contact_name=name,
+                         contact_number=(request.form.get("contact_number") or "").strip(),
+                         mode="voice" if request.form.get("mode") == "voice" else "video",
+                         subject=(request.form.get("subject") or "").strip()[:160])
+    return redirect(url_for("call_room", call_id=call["id"]))
+
+
+@app.route("/call/<int:call_id>")
+@auth.login_required
+def call_room(call_id):
+    """The call screen itself."""
+    me = auth.current_user()
+    call = db.get_call(call_id)
+    if not call:
+        abort(404)
+    if not _call_can_see(call, me):
+        abort(403)
+    if call["other_user"] == me["username"]:
+        call = db.answer_call(call_id)
+
+    other = None
+    if call["other_user"]:
+        other = db.get_user_by_username(
+            call["other_user"] if call["started_by"] == me["username"] else call["started_by"])
+    guest_link = _abs(url_for("call_guest", token=call["guest_token"]))
+    room_link = "https://{}/{}".format(MEET_HOST, call["room"])
+    history = db.recent_calls_with(me["username"], call["other_user"] or "") if call["other_user"] else []
+
+    return render_template("call_room.html", call=call, other=other, me=me,
+                            meet_host=MEET_HOST, guest_link=guest_link,
+                            room_link=room_link, history=history,
+                            display_name=_display_name(me))
+
+
+@app.route("/call/<int:call_id>/end", methods=["POST"])
+@auth.login_required
+def call_end(call_id):
+    """Hang up and write the call into the register. Called by the page when
+    the room closes, and by the Leave button, so a closed tab still logs."""
+    me = auth.current_user()
+    call = db.get_call(call_id)
+    if not call:
+        abort(404)
+    if not _call_can_see(call, me):
+        abort(403)
+    seconds = request.form.get("seconds", type=int)
+    if seconds is None:
+        seconds = (request.get_json(silent=True) or {}).get("seconds")
+    ended = db.end_call(call_id, seconds=seconds,
+                        outcome=(request.form.get("outcome") or "").strip()[:200])
+    rid = _log_call_to_register(ended, _display_name(me))
+    if request.form.get("quiet") or request.headers.get("X-Requested-With") == "beacon":
+        return {"ok": True, "record_id": rid}
+    if rid:
+        flash("Call ended and logged to the Call Log.", "success")
+    return redirect(url_for("call_detail", record_id=rid) if rid else url_for("calls"))
+
+
+@app.route("/call/<int:call_id>/decline", methods=["POST"])
+@auth.login_required
+def call_decline(call_id):
+    me = auth.current_user()
+    call = db.get_call(call_id)
+    if not call or not _call_can_see(call, me):
+        abort(404)
+    ended = db.end_call(call_id, seconds=0, status=db.CALL_STATUS_MISSED,
+                        outcome="Declined")
+    _log_call_to_register(ended, _display_name(me))
+    return {"ok": True}
+
+
+@app.route("/call/incoming.json")
+@auth.login_required
+def call_incoming():
+    """Polled by every page so a call rings wherever the person is."""
+    me = auth.current_user()
+    db.expire_stale_calls()
+    out = []
+    for c in db.incoming_calls_for(me["username"]):
+        caller = db.get_user_by_username(c["started_by"])
+        out.append({
+            "id": c["id"], "mode": c["mode"],
+            "from": (caller["full_name"] if caller else c["started_by"]),
+            "role": (caller["role"] if caller else ""),
+            "url": url_for("call_room", call_id=c["id"]),
+            "decline": url_for("call_decline", call_id=c["id"]),
+        })
+    return {"calls": out}
+
+
+@app.route("/call/guest/<token>")
+def call_guest(token):
+    """The link handed to somebody outside the company. No sign-in: holding
+    the link is the permission, which is why the token is long and random."""
+    call = db.get_call_by_token(token)
+    if not call:
+        return render_template("error.html", code=404,
+                                message="That call link is not valid. Ask for a new one."), 404
+    if call["status"] == db.CALL_STATUS_ENDED:
+        return render_template("error.html", code=410,
+                                message="That call has already finished."), 410
+    host = db.get_user_by_username(call["started_by"])
+    return render_template("call_guest.html", call=call, meet_host=MEET_HOST,
+                            host_name=(host["full_name"] if host else "DHARANI 360"))
+
+
+# --------------------------------------------------------------------- PDF --
+
+def _pdf_response(doc, filename):
+    resp = make_response(doc.bytes())
+    resp.headers["Content-Type"] = "application/pdf"
+    resp.headers["Content-Disposition"] = 'attachment; filename="{}"'.format(filename)
+    return resp
+
+
+@app.route("/record/<form_code>/<int:record_id>/sheet.pdf")
+@auth.login_required
+def record_pdf(form_code, record_id):
+    """One record as a branded PDF - the thing you send to a client or a bank."""
+    form = FORMS_BY_CODE.get(form_code)
+    if not form:
+        abort(404)
+    _require_dept(form["dept"])
+    rec = db.get_record(form_code, record_id)
+    if not rec:
+        abort(404)
+    me = auth.current_user()
+    dept = DEPARTMENTS_BY_CODE.get(form["dept"], {})
+
+    doc = pdfout.Document(
+        form["title"], "DR-{} / {}".format(form["code"], dept.get("name", "")),
+        footer="DHARANI 360 - shared by {} on {}".format(
+            _display_name(me), date.today().strftime("%d %b %Y")))
+    meta = [("Document no", rec.get("doc_no") or "-"), ("Status", rec.get("status") or "-")]
+    if form.get("expiry_field"):
+        meta.append(("Expires", rec.get(form["expiry_field"]) or "-"))
+    meta.append(("Recorded by", rec.get("created_by") or "-"))
+    doc.doc_head(meta)
+
+    doc.heading("Record details")
+    doc.fields([(f["label"], rec.get(f["name"])) for f in form["fields"]
+                if f["name"] != "notes"], columns=2)
+
+    if rec.get("notes"):
+        doc.heading("Notes")
+        doc.paragraph(rec["notes"])
+
+    atts = db.get_attachments(form_code, record_id)
+    if atts:
+        doc.heading("Attached documents")
+        doc.table(["File", "Size", "Attached by", "When"],
+                  [[a["original_name"], "{:.0f} KB".format((a["size_bytes"] or 0) / 1024.0),
+                    a["uploaded_by"] or "-", (a["uploaded_at"] or "")[:10]] for a in atts],
+                  widths=[0.44, 0.14, 0.24, 0.18])
+
+    doc.space(4)
+    doc.callout("This is a copy",
+                "The live record is the one inside DHARANI 360. If this sheet and the system "
+                "disagree, the system is right. Printed {}.".format(
+                    datetime.now().strftime("%d %b %Y at %H:%M")))
+    doc.qr(qrgen.matrix(_abs(url_for("record_view", form_code=form_code, record_id=record_id))),
+           "Scan to open this record")
+    return _pdf_response(doc, "{}.pdf".format((rec.get("doc_no") or form["code"]).replace("/", "-")))
+
+
+@app.route("/register/<form_code>/export.pdf")
+@auth.login_required
+def register_pdf(form_code):
+    """A whole register as a PDF table - for a meeting, an audit or an email."""
+    form = FORMS_BY_CODE.get(form_code)
+    if not form:
+        abort(404)
+    _require_dept(form["dept"])
+    q = request.args.get("q", "").strip()
+    rows, total = db.get_records(form_code, q=q or None)
+    dept = DEPARTMENTS_BY_CODE.get(form["dept"], {})
+    me = auth.current_user()
+
+    doc = pdfout.Document(
+        form["title"], "DR-{} / {}".format(form["code"], dept.get("name", "")),
+        footer="DHARANI 360 - exported by {} on {}".format(
+            _display_name(me), date.today().strftime("%d %b %Y")))
+    doc.doc_head([("Records", str(total)),
+                  ("Filter", q or "none"),
+                  ("Exported", date.today().strftime("%d %b %Y"))])
+
+    cols = [{"label": "Doc no", "name": "doc_no"}] + form["fields"][:4] + [
+        {"label": "Status", "name": "status"}]
+    body = form["fields"][:4]
+    widths = [0.24] + [0.63 / max(1, len(body))] * len(body) + [0.13]
+    doc.heading("Register")
+    doc.table([c["label"] for c in cols],
+              [[r.get(c["name"]) for c in cols] for r in rows],
+              widths=widths[:len(cols)], max_rows=400)
+    if total > 400:
+        doc.paragraph("Showing the first 400 of {} records. Narrow the search to export "
+                      "a smaller set.".format(total), color=pdfout.MUTED)
+    doc.space(4)
+    doc.qr(qrgen.matrix(_abs(url_for("register", form_code=form_code))),
+           "Scan to open the live register")
+    return _pdf_response(doc, "{}-register.pdf".format(form["code"]))
 
 
 @app.route("/regulations")

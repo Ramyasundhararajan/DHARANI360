@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Join the call · DHARANI 360</title>
+<link rel="icon" href="{{ url_for('static', filename='images/logo.png') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="guest-body">
+
+<div class="guest-shell">
+  <header class="guest-head">
+    <img src="{{ url_for('static', filename='images/logo.png') }}" alt="" class="guest-logo">
+    <div>
+      <b>DHARANI 360</b>
+      <span>{{ host_name }} is inviting you to a {{ 'video' if call.mode != 'voice' else 'voice' }} call</span>
+    </div>
+  </header>
+
+  <div class="guest-card" id="guestGate">
+    <h1>Join the call</h1>
+    <p>Type the name you would like the others to see, then join. Nothing is installed and no
+       account is needed.</p>
+    <label for="guestName">Your name</label>
+    <input type="text" id="guestName" maxlength="60" placeholder="e.g. Ahmed Al Marri"
+           value="{{ call.contact_name or '' }}" autocomplete="name">
+    <button type="button" class="btn" id="guestJoin">Join now</button>
+    <p class="guest-note">
+      Your browser will ask permission for the camera and microphone. This link is private &mdash;
+      please do not forward it.
+    </p>
+  </div>
+
+  <div class="guest-stage" id="guestStage" hidden></div>
+
+  <div class="guest-card" id="guestOffline" hidden>
+    <h1>The room could not load</h1>
+    <p>This device could not reach the call service. Check the internet connection and open this
+       link again, or join the room directly:</p>
+    <a class="btn" href="https://{{ meet_host }}/{{ call.room }}" target="_blank" rel="noopener">Open the room</a>
+  </div>
+</div>
+
+<script src="https://{{ meet_host }}/external_api.js"
+        onerror="document.getElementById('guestOffline').hidden=false;document.getElementById('guestGate').hidden=true;"></script>
+<script>
+(function () {
+  var btn = document.getElementById('guestJoin');
+  btn.addEventListener('click', function () {
+    var name = (document.getElementById('guestName').value || 'Guest').trim().slice(0, 60);
+    if (typeof JitsiMeetExternalAPI === 'undefined') {
+      document.getElementById('guestOffline').hidden = false;
+      document.getElementById('guestGate').hidden = true;
+      return;
+    }
+    document.getElementById('guestGate').hidden = true;
+    var stage = document.getElementById('guestStage');
+    stage.hidden = false;
+    new JitsiMeetExternalAPI({{ meet_host|tojson }}, {
+      roomName: {{ call.room|tojson }},
+      parentNode: stage,
+      width: '100%', height: '100%',
+      userInfo: { displayName: name },
+      configOverwrite: { prejoinPageEnabled: false, disableDeepLinking: true,
+                         startWithVideoMuted: {{ (call.mode == 'voice')|tojson }} },
+      interfaceConfigOverwrite: { SHOW_JITSI_WATERMARK: false, DEFAULT_BACKGROUND: '#0b2b33' }
+    });
+  });
+  document.getElementById('guestName').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') btn.click();
+  });
+})();
+</script>
+</body>
+</html>

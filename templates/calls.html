@@ -51,6 +51,65 @@
 </div>
 {% endif %}
 
+{# Starting a call, as opposed to recording one that already happened. ------- #}
+<div class="call-start card no-print">
+  <div class="call-start-head">
+    <h2>{{ icon('video') }}Start a call</h2>
+    <p>Opens a private room in this browser. Nothing to install, and the call logs itself when it ends.</p>
+  </div>
+
+  <div class="call-start-grid">
+    <div class="call-start-col">
+      <div class="call-start-label">A colleague</div>
+      <div class="call-start-people">
+        {% for c in share_colleagues %}
+        <form method="post" action="{{ url_for('call_start', username=c.username) }}" class="call-start-person">
+          <input type="hidden" name="mode" value="video">
+          <button type="submit" title="Video call {{ c.full_name or c.username }}">
+            <span class="call-start-avatar">
+              {% if c.photo_path %}<img src="{{ url_for('photo_file', relpath=c.photo_path) }}" alt="">
+              {% else %}{{ (c.full_name or c.username)[:1]|upper }}{% endif %}
+            </span>
+            <span class="call-start-name">{{ c.full_name or c.username }}</span>
+            <span class="call-start-go">{{ icon('video') }}</span>
+          </button>
+        </form>
+        {% else %}
+        <p class="field-hint">No other colleagues have accounts yet.</p>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="call-start-col">
+      <div class="call-start-label">Someone outside the company</div>
+      <form method="post" action="{{ url_for('call_quick') }}" class="call-start-form">
+        <div class="form-row">
+          <label>
+            <span>Who is the call with?</span>
+            <input type="text" name="contact_name" required maxlength="120" placeholder="e.g. Ahmed Al Marri">
+          </label>
+          <label>
+            <span>Phone <em>(optional)</em></span>
+            <input type="text" name="contact_number" maxlength="40" placeholder="+971 50 000 0000">
+          </label>
+        </div>
+        <label>
+          <span>What is it about? <em>(optional)</em></span>
+          <input type="text" name="subject" maxlength="160" placeholder="e.g. Marina 2-bed viewing follow-up">
+        </label>
+        <div class="call-start-actions">
+          <button type="submit" name="mode" value="video" class="btn">{{ icon('video') }}<span>Video room</span></button>
+          <button type="submit" name="mode" value="voice" class="btn btn-secondary">{{ icon('phone-call') }}<span>Voice only</span></button>
+        </div>
+        <p class="field-hint">
+          You get a private link to send them on WhatsApp or email. They join in a browser &mdash;
+          no account, nothing to download.
+        </p>
+      </form>
+    </div>
+  </div>
+</div>
+
 <details class="quick-log no-print">
   <summary class="quick-log-summary">
     {{ icon('phone') }}<span>Log a call</span>

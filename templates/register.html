@@ -26,7 +26,16 @@
 
 <div class="btn-row">
   <a class="btn" href="{{ url_for('form_view', form_code=form.code) }}">+ New Entry</a>
-  <a class="btn btn-secondary" href="{{ url_for('export_csv', form_code=form.code) }}">Export CSV</a>
+  <a class="btn btn-secondary" href="{{ url_for('export_csv', form_code=form.code) }}">{{ icon('download') }}<span>Export CSV</span></a>
+  <a class="btn btn-secondary" href="{{ url_for('register_pdf', form_code=form.code, q=q) }}">{{ icon('file-text') }}<span>Export PDF</span></a>
+  {% set share_kind = 'register' %}
+  {% set share_form_code = form.code %}
+  {% set share_record_id = none %}
+  {% set share_title = reg_label %}
+  {% set share_url = url_for('register', form_code=form.code) %}
+  {% set share_abs_url = request.url_root.rstrip('/') ~ share_url %}
+  {% set share_pdf_url = url_for('register_pdf', form_code=form.code, q=q) %}
+  {% include "_share_box.html" %}
   {% if q %}<a class="btn btn-secondary" href="{{ url_for('register', form_code=form.code) }}">Clear Filter</a>{% endif %}
   <span class="crumbs" style="align-self:center; margin-left:auto;">{{ total }} record{{ 's' if total != 1 else '' }}</span>
 </div>
@@ -38,6 +47,7 @@
   </a>
 {%- endmacro %}
 
+  <div class="table-scroll-hint">{{ icon('chevron') }}<span>Swipe the table sideways to see every column.</span></div>
 <div class="table-wrap">
 <table>
   <thead>

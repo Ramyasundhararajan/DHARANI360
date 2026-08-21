@@ -68,6 +68,7 @@
 <form id="reset-form-{{ u.id }}" method="post" action="{{ url_for('user_reset_password', user_id=u.id) }}" data-confirm="Reset the password for {{ u.username }}? A new temporary password will be generated."></form>
 <form id="delete-form-{{ u.id }}" method="post" action="{{ url_for('user_delete', user_id=u.id) }}" data-confirm="Delete the account for {{ u.username }}? They will no longer be able to sign in. Their sign-in history and every record they created are kept. This cannot be undone."></form>
 {% endfor %}
+  <div class="table-scroll-hint">{{ icon('chevron') }}<span>Swipe the table sideways to see every column.</span></div>
 <div class="table-wrap">
 <table>
   <thead><tr><th></th><th>Username</th><th>Full Name</th><th>Work Email</th><th>Role</th><th>Active</th><th>Last Login</th><th>Actions</th></tr></thead>

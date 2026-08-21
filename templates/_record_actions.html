@@ -10,24 +10,21 @@
       {{ icon('download') }}<span>Download</span>{{ icon('chevron') }}
     </button>
     <div class="action-menu-panel">
-      <button type="button" onclick="window.print()">{{ icon('printer') }}<span>PDF <em>(print dialog)</em></span></button>
+      <a href="{{ url_for('record_pdf', form_code=form.code, record_id=record.id) }}">{{ icon('file-text') }}<span>PDF sheet <em>(branded)</em></span></a>
+      <button type="button" data-copy-summary>{{ icon('copy') }}<span>Copy summary text</span></button>
       <a href="{{ url_for('record_download', form_code=form.code, record_id=record.id, fmt='csv') }}">{{ icon('download') }}<span>CSV spreadsheet</span></a>
       <a href="{{ url_for('record_download', form_code=form.code, record_id=record.id, fmt='json') }}">{{ icon('download') }}<span>JSON data</span></a>
     </div>
   </div>
 
-  <div class="action-menu">
-    <button type="button" class="btn btn-secondary action-menu-trigger">
-      {{ icon('share') }}<span>Share</span>{{ icon('chevron') }}
-    </button>
-    <div class="action-menu-panel">
-      <button type="button" data-copy-link>{{ icon('link') }}<span>Copy link to this record</span></button>
-      <button type="button" data-copy-summary>{{ icon('copy') }}<span>Copy summary text</span></button>
-      <a href="mailto:?subject={{ record.doc_no|urlencode }}%20-%20{{ form.title|urlencode }}&body=Record%20{{ record.doc_no|urlencode }}%20in%20DHARANI%20360.%0A%0AOpen%20on%20the%20office%20computer%3A%20{{ request.url|urlencode }}">
-        {{ icon('mail') }}<span>Email this link</span>
-      </a>
-    </div>
-  </div>
+  {% set share_kind = 'record' %}
+  {% set share_form_code = form.code %}
+  {% set share_record_id = record.id %}
+  {% set share_title = (record.doc_no or form.code) ~ ' - ' ~ form.title %}
+  {% set share_url = url_for('record_view', form_code=form.code, record_id=record.id) %}
+  {% set share_abs_url = request.url_root.rstrip('/') ~ share_url %}
+  {% set share_pdf_url = url_for('record_pdf', form_code=form.code, record_id=record.id) %}
+  {% include "_share_box.html" %}
 
   <button type="button" class="btn btn-secondary" onclick="window.print()">{{ icon('printer') }}<span>Print</span></button>
 

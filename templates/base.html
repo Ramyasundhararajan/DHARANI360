@@ -343,6 +343,21 @@
   });
 })();
 
+/* A register can have more columns than the screen. Say so - and only when it
+   is actually true, so the hint never appears on a table that already fits. */
+function markScrollableTables() {
+  document.querySelectorAll('.table-wrap').forEach(function (wrap) {
+    var over = wrap.scrollWidth > wrap.clientWidth + 4;
+    wrap.classList.toggle('is-scrollable', over);
+    var hint = wrap.previousElementSibling;
+    if (hint && hint.classList && hint.classList.contains('table-scroll-hint')) {
+      hint.classList.toggle('is-needed', over);
+    }
+  });
+}
+window.addEventListener('load', markScrollableTables);
+window.addEventListener('resize', markScrollableTables);
+
 document.addEventListener('submit', function (e) {
   var form = e.target;
   if (!form || !form.getAttribute) return;
@@ -352,5 +367,61 @@ document.addEventListener('submit', function (e) {
   }
 }, true);
 </script>
+
+{% if current_user %}
+{# ---------------------------------------------------------------------------
+   Incoming call. Every page polls, so a call reaches you wherever you are in
+   the system rather than only on the Chat screen. -------------------------- #}
+<div class="ring-toast no-print" id="ringToast" hidden>
+  <div class="ring-avatar" id="ringAvatar">?</div>
+  <div class="ring-body">
+    <b id="ringName">Someone</b>
+    <em id="ringWhat">is calling you</em>
+  </div>
+  <div class="ring-actions">
+    <button type="button" class="btn btn-sm btn-danger" id="ringDecline">Decline</button>
+    <a class="btn btn-sm" id="ringAnswer" href="#">Answer</a>
+  </div>
+</div>
+<script>
+(function () {
+  var toast = document.getElementById('ringToast');
+  if (!toast) return;
+  var URL_INCOMING = {{ url_for('call_incoming')|tojson }};
+  var showing = null;
+
+  function hide() { toast.hidden = true; showing = null; }
+
+  document.getElementById('ringDecline').addEventListener('click', function () {
+    if (!showing) return;
+    var fd = new FormData();
+    fetch(showing.decline, {method: 'POST', body: fd, credentials: 'same-origin'})
+      .catch(function () {});
+    hide();
+  });
+
+  function poll() {
+    fetch(URL_INCOMING, {credentials: 'same-origin'})
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (!d || !d.calls || !d.calls.length) { if (showing) hide(); return; }
+        var c = d.calls[0];
+        if (showing && showing.id === c.id) return;
+        showing = c;
+        document.getElementById('ringName').textContent = c.from;
+        document.getElementById('ringWhat').textContent =
+          'is starting a ' + (c.mode === 'voice' ? 'voice' : 'video') + ' call';
+        document.getElementById('ringAvatar').textContent = (c.from || '?').charAt(0).toUpperCase();
+        document.getElementById('ringAnswer').href = c.url;
+        toast.hidden = false;
+      })
+      .catch(function () { /* offline - try again next tick */ });
+  }
+  setInterval(poll, 7000);
+  setTimeout(poll, 1500);
+})();
+</script>
+{% endif %}
+
 </body>
 </html>

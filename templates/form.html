@@ -84,12 +84,20 @@
     </div>
     {% endfor %}
 
+    {# A register may already have its own "Details & Notes" section from
+       group_fields(); saying it twice looked like a bug. #}
     <div class="form-section">
-      <div class="form-section-title">Details &amp; Notes</div>
+      <div class="form-section-title">
+        {% if grouped and grouped[-1][0] == 'Details &amp; Notes' or (grouped and grouped[-1][0] == 'Details & Notes') %}
+          Anything else
+        {% else %}
+          Details &amp; Notes
+        {% endif %}
+      </div>
       <div class="form-grid">
         <div class="field full">
           <label>Notes</label>
-          <textarea name="notes">{{ values.get('notes', '') }}</textarea>
+          <textarea name="notes" rows="4">{{ values.get('notes', '') }}</textarea>
         </div>
       </div>
     </div>
