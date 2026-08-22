@@ -23,6 +23,7 @@ publishable anon key only. The service-role key is never read here and must
 never be placed in it - only the one-time provisioning script asks for that,
 and it asks for it locally.
 """
+import config
 import json
 import os
 import time
@@ -31,15 +32,21 @@ import urllib.request
 
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "supabase_config.json")
 
-# Only these five addresses may sign in. This is the authoritative list: it is
-# checked before Supabase is contacted and again after it answers.
-ALLOWED_EMAILS = [
+# Addresses permitted to sign in. This is the authoritative list: it is checked
+# before Supabase is contacted and again after it answers.
+#
+# A hosted deployment sets ALLOWED_EMAILS in the environment (see .env.example)
+# so the list can change without editing code. With nothing set, the built-in
+# list below applies, and an existing installation keeps working untouched.
+DEFAULT_ALLOWED_EMAILS = [
     "akbar@dharanis.ae",
     "ramya@dharanis.ae",
     "khalidaamyn@dharanis.ae",
     "baqeer@dharanis.ae",
     "greetus@dharanis.ae",
 ]
+
+ALLOWED_EMAILS = config.ALLOWED_EMAILS or DEFAULT_ALLOWED_EMAILS
 
 _ALLOWED_SET = {e.lower() for e in ALLOWED_EMAILS}
 
@@ -59,12 +66,22 @@ def is_allowed(email):
 
 
 def load_config():
-    """Project URL and anon key, or None if not configured yet."""
-    try:
-        with open(CONFIG_PATH, "r", encoding="utf-8") as fh:
-            cfg = json.load(fh)
-    except (OSError, ValueError):
-        return None
+    """Project URL and anon key, or None if not configured yet.
+
+    The environment wins over the file. A hosted deployment sets SUPABASE_URL
+    and SUPABASE_ANON_KEY and ships no secrets file at all; a local PC keeps
+    using supabase_config.json exactly as before.
+    """
+    if config.SUPABASE_URL and config.SUPABASE_ANON_KEY:
+        cfg = {"url": config.SUPABASE_URL,
+               "anon_key": config.SUPABASE_ANON_KEY,
+               "offline_fallback": config.flag("SUPABASE_OFFLINE_FALLBACK", True)}
+    else:
+        try:
+            with open(CONFIG_PATH, "r", encoding="utf-8") as fh:
+                cfg = json.load(fh)
+        except (OSError, ValueError):
+            return None
     url = (cfg.get("url") or "").strip().rstrip("/")
     key = (cfg.get("anon_key") or "").strip()
     if not url or not key or url.startswith("https://YOUR-"):

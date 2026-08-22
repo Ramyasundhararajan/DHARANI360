@@ -12,6 +12,7 @@ company." Login required; each role sees only its departments (see
 access.py). Records link to each other automatically wherever they share
 a real-world key (lead, client, agent, property, transaction...).
 """
+import config  # noqa: F401  - must be first: loads .env into the environment
 import os
 import secrets
 import io

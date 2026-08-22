@@ -18,6 +18,7 @@ Switch by setting one environment variable:
 
 Leave it unset and everything behaves exactly as it did before.
 """
+import config  # noqa: F401  - must be first: loads .env into the environment
 import os
 import re
 import sqlite3

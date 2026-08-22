@@ -15,6 +15,7 @@ know which engine is in use.
 Every write that changes a record is recorded in audit_log: who changed
 which field, from what, to what, and when.
 """
+import config  # noqa: F401  - must be first: loads .env into the environment
 import threading
 import dbcompat
 import hashlib
