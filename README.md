@@ -278,6 +278,55 @@ rather than data.
 
 **Run `verify` at least once.** A backup nobody has restored is not a backup.
 
+### Attachments that outlive the machine
+
+Scanned passports, trade licences and signed contracts are the evidence
+behind the registers. By default they sit in `instance/uploads/` — right for
+one PC, wrong for a server, because a server's disk is disposable and these
+files are not.
+
+Set `S3_BUCKET`, `S3_ENDPOINT`, `S3_ACCESS_KEY` and `S3_SECRET_KEY` in `.env`
+and they move to object storage — Supabase Storage, Cloudflare R2, Backblaze
+B2, Wasabi or AWS S3. Then move what is already on disk:
+
+```
+python migrate_files.py check      what would move, and is the store reachable
+python migrate_files.py upload     copy it up, reading each file back to confirm
+python migrate_files.py verify     every attachment is in the store, right size
+```
+
+**Nothing is ever deleted from disk.** The local copies stay until you remove
+them yourself, so a half-finished migration costs you nothing.
+
+### Changing the schema safely
+
+```
+python migrations.py status     what the database looks like now
+python migrations.py check      exit non-zero if changes are pending
+python migrations.py upgrade    apply them
+```
+
+System tables are versioned in numbered steps. Register tables are still
+generated from `forms_data.py` — but **nothing is ever dropped**. Remove a
+field from `forms_data.py` and the column stays, holding its records, and is
+reported as an orphan. A compliance system quietly deleting a column because
+someone tidied a Python file is not a trade worth making.
+
+### Forgotten passwords
+
+Anyone can use **Forgot your password?** on the sign-in page. They get a
+one-time link that stops working after 30 minutes or on first use, whichever
+comes first. Requesting a new link kills the previous one.
+
+The link is only ever stored as a hash, so a copy of the database cannot be
+used to reset anybody's password. The page says the same thing whether or not
+the address exists — telling a stranger "no such account" turns it into a way
+to discover who works here. Every request, success and failure is in the
+Audit Trail.
+
+Requires SMTP (Settings page, or `SMTP_*` in `.env`). Without it, a director
+can still issue a one-time password from **Users & Access**.
+
 ### Knowing it is alive, and why it broke
 
 `GET /healthz` answers `{"status": "ok"}` without a sign-in, and reports
@@ -342,6 +391,10 @@ dharani360-portal/
   backup.py          <- backup, verify and restore
   smoketest.py       <- 50 checks that the whole system still works
   observability.py   <- /healthz health check and error logging
+  storage.py         <- attachments on local disk or in object storage
+  migrations.py      <- schema versioning; never drops a column
+  mailer.py          <- one place that knows how to send email
+  migrate_files.py   <- move existing attachments into object storage
   OPERATIONS.md      <- how to run it: backups, outages, secrets, deploys
   config.py          <- every setting, and where it came from
   preview.py         <- sample-data preview, isolated from real records

@@ -18,6 +18,7 @@ which field, from what, to what, and when.
 import config  # noqa: F401  - must be first: loads .env into the environment
 import threading
 import dbcompat
+import storage
 import hashlib
 import json
 import os
@@ -297,8 +298,33 @@ def init_db():
     cur.execute("CREATE INDEX IF NOT EXISTS idx_attempts_identifier "
                 "ON login_attempts (identifier, at)")
 
+    # Password-reset links. The token itself is never stored - only its hash,
+    # so a copy of this table cannot be used to reset anybody's password.
+    cur.execute("""CREATE TABLE IF NOT EXISTS password_resets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        token_hash TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        used_at TEXT,
+        requested_ip TEXT
+    )""")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_resets_hash "
+                "ON password_resets (token_hash)")
+
     conn.commit()
     dbcompat.schema_changed()
+
+    # Record the schema version. See migrations.py for why the system tables
+    # are versioned explicitly while the registers are reconciled from
+    # forms_data.py - and why nothing here ever drops a column.
+    try:
+        import migrations
+        migrations.apply_pending(conn)
+    except Exception:
+        # A migration bookkeeping failure must not stop the app from starting.
+        # `python migrations.py status` will show the real state.
+        pass
 
     # Seed a default administrator on first run only.
     row = cur.execute("SELECT COUNT(*) FROM users").fetchone()
@@ -534,6 +560,80 @@ def prune_login_attempts(older_than_hours=24):
     cutoff = (datetime.utcnow() - timedelta(hours=older_than_hours)).isoformat(timespec="seconds")
     conn = get_conn()
     conn.execute("DELETE FROM login_attempts WHERE at < ?", (cutoff,))
+    conn.commit()
+    conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Password reset links
+# ---------------------------------------------------------------------------
+
+#: How long a reset link works for. Short on purpose: it arrives by email,
+#: and email is not a secure channel.
+RESET_VALID_MINUTES = 30
+
+
+def _hash_token(token):
+    return hashlib.sha256(("d360-reset:" + (token or "")).encode("utf-8")).hexdigest()
+
+
+def create_password_reset(user_id, ip_address=None):
+    """Mint a reset token. Returns the plain token - stored only as a hash.
+
+    Any earlier unused link for this person stops working immediately, so
+    asking twice does not leave two live doors open.
+    """
+    token = uuid.uuid4().hex + uuid.uuid4().hex
+    now = datetime.utcnow()
+    conn = get_conn()
+    conn.execute("UPDATE password_resets SET used_at = ? WHERE user_id = ? AND used_at IS NULL",
+                 (now.isoformat(timespec="seconds"), user_id))
+    conn.execute(
+        "INSERT INTO password_resets (user_id, token_hash, created_at, expires_at, requested_ip) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (user_id, _hash_token(token), now.isoformat(timespec="seconds"),
+         (now + timedelta(minutes=RESET_VALID_MINUTES)).isoformat(timespec="seconds"),
+         ip_address))
+    conn.commit()
+    conn.close()
+    return token
+
+
+def password_reset_user(token):
+    """The user this token belongs to, or None if it is unusable.
+
+    Unusable covers all of: unknown, already used, and expired. The caller
+    is told nothing more than that, on purpose.
+    """
+    if not token:
+        return None
+    now = datetime.utcnow().isoformat(timespec="seconds")
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT user_id FROM password_resets "
+        "WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?",
+        (_hash_token(token), now)).fetchone()
+    conn.close()
+    return get_user(row["user_id"]) if row else None
+
+
+def consume_password_reset(token):
+    """Mark the token used. Returns the user, or None if it was not valid."""
+    user = password_reset_user(token)
+    if user is None:
+        return None
+    conn = get_conn()
+    conn.execute("UPDATE password_resets SET used_at = ? WHERE token_hash = ?",
+                 (datetime.utcnow().isoformat(timespec="seconds"), _hash_token(token)))
+    conn.commit()
+    conn.close()
+    return user
+
+
+def prune_password_resets(older_than_days=7):
+    cutoff = (datetime.utcnow() - timedelta(days=older_than_days)).isoformat(timespec="seconds")
+    conn = get_conn()
+    conn.execute("DELETE FROM password_resets WHERE created_at < ?", (cutoff,))
     conn.commit()
     conn.close()
 
@@ -1246,12 +1346,20 @@ def _attachment_dir(form_code, record_id):
     return d
 
 
+def attachment_key(form_code, record_id, stored_name):
+    """Where this file lives, as a storage key.
+
+    Deliberately the same shape as the old on-disk layout
+    ("uploads/COR-002/14/ab12.pdf"), so switching to object storage is a copy
+    rather than a rename, and every existing record keeps working.
+    """
+    return "uploads/{}/{}/{}".format(form_code, record_id, stored_name)
+
+
 def add_attachment(form_code, record_id, original_name, file_bytes, uploaded_by="Admin"):
     ext = original_name.rsplit(".", 1)[-1].lower() if "." in original_name else ""
     stored_name = "{}.{}".format(uuid.uuid4().hex, ext) if ext else uuid.uuid4().hex
-    path = os.path.join(_attachment_dir(form_code, record_id), stored_name)
-    with open(path, "wb") as fh:
-        fh.write(file_bytes)
+    storage.put(attachment_key(form_code, record_id, stored_name), file_bytes)
     conn = get_conn()
     conn.execute(
         "INSERT INTO attachments (form_code, record_id, original_name, stored_name, size_bytes, uploaded_by, uploaded_at) "
@@ -1297,11 +1405,12 @@ def attachment_counts_for(form_code, record_ids):
 
 
 def _delete_attachment_file(att):
-    path = os.path.join(_attachment_dir(att["form_code"], att["record_id"]), att["stored_name"])
     try:
-        if os.path.exists(path):
-            os.remove(path)
-    except OSError:
+        storage.delete(attachment_key(att["form_code"], att["record_id"], att["stored_name"]))
+    except storage.StorageError:
+        # The database row still goes, and the deletion is still audited. A
+        # file that could not be removed is a cleanup job, not a reason to
+        # refuse the user's request.
         pass
 
 
@@ -1319,7 +1428,18 @@ def delete_attachment(attachment_id):
 
 
 def attachment_file_path(att):
-    return os.path.join(_attachment_dir(att["form_code"], att["record_id"]), att["stored_name"])
+    """A real path on disk, or None when the file lives in object storage."""
+    return storage.local_path(attachment_key(att["form_code"], att["record_id"],
+                                             att["stored_name"]))
+
+
+def attachment_bytes(att):
+    """The file's contents, wherever it is stored."""
+    return storage.get(attachment_key(att["form_code"], att["record_id"], att["stored_name"]))
+
+
+def attachment_exists(att):
+    return storage.exists(attachment_key(att["form_code"], att["record_id"], att["stored_name"]))
 
 
 def list_all_attachments(depts_allowed=None, limit=300):

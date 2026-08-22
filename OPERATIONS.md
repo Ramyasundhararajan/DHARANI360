@@ -101,11 +101,43 @@ Every failure and lockout is in **Audit Trail** under `login.failed` and
 `login.blocked` — check there before assuming someone forgot their password.
 A run of failures against several addresses is somebody probing you.
 
+**Somebody forgot their password.** They can use **Forgot your password?**
+on the sign-in page themselves — a one-time link, good for 30 minutes. That
+needs SMTP configured. Check the Audit Trail for `reset.requested` and
+`reset.completed`; `reset.failed` means the email could not be sent, and the
+link is written to `instance/logs/errors.log` so you can pass it on manually.
+
 **Somebody is locked out and needs in now.** Users & Access → their row →
 Reset Password. A one-time password appears once on screen; share it securely,
 and they must set their own at next sign-in.
 
 ---
+
+## Changing the schema
+
+```
+python migrations.py status     what is applied, pending, and orphaned
+python migrations.py check      non-zero means the schema would change
+python migrations.py upgrade    apply it
+```
+
+**Back up first.** `upgrade` says so too.
+
+Nothing is ever dropped. A field removed from `forms_data.py` leaves its
+column and its records in place, reported as an orphan by `status`. If you
+truly want a column gone, do it by hand, deliberately, after a backup.
+
+## Moving attachments to object storage
+
+```
+python migrate_files.py check
+python migrate_files.py upload
+python migrate_files.py verify
+```
+
+Local copies are never deleted. Keep `instance/uploads/` until `verify` is
+clean **and** you have one verified backup after that. Then remove it
+yourself.
 
 ## Changing settings
 

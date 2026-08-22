@@ -38,6 +38,10 @@
     <button type="submit" class="btn" style="width:100%;">Sign In</button>
   </form>
 
+  <div style="text-align:center;margin-top:14px;">
+    <a href="{{ url_for('forgot_password') }}" style="font-size:13px;">Forgot your password?</a>
+  </div>
+
   {% if supabase %}
   <div class="auth-status auth-status-{{ 'ok' if supabase.ok else 'warn' }}">
     <span class="dot" style="background: {{ 'var(--success)' if supabase.ok else 'var(--warning)' }};"></span>

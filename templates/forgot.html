@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reset your password · DHARANI 360</title>
+<link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="auth-body">
+<div class="auth-card">
+  <div class="auth-logo">
+    <img src="{{ url_for('static', filename='images/logo.png') }}" alt="DHARANI 360">
+    <div>
+      <div class="brand" style="font-size:22px;">DHARANI 360</div>
+      <div class="brand-sub" style="font-size:11.5px;">Realty Operations &amp; Compliance Suite</div>
+    </div>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="flash flash-{{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  {% if sent %}
+    <div class="auth-hint" style="margin-top:0;">
+      <p style="margin:0 0 10px;"><b>Check your inbox.</b></p>
+      <p style="margin:0 0 10px;">
+        If that address belongs to an active account, a link to set a new password
+        is on its way. It works once and stops working in {{ minutes }} minutes.
+      </p>
+      <p style="margin:0;">
+        Nothing arrived? Check spam, then ask a director to reset it for you from
+        Users &amp; Access.
+      </p>
+    </div>
+    <div style="text-align:center;margin-top:18px;">
+      <a href="{{ url_for('login') }}" style="font-size:13px;">Back to sign in</a>
+    </div>
+  {% else %}
+    <form method="post"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <div class="field" style="margin-bottom:20px;">
+        <label for="email">Work email</label>
+        <input id="email" type="email" name="email" autocomplete="username"
+               placeholder="you@dharanis.ae" autofocus required>
+      </div>
+      <button type="submit" class="btn" style="width:100%;">Send reset link</button>
+    </form>
+
+    <div style="text-align:center;margin-top:14px;">
+      <a href="{{ url_for('login') }}" style="font-size:13px;">Back to sign in</a>
+    </div>
+
+    <div class="auth-hint">
+      We will send a link to that address if it belongs to an active account.
+      For your safety we do not say whether it does.
+    </div>
+  {% endif %}
+</div>
+</body>
+</html>

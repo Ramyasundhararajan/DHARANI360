@@ -119,9 +119,19 @@ def init_health(app):
                              traceback.format_exc())
 
         try:
-            writable = os.access(db.INSTANCE_DIR, os.W_OK)
-            checks["storage"] = "ok" if writable else "not writable"
-            ok = ok and writable
+            import storage
+            if storage.configured_backend_name() == "s3":
+                # A remote store can be reachable or not; that is worth knowing
+                # before someone tries to open a scanned licence.
+                good, detail = storage.health()
+                checks["storage"] = "ok" if good else "unreachable"
+                if not good:
+                    ok = False
+                    app.logger.error("health check: file storage unreachable: %s", detail)
+            else:
+                writable = os.access(db.INSTANCE_DIR, os.W_OK)
+                checks["storage"] = "ok" if writable else "not writable"
+                ok = ok and writable
         except Exception:
             checks["storage"] = "unknown"
             ok = False

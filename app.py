@@ -30,6 +30,7 @@ import qrgen
 import auth
 import icons
 import insights
+import mailer
 import observability
 import regulations_data
 import security
@@ -469,6 +470,101 @@ def login():
             return redirect(request.args.get("next") or url_for("dashboard"))
 
     return render_template("login.html", supabase=supabase_auth.health())
+
+
+@app.route("/forgot", methods=["GET", "POST"])
+def forgot_password():
+    """Ask for a reset link.
+
+    The answer is identical whether or not the address exists. Telling a
+    stranger "no such account" turns this page into a way to discover who
+    works here, which is exactly what an attacker wants first.
+    """
+    if request.method != "POST":
+        return render_template("forgot.html", sent=False, minutes=db.RESET_VALID_MINUTES)
+
+    email = request.form.get("email", "").strip()
+    ip = security.client_ip()
+    db.set_audit_context(actor=email or None, ip_address=ip)
+
+    # Reuse the sign-in throttle: this endpoint sends email, so it is worth
+    # even more to an attacker than the password form.
+    if db.login_locked_for(email):
+        flash("Too many requests for that address. Try again shortly.", "error")
+        db.record_audit("reset.blocked", detail="Reset throttled for {}".format(email or "(blank)"))
+        return render_template("forgot.html", sent=False, minutes=db.RESET_VALID_MINUTES)
+    db.record_login_failure(email, ip_address=ip)
+
+    user = db.get_user_by_email(email) if supabase_auth.is_allowed(email) else None
+
+    if user is not None and user["active"]:
+        token = db.create_password_reset(user["id"], ip_address=ip)
+        link = url_for("reset_password", token=token, _external=True)
+        try:
+            mailer.send_password_reset(user["email"], user["full_name"] or user["username"],
+                                       link, db.RESET_VALID_MINUTES)
+            db.record_audit("reset.requested", record_id=user["id"],
+                            detail="Reset link sent to {}".format(email))
+        except mailer.MailNotConfigured:
+            # Do not pretend an email went out when no mail is configured -
+            # but say it on the server, not to the person at the door.
+            app.logger.error("Password reset requested for %s but no SMTP is configured. "
+                             "Link (valid %s minutes): %s",
+                             email, db.RESET_VALID_MINUTES, link)
+            db.record_audit("reset.failed",
+                            detail="Reset for {} could not be emailed: SMTP not configured"
+                            .format(email))
+        except mailer.MailFailed as exc:
+            app.logger.error("Password reset email to %s failed: %s", email, exc)
+            db.record_audit("reset.failed",
+                            detail="Reset for {} could not be emailed".format(email))
+    else:
+        db.record_audit("reset.unknown",
+                        detail="Reset asked for {}, which has no active account"
+                        .format(email or "(blank)"))
+
+    return render_template("forgot.html", sent=True, minutes=db.RESET_VALID_MINUTES)
+
+
+@app.route("/reset/<token>", methods=["GET", "POST"])
+def reset_password(token):
+    """Set a new password using a link from email."""
+    user = db.password_reset_user(token)
+    if user is None:
+        flash("That link has expired or has already been used. Ask for a new one.", "error")
+        return redirect(url_for("forgot_password"))
+
+    if request.method != "POST":
+        return render_template("reset_password.html", user=user)
+
+    new = request.form.get("new_password", "")
+    confirm = request.form.get("confirm_password", "")
+    if len(new) < 8:
+        flash("Use at least 8 characters.", "error")
+        return render_template("reset_password.html", user=user)
+    if new != confirm:
+        flash("Those two passwords do not match.", "error")
+        return render_template("reset_password.html", user=user)
+
+    # Consume the token first: if anything below fails, the link is still
+    # spent, which is the safe direction to fail in.
+    user = db.consume_password_reset(token)
+    if user is None:
+        flash("That link has expired or has already been used. Ask for a new one.", "error")
+        return redirect(url_for("forgot_password"))
+
+    db.set_audit_context(actor=user["username"], actor_role=user["role"],
+                         ip_address=security.client_ip())
+    db.set_password(user["id"], auth.hash_password(new), must_change_password=False)
+    db.clear_login_failures(user["email"] or "")
+    db.record_audit("reset.completed", record_id=user["id"],
+                    detail="Password set from an emailed reset link")
+
+    from flask import session
+    session["user_id"] = user["id"]
+    db.record_login(user["id"], ip_address=security.client_ip())
+    flash("Your password has been changed. You are signed in.", "success")
+    return redirect(url_for("dashboard"))
 
 
 @app.route("/logout")
@@ -1387,10 +1483,32 @@ def attachment_download(attachment_id):
     form = FORMS_BY_CODE.get(att["form_code"])
     if form:
         _require_dept(form["dept"])
+    # On local storage the file is streamed straight from disk. In object
+    # storage there is no path, so the bytes are fetched and streamed instead.
     path = db.attachment_file_path(att)
-    if not os.path.exists(path):
-        return "File missing on disk", 404
-    return send_file(path, as_attachment=True, download_name=att["original_name"])
+    if path is not None:
+        if not os.path.exists(path):
+            return render_template("error.html", code=404,
+                                   message="That attachment is recorded but its file is "
+                                           "missing from storage. The record and its "
+                                           "history are unaffected."), 404
+        return send_file(path, as_attachment=True, download_name=att["original_name"])
+
+    try:
+        data = db.attachment_bytes(att)
+    except db.storage.NotFound:
+        return render_template("error.html", code=404,
+                               message="That attachment is recorded but its file is "
+                                       "missing from storage. The record and its "
+                                       "history are unaffected."), 404
+    except db.storage.StorageError as exc:
+        app.logger.error("attachment %s could not be read from storage: %s", attachment_id, exc)
+        return render_template("error.html", code=503,
+                               message="The file store could not be reached just now. "
+                                       "Try again in a moment."), 503
+
+    return send_file(io.BytesIO(data), as_attachment=True,
+                     download_name=att["original_name"])
 
 
 @app.route("/attachment/<int:attachment_id>/delete", methods=["POST"])

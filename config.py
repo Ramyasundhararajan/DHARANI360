@@ -140,6 +140,13 @@ SESSION_HOURS = number("SESSION_HOURS", 12)
 PORT = number("PORT", 5000)
 GUNICORN_WORKERS = number("GUNICORN_WORKERS", 1)
 
+#: File storage. Empty S3_BUCKET means attachments stay on local disk.
+S3_BUCKET = get("S3_BUCKET", "")
+S3_ENDPOINT = get("S3_ENDPOINT", "")
+S3_ACCESS_KEY = get("S3_ACCESS_KEY", "")
+S3_SECRET_KEY = get("S3_SECRET_KEY", "")
+S3_REGION = get("S3_REGION", "us-east-1")
+
 #: Backups.
 BACKUP_DIR = get("BACKUP_DIR", os.path.join(BASE_DIR, "backups"))
 KEEP_DAYS = number("KEEP_DAYS", 30)
@@ -180,14 +187,18 @@ def database_engine():
 # The report
 # ---------------------------------------------------------------------------
 
-SECRET_SETTINGS = {"SECRET_KEY", "SUPABASE_ANON_KEY", "SMTP_PASSWORD", "DATABASE_URL"}
+SECRET_SETTINGS = {"SECRET_KEY", "SUPABASE_ANON_KEY", "SMTP_PASSWORD", "DATABASE_URL",
+                   "S3_SECRET_KEY", "S3_ACCESS_KEY"}
 
 REPORTED = [
     ("DATABASE_URL", DATABASE_URL, "Empty = SQLite on this PC. Set = PostgreSQL."),
     ("SECRET_KEY", SECRET_KEY, "Signs login cookies. Required when hosted."),
     ("SUPABASE_URL", SUPABASE_URL, "Supabase project used for sign-in."),
     ("SUPABASE_ANON_KEY", SUPABASE_ANON_KEY, "Publishable key. Never the service_role key."),
-    ("SUPABASE_BUCKET", SUPABASE_BUCKET, "Storage bucket for attachments."),
+    ("S3_BUCKET", S3_BUCKET, "Object storage for attachments. Empty = local disk."),
+    ("S3_ENDPOINT", S3_ENDPOINT, "Object storage endpoint."),
+    ("S3_ACCESS_KEY", S3_ACCESS_KEY, "Object storage access key."),
+    ("S3_SECRET_KEY", S3_SECRET_KEY, "Object storage secret key."),
     ("ALLOWED_EMAILS", ",".join(ALLOWED_EMAILS), "Who may sign in. Empty = the list in supabase_auth.py."),
     ("SECURE_COOKIES", SECURE_COOKIES, "Empty = on when hosted, off on a local PC."),
     ("SESSION_HOURS", SESSION_HOURS, "How long a sign-in lasts."),
@@ -256,6 +267,13 @@ def report():
     if PREVIEW and DATABASE_URL:
         problems.append("Preview mode is on AND a DATABASE_URL is set. Preview must never "
                         "reach a real database - start it with preview.py, which isolates it.")
+    if S3_BUCKET and not (S3_ACCESS_KEY and S3_SECRET_KEY):
+        problems.append("S3_BUCKET is set but the access key or secret is missing - "
+                        "attachments will fail to save.")
+    if is_hosted() and not S3_BUCKET:
+        problems.append("Hosted with no object storage: attachments are written to the "
+                        "server's own disk, which most hosts erase on the next deploy. "
+                        "See S3_BUCKET in .env.example.")
     if not COPY_TO:
         problems.append("COPY_TO is not set, so every backup sits on the same disk as the "
                         "data it protects. Point it at another drive or a synced folder.")
