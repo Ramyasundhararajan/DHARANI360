@@ -17,7 +17,7 @@
 <div class="notes-layout">
 <div class="card notes-composer">
   <div class="notes-composer-title">{{ icon('edit') }}New note</div>
-  <form method="post" action="{{ url_for('note_add') }}" class="notes-composer-form">
+  <form method="post" action="{{ url_for('note_add') }}" class="notes-composer-form"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <textarea name="text" rows="3" placeholder="Write a note..." required></textarea>
     <select name="color">
       <option value="blue">Blue</option>
@@ -32,7 +32,7 @@
 <div class="notes-grid">
   {% for n in notes %}
   <div class="note-card tint-{{ n.color or 'blue' }}">
-    <form method="post" action="{{ url_for('note_delete', note_id=n.id) }}" class="note-del-form"><button type="submit" class="todo-del" title="Delete">&times;</button></form>
+    <form method="post" action="{{ url_for('note_delete', note_id=n.id) }}" class="note-del-form"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button type="submit" class="todo-del" title="Delete">&times;</button></form>
     <div class="note-text">{{ n.text }}</div>
     <div class="note-meta">{{ n.created_at[:16].replace("T", " ") if n.created_at else "" }}</div>
   </div>

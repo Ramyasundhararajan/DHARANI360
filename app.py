@@ -30,6 +30,7 @@ import auth
 import icons
 import insights
 import regulations_data
+import security
 import supabase_auth
 from access import ROLES, ROLE_NAMES, depts_for_role, is_admin_role, can_access_dept
 from forms_data import (FORMS, FORMS_BY_CODE, DEPARTMENTS, DEPARTMENTS_BY_CODE,
@@ -71,7 +72,32 @@ app.secret_key = _load_secret_key()
 app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024  # 20MB per request
 app.config["TEMPLATES_AUTO_RELOAD"] = True
 
+# CSRF protection, session cookie hardening and response headers. Has to run
+# before any route is registered so its before_request hooks come first.
+security.init_security(app)
+
 db.init_db()
+
+
+@app.before_request
+def _set_audit_actor():
+    """Tell db.py who is making changes on this request.
+
+    Everything written between here and the end of the request is attributed
+    to this person in audit_log, without every function having to be passed
+    the user.
+    """
+    user = auth.current_user()
+    db.set_audit_context(
+        actor=(user["username"] if user else None),
+        actor_role=(user["role"] if user else None),
+        ip_address=security.client_ip(),
+    )
+
+
+@app.teardown_request
+def _clear_audit_actor(exc=None):
+    db.clear_audit_context()
 
 
 @app.after_request
@@ -364,7 +390,10 @@ def login():
         if signed_in:
             from flask import session
             session["user_id"] = user["id"]
-            db.record_login(user["id"], ip_address=request.remote_addr)
+            db.record_login(user["id"], ip_address=security.client_ip())
+            db.set_audit_context(actor=user["username"], actor_role=user["role"],
+                                 ip_address=security.client_ip())
+            db.record_audit("login", detail="Signed in as {}".format(email))
             flash("Welcome back, {}.".format(user["full_name"] or user["username"]), "success")
             return redirect(request.args.get("next") or url_for("dashboard"))
 
@@ -774,8 +803,10 @@ def record_view(form_code, record_id):
     grouped = group_fields(form["fields"])
     related = db.related_records(form_code, record_id)
     attachments = db.get_attachments(form_code, record_id)
+    history = db.list_audit(form_code=form_code, record_id=record_id, limit=50)
     return render_template("record_view.html", form=form, dept=dept, record=record,
                             grouped=grouped, related=related, attachments=attachments,
+                            history=history,
                             allowed_ext=sorted(db.ALLOWED_ATTACHMENT_EXTENSIONS))
 
 
@@ -2372,6 +2403,28 @@ def settings_send_test():
 @auth.admin_required
 def login_activity():
     return render_template("login_activity.html", logins=db.list_login_log(150))
+
+
+@app.route("/audit")
+@auth.admin_required
+def audit_trail():
+    """Every change to every register, in one place.
+
+    This is the screen an auditor, a regulator or an internal investigation
+    actually asks for. Administrators only - it necessarily shows values from
+    departments the viewer might not otherwise open.
+    """
+    q = (request.args.get("q") or "").strip()
+    action = (request.args.get("action") or "").strip()
+    actor = (request.args.get("actor") or "").strip()
+    limit = 300
+    entries = db.list_audit(q=q or None, action=action or None,
+                            actor=actor or None, limit=limit)
+    return render_template(
+        "audit.html", entries=entries, total=db.audit_count(), limit=limit,
+        q=q, action=action, actor=actor,
+        actions=db.audit_actions(),
+        actors=[u["username"] for u in db.list_users()])
 
 
 @app.errorhandler(413)

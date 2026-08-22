@@ -18,11 +18,33 @@ services:
       # Leave empty to use the SQLite file in the volume.
       # Set to a Supabase connection string to share one database.
       DATABASE_URL: ${DATABASE_URL:-}
+      # More than one worker is only safe once DATABASE_URL points at
+      # Postgres. On SQLite, leave this at 1.
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-1}
+      # Secure session cookies. Leave on whenever the site is reached over
+      # HTTPS, which is the case behind Cloudflare Tunnel.
+      SECURE_COOKIES: ${SECURE_COOKIES:-1}
     volumes:
       - dharani-data:/app/instance
       # The live Supabase keys for this installation, if you use them.
       # Read-only, and never baked into the image.
       - ./supabase_config.json:/app/supabase_config.json:ro
 
+  # Uncomment this block, and set
+  #   DATABASE_URL=postgresql://dharani:CHANGE-ME@postgres:5432/dharani360
+  # in your .env, to run a real database alongside the app.
+  #
+  # postgres:
+  #   image: postgres:16
+  #   container_name: dharani360-db
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_DB: dharani360
+  #     POSTGRES_USER: dharani
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+  #   volumes:
+  #     - dharani-db:/var/lib/postgresql/data
+
 volumes:
   dharani-data:
+  # dharani-db:

@@ -2,7 +2,7 @@
 ### Real Estate Operations, Compliance & Growth System
 People · Process · Property · Protection · Performance
 
-A working portal, not a slide deck: 76 forms across 10 departments, each
+A working portal, not a slide deck: 112 forms across 17 departments, each
 feeding a permanent register (a real database table), a real login system
 with role-based access, records that automatically cross-link to each
 other, file attachments, and an Admin Control Tower dashboard that watches
@@ -138,7 +138,7 @@ cross-referencing required. This works off shared field names (lead ID,
 client name, agent name, property reference, transaction reference,
 employee name, vendor name, asset reference, owner name, referral source)
 defined once in `forms_data.py` as `LINK_FIELD_NAMES` — add that field
-name to form #77 and it links up with everything else automatically.
+name to a new form and it links up with everything else automatically.
 
 Note the honest limit: linking is by matching text value in a same-named
 field, not a real foreign key. Two different "Michael Chen"s would show
@@ -199,25 +199,94 @@ printout of that record's details for a physical file.
 
 Everything the portal knows about — every department, every form, every
 field, which fields link across registers — is defined in one place:
-`forms_data.py`. To add form #77, add one entry to the `FORMS` list there
+`forms_data.py`. To add another form, add one entry to the `FORMS` list there
 (copy an existing one as a template) and restart the app; the database
 table, the entry form (with automatic section grouping), the register
 table, sorting, CSV export, attachments, related-record linking and (if
 you give it an `expiry_field`) the compliance calendar are all created
 automatically. No other file needs to change.
 
-## 13. Honest limits of this version (read this)
+## 13. Running it as shared software
 
-- **Not a hardened multi-tenant auth system.** Login and roles stop a
-  casual open door and attribute every record to a real account — they
-  are not audited, penetration-tested security. Anyone with the admin
-  account (or physical/network access to this computer) has full control.
-- **Single computer, not yet multi-user over a network.** Built to run on
-  one PC today. Making it reachable from other desks on your office
-  network (a shared server, HTTPS, proper session security) is a
-  deliberate, well-scoped next step — the design already supports it.
+Everything above works on one PC with no setup. These three switches turn
+the same code into something a whole office can use at once.
+
+### A real database
+
+Set one environment variable and DHARANI 360 talks to PostgreSQL instead of
+the local file. Nothing else changes — the same registers, the same screens.
+
+```
+DATABASE_URL=postgresql://user:password@host:5432/dharani360
+```
+
+Leave it unset and it stays on SQLite exactly as before. With Postgres you
+can also run more than one web worker (`GUNICORN_WORKERS=4`), which is what
+lets several people write at the same time without waiting for each other.
+`dbcompat.py` handles the differences; no query in `db.py` had to be
+rewritten for one engine or the other.
+
+### The audit trail
+
+Every change to every register is now recorded: who changed which field,
+what it was before, what it became, when, and from which address. Records
+are written automatically and the application never edits or deletes them.
+
+- **Audit Trail** in the sidebar (Director only) shows everything, filterable
+  by person, action, or any value.
+- Every record page has a **History** panel showing that record's own changes.
+- Account changes are logged too — roles granted, accounts created or
+  removed, passwords reset. The password itself is never written down.
+
+This is the difference between a system that holds your records and a system
+that can prove what happened to them.
+
+### Backups you have actually tested
+
+```
+python backup.py create             make a backup now
+python backup.py list               see what you have
+python backup.py verify <file>      prove a backup is readable and complete
+python backup.py restore <file>     put it back (takes a safety copy first)
+```
+
+`backup.bat` does the same by double-click, and Windows Task Scheduler can
+run it daily (Create Basic Task → Daily → Start a program → `backup.bat`).
+A backup holds the database plus every attachment, staff photo, chat file and
+library file. It deliberately excludes the signing key, which is a credential
+rather than data.
+
+**Run `verify` at least once.** A backup nobody has restored is not a backup.
+
+### Security when it leaves the desk
+
+- Every form is protected against cross-site request forgery, so another
+  website cannot make your browser submit something here using your session.
+- Session cookies are HttpOnly and SameSite, and marked Secure automatically
+  when the site is hosted. Force it either way with `SECURE_COOKIES=1` or `0`.
+- Sign-ins expire after 12 hours of inactivity (`SESSION_HOURS` to change).
+
+Check the whole thing still works after any change:
+
+```
+python smoketest.py
+```
+
+It signs in, opens every page, every register and every blank form, runs a
+create/edit/delete cycle, and confirms the audit trail recorded it — 44
+checks, on whichever database is configured.
+
+## 14. Honest limits of this version (read this)
+
+- **Not yet multi-tenant.** One installation serves one company. Running it
+  for several brokerages means several deployments today.
+- **Roles are defined in code.** `access.py` is one dictionary; changing what
+  a role can see means editing it and restarting, not a settings screen.
 - **Cross-record linking is name/value matching, not a relational
   database.** See section 6.
+- **Login is not penetration-tested.** The protections in section 13 close
+  the obvious doors. They are not a substitute for a security review before
+  the system holds another company's data.
 - **Email digest requires you to supply your own SMTP account** (Gmail,
   Outlook/365, Zoho, etc. all work with an app password). DHARANI 360
   can't send email on your behalf without those credentials.
@@ -227,13 +296,17 @@ automatically. No other file needs to change.
   thresholds, AML retention periods, etc.) — confirm with your
   accountant/lawyer and adjust `forms_data.py` if needed.
 
-## 14. What's inside this folder
+## 15. What's inside this folder
 
 ```
 dharani360-portal/
   app.py             <- routes/logic
   db.py              <- database engine (generic, driven by forms_data.py)
-  forms_data.py      <- master library: 10 departments, 76 forms/fields, linking rules
+  dbcompat.py        <- lets the same code run on SQLite or PostgreSQL
+  security.py        <- CSRF protection, session and header hardening
+  backup.py          <- backup, verify and restore
+  smoketest.py       <- 44 checks that the whole system still works
+  forms_data.py      <- master library: 17 departments, 112 forms/fields, linking rules
   access.py          <- roles & which departments each role can see
   auth.py            <- login/session/password handling
   email_digest.py    <- standalone compliance-digest emailer

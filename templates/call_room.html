@@ -51,7 +51,7 @@
     </div>
 
     <div class="call-controls no-print">
-      <form method="post" action="{{ url_for('call_end', call_id=call.id) }}" id="endForm">
+      <form method="post" action="{{ url_for('call_end', call_id=call.id) }}" id="endForm"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
         <input type="hidden" name="seconds" id="endSeconds" value="0">
         <input type="text" name="outcome" class="call-outcome" maxlength="200"
                placeholder="What came of it? e.g. &quot;Viewing booked for Saturday 11am&quot;">

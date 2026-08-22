@@ -32,7 +32,7 @@
 
   <form method="post" action="{{ url_for('record_delete', form_code=form.code, record_id=record.id) }}"
         data-confirm="Delete {{ record.doc_no }} permanently? This removes the record and cannot be undone."
-        class="action-bar-end">
+        class="action-bar-end"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <button type="submit" class="btn btn-danger">{{ icon('trash') }}<span>Delete</span></button>
   </form>
 </div>

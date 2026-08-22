@@ -101,7 +101,7 @@
       <button type="button" class="modal-close" id="calModalClose" aria-label="Close">&times;</button>
     </div>
 
-    <form method="post" id="calForm" action="{{ url_for('meeting_add') }}">
+    <form method="post" id="calForm" action="{{ url_for('meeting_add') }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
       <div class="modal-body">
         <div class="form-grid">
           <div class="field full">
@@ -139,7 +139,7 @@
     </form>
 
     <form method="post" id="calDeleteForm" class="modal-delete" hidden
-          data-confirm="Remove this entry from the calendar?">
+          data-confirm="Remove this entry from the calendar?"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
       <button type="submit" class="btn btn-danger">{{ icon('trash') }}<span>Remove</span></button>
     </form>
   </div>
@@ -170,7 +170,7 @@
                   data-edit-start="{{ e.start_time }}" data-edit-end="{{ e.end_time }}"
                   data-edit-attendees="{{ e.attendees }}" data-edit-link="{{ e.link }}">{{ icon('edit') }}</button>
           <form method="post" action="{{ url_for('meeting_delete', meeting_id=e.id) }}"
-                data-confirm="Remove &quot;{{ e.title }}&quot; from the calendar?">
+                data-confirm="Remove &quot;{{ e.title }}&quot; from the calendar?"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
             <button type="submit" class="row-action row-action-danger" title="Remove">{{ icon('trash') }}</button>
           </form>
         {% elif e.url %}

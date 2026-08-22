@@ -25,7 +25,7 @@
     {% endif %}
   {% endwith %}
 
-  <form method="post">
+  <form method="post"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <div class="field" style="margin-bottom:14px;">
       <label for="email">Work email</label>
       <input id="email" type="email" name="email" autocomplete="username"

@@ -1,0 +1,1000 @@
+<title>Dharani 360 Productisation Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Faustina:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Public+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+  :root {
+    --ground:      #F7F8F5;
+    --surface:     #FFFFFF;
+    --surface-alt: #EFF2EC;
+    --ink:         #141A16;
+    --ink-soft:    #37423B;
+    --muted:       #5F6B62;
+    --rule:        #DCE2D8;
+    --rule-strong: #C2CBBD;
+    --accent:      #1E6B57;
+    --accent-deep: #14493B;
+    --accent-soft: #E3EFE8;
+    --critical:    #A8321F;
+    --critical-soft:#F7E7E2;
+    --warn:        #856012;
+    --warn-soft:   #F6EEDA;
+    --shadow:      0 1px 2px rgba(20,26,22,.05), 0 8px 24px -16px rgba(20,26,22,.22);
+
+    --measure: 68ch;
+    --wide: 1120px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #0F1411;
+      --surface:     #161C18;
+      --surface-alt: #1C2420;
+      --ink:         #E7ECE5;
+      --ink-soft:    #C3CCC1;
+      --muted:       #939E95;
+      --rule:        #29322B;
+      --rule-strong: #3A453D;
+      --accent:      #63C1A2;
+      --accent-deep: #8FD8BE;
+      --accent-soft: #182A24;
+      --critical:    #E4907C;
+      --critical-soft:#2C1C18;
+      --warn:        #D5AC5F;
+      --warn-soft:   #2A2317;
+      --shadow:      0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.7);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:      #0F1411;
+    --surface:     #161C18;
+    --surface-alt: #1C2420;
+    --ink:         #E7ECE5;
+    --ink-soft:    #C3CCC1;
+    --muted:       #939E95;
+    --rule:        #29322B;
+    --rule-strong: #3A453D;
+    --accent:      #63C1A2;
+    --accent-deep: #8FD8BE;
+    --accent-soft: #182A24;
+    --critical:    #E4907C;
+    --critical-soft:#2C1C18;
+    --warn:        #D5AC5F;
+    --warn-soft:   #2A2317;
+    --shadow:      0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.7);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Public Sans", "Helvetica Neue", Arial, sans-serif;
+    font-size: 17px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+    margin: 0;
+    padding: 0 24px 96px;
+  }
+
+  .doc { max-width: var(--wide); margin: 0 auto; }
+  .col { max-width: var(--measure); }
+
+  /* ---------- masthead ---------- */
+
+  .masthead {
+    padding: 64px 0 28px;
+    border-bottom: 2px solid var(--ink);
+  }
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 18px;
+  }
+  h1 {
+    font-family: Faustina, Georgia, serif;
+    font-weight: 600;
+    font-size: clamp(2.4rem, 5.4vw, 3.9rem);
+    line-height: 1.05;
+    letter-spacing: -.018em;
+    text-wrap: balance;
+    margin: 0 0 20px;
+    max-width: 18ch;
+  }
+  .standfirst {
+    font-family: Faustina, Georgia, serif;
+    font-size: clamp(1.08rem, 2vw, 1.3rem);
+    line-height: 1.5;
+    color: var(--ink-soft);
+    max-width: 56ch;
+    margin: 0 0 28px;
+  }
+  .stampline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 28px;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12px;
+    letter-spacing: .05em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .stampline b { color: var(--ink-soft); font-weight: 500; }
+
+  /* ---------- contents ---------- */
+
+  nav.toc {
+    margin: 40px 0 8px;
+    padding: 24px 26px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    box-shadow: var(--shadow);
+  }
+  nav.toc h2 {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+    margin: 0 0 14px;
+  }
+  nav.toc ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 4px 32px;
+    counter-reset: toc;
+  }
+  nav.toc li { counter-increment: toc; }
+  nav.toc a {
+    display: flex;
+    gap: 12px;
+    padding: 5px 0;
+    color: var(--ink-soft);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+  }
+  nav.toc a::before {
+    content: counter(toc, decimal-leading-zero);
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12px;
+    color: var(--accent);
+    padding-top: 3px;
+  }
+  nav.toc a:hover { color: var(--accent); }
+  nav.toc a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  /* ---------- sections ---------- */
+
+  section { padding: 56px 0 0; }
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    margin: 0 0 8px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--rule-strong);
+  }
+  .sec-num {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12px;
+    letter-spacing: .1em;
+    color: var(--accent);
+    padding-top: 4px;
+    flex: none;
+  }
+  h2.sec-title {
+    font-family: Faustina, Georgia, serif;
+    font-weight: 600;
+    font-size: clamp(1.55rem, 3vw, 2.1rem);
+    letter-spacing: -.012em;
+    line-height: 1.15;
+    text-wrap: balance;
+    margin: 0;
+  }
+  h3 {
+    font-family: "Public Sans", sans-serif;
+    font-size: 1.02rem;
+    font-weight: 700;
+    letter-spacing: -.005em;
+    margin: 34px 0 10px;
+  }
+  h4 {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11.5px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+    margin: 26px 0 10px;
+  }
+  p { margin: 0 0 16px; }
+  p, li { max-width: var(--measure); }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  strong { font-weight: 600; }
+  em { font-style: italic; }
+  ul, ol { margin: 0 0 16px; padding-left: 22px; }
+  li { margin-bottom: 7px; }
+  code {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .86em;
+    background: var(--surface-alt);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 1px 5px;
+  }
+
+  /* ---------- devices ---------- */
+
+  .lede {
+    font-family: Faustina, Georgia, serif;
+    font-size: 1.16rem;
+    line-height: 1.55;
+    color: var(--ink-soft);
+    margin: 20px 0 26px;
+    max-width: 58ch;
+  }
+
+  .pull {
+    margin: 30px 0;
+    padding: 22px 26px;
+    background: var(--accent-soft);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 4px 4px 0;
+    max-width: 62ch;
+  }
+  .pull p:last-child { margin-bottom: 0; }
+  .pull .said {
+    font-family: Faustina, Georgia, serif;
+    font-size: 1.1rem;
+    line-height: 1.5;
+  }
+
+  .callout {
+    margin: 26px 0;
+    padding: 18px 22px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    max-width: 66ch;
+  }
+  .callout.warn { background: var(--warn-soft); border-color: transparent; }
+  .callout.crit { background: var(--critical-soft); border-color: transparent; }
+  .callout p:last-child { margin-bottom: 0; }
+  .callout .tag {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 7px;
+    color: var(--muted);
+  }
+  .callout.warn .tag { color: var(--warn); }
+  .callout.crit .tag { color: var(--critical); }
+
+  /* ---------- reading cards (the three readings) ---------- */
+
+  .readings {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(268px, 1fr));
+    gap: 16px;
+    margin: 26px 0 30px;
+  }
+  .reading {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 20px 22px;
+    box-shadow: var(--shadow);
+  }
+  .reading .kicker {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 9px;
+  }
+  .reading h3 { margin: 0 0 8px; font-size: .99rem; }
+  .reading p { font-size: .94rem; color: var(--ink-soft); margin: 0 0 10px; }
+  .reading p:last-child { margin: 0; }
+  .reading .tell {
+    font-size: .88rem;
+    color: var(--muted);
+    border-top: 1px solid var(--rule);
+    padding-top: 10px;
+    margin-top: 12px !important;
+  }
+
+  /* ---------- tables ---------- */
+
+  .tablewrap {
+    overflow-x: auto;
+    margin: 26px 0 30px;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    background: var(--surface);
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 620px;
+    font-size: .93rem;
+  }
+  th, td {
+    text-align: left;
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+    max-width: none;
+  }
+  thead th {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 10.5px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    font-weight: 500;
+    color: var(--muted);
+    background: var(--surface-alt);
+    border-bottom: 1px solid var(--rule-strong);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td:first-child { font-weight: 500; }
+  .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .pill {
+    display: inline-block;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 10.5px;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    padding: 2.5px 8px;
+    border-radius: 100px;
+    white-space: nowrap;
+    font-weight: 500;
+  }
+  .pill.have { background: var(--accent-soft); color: var(--accent-deep); }
+  .pill.part { background: var(--warn-soft); color: var(--warn); }
+  .pill.none { background: var(--critical-soft); color: var(--critical); }
+  :root[data-theme="dark"] .pill.have,
+  :root[data-theme="dark"] .pill.part,
+  :root[data-theme="dark"] .pill.none { font-weight: 600; }
+
+  /* ---------- phases ---------- */
+
+  .phases { display: flex; flex-direction: column; gap: 2px; margin: 28px 0 8px; }
+  .phase {
+    display: grid;
+    grid-template-columns: 92px 1fr;
+    gap: 0 26px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    padding: 24px 26px;
+  }
+  .phase:first-child { border-radius: 4px 4px 0 0; }
+  .phase:last-child { border-radius: 0 0 4px 4px; }
+  .phase + .phase { border-top: none; }
+  .phase-mark { border-right: 1px solid var(--rule); padding-right: 22px; }
+  .phase-mark .n {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 2rem;
+    line-height: 1;
+    color: var(--accent);
+    display: block;
+    letter-spacing: -.03em;
+  }
+  .phase-mark .dur {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px;
+    color: var(--muted);
+    display: block;
+    margin-top: 9px;
+    letter-spacing: .04em;
+  }
+  .phase h3 { margin: 0 0 6px; font-size: 1.12rem; }
+  .phase .why {
+    font-size: .95rem;
+    color: var(--muted);
+    margin: 0 0 14px;
+    max-width: 60ch;
+  }
+  .phase ul { margin: 0 0 14px; padding-left: 20px; }
+  .phase li { font-size: .94rem; margin-bottom: 6px; max-width: 62ch; }
+  .donewhen {
+    font-size: .9rem;
+    background: var(--surface-alt);
+    border-radius: 3px;
+    padding: 10px 14px;
+    max-width: 62ch;
+  }
+  .donewhen b {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 10.5px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 3px;
+    font-weight: 500;
+  }
+  @media (max-width: 620px) {
+    .phase { grid-template-columns: 1fr; gap: 14px; }
+    .phase-mark {
+      border-right: none;
+      border-bottom: 1px solid var(--rule);
+      padding: 0 0 12px;
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+    }
+    .phase-mark .dur { margin-top: 0; }
+  }
+
+  /* ---------- checklist ---------- */
+
+  ol.week {
+    counter-reset: wk;
+    list-style: none;
+    padding: 0;
+    margin: 26px 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  ol.week li {
+    counter-increment: wk;
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    gap: 16px;
+    max-width: 70ch;
+    margin: 0;
+  }
+  ol.week li::before {
+    content: counter(wk);
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 13px;
+    color: var(--accent);
+    border: 1px solid var(--rule-strong);
+    border-radius: 100px;
+    width: 30px; height: 30px;
+    display: grid; place-items: center;
+  }
+  ol.week b { display: block; }
+  ol.week span { color: var(--ink-soft); font-size: .95rem; }
+
+  footer {
+    margin-top: 72px;
+    padding-top: 22px;
+    border-top: 1px solid var(--rule);
+    font-size: .88rem;
+    color: var(--muted);
+    max-width: var(--measure);
+  }
+  footer a { color: var(--accent); }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="doc">
+
+  <header class="masthead">
+    <p class="eyebrow">Dharani 360 · Productisation Plan</p>
+    <h1>From working portal to sellable software</h1>
+    <p class="standfirst">A client looked at Dharani 360 and called it a CRM. That is a positioning problem and an engineering problem at the same time — and both are fixable from where the code already stands.</p>
+    <div class="stampline">
+      <span><b>Prepared</b> 22 Aug 2026</span>
+      <span><b>Codebase</b> dharani360-portal</span>
+      <span><b>Stack</b> Flask · SQLite · Jinja</span>
+      <span><b>Scope</b> 17 departments · 112 registers · 75 routes</span>
+    </div>
+  </header>
+
+  <nav class="toc" aria-label="Contents">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#reading">Decoding &ldquo;it&rsquo;s a CRM&rdquo;</a></li>
+      <li><a href="#have">What you actually built</a></li>
+      <li><a href="#codes">The codes are in the way</a></li>
+      <li><a href="#gaps">Why it reads as a CRM</a></li>
+      <li><a href="#category">The category to claim</a></li>
+      <li><a href="#roadmap">The five-phase roadmap</a></li>
+      <li><a href="#audit">Feature audit</a></li>
+      <li><a href="#commercial">How you sell it</a></li>
+      <li><a href="#week">Do this week</a></li>
+    </ol>
+  </nav>
+
+  <!-- 01 -->
+  <section id="reading">
+    <div class="sec-head">
+      <span class="sec-num">01</span>
+      <h2 class="sec-title">Decoding &ldquo;it&rsquo;s a CRM&rdquo;</h2>
+    </div>
+
+    <p class="lede">Three people can say that sentence and mean three completely different things. You cannot plan the next six months until you know which one you heard.</p>
+
+    <div class="readings">
+      <article class="reading">
+        <span class="kicker">Reading A</span>
+        <h3>A dismissal</h3>
+        <p>&ldquo;This is a commodity. I can subscribe to one for a few hundred dirhams a month.&rdquo; They are comparing you to a product category with dozens of established vendors.</p>
+        <p class="tell">You&rsquo;ll hear it as: a price question, or a request for a comparison with a named tool.</p>
+      </article>
+      <article class="reading">
+        <span class="kicker">Reading B</span>
+        <h3>A request</h3>
+        <p>&ldquo;Good — a CRM is what I need.&rdquo; They saw leads, clients, agents and pipeline, and that solved their actual problem. The compliance half is a bonus they haven&rsquo;t priced yet.</p>
+        <p class="tell">You&rsquo;ll hear it as: questions about users, import, and their existing portal listings.</p>
+      </article>
+      <article class="reading">
+        <span class="kicker">Reading C</span>
+        <h3>A misread</h3>
+        <p>They clicked into Sales, Leads &amp; Clients, recognised it, and stopped. They never opened Corporate &amp; Licensing, AML/KYC, HR or the Compliance Calendar.</p>
+        <p class="tell">You&rsquo;ll hear it as: no mention of licences, expiries, or audits anywhere in their feedback.</p>
+      </article>
+    </div>
+
+    <h3>Ask them these three questions, in this order</h3>
+    <ol>
+      <li><strong>&ldquo;Which screens did you actually open?&rdquo;</strong> — separates Reading C from A and B in one answer.</li>
+      <li><strong>&ldquo;Today, where do you track your trade licence renewal, your brokers&rsquo; RERA card expiries, and your KYC files?&rdquo;</strong> — if the answer is a spreadsheet or a WhatsApp reminder, you have found the problem no CRM on their shortlist solves.</li>
+      <li><strong>&ldquo;If your regulator asked for two years of client due-diligence records on Monday, how long would that take?&rdquo;</strong> — this is the question that reframes the whole conversation.</li>
+    </ol>
+
+    <div class="pull">
+      <p class="said">&ldquo;It has a CRM in it. A CRM is one of ten registers. The other nine are the ones that get you fined if they&rsquo;re wrong.&rdquo;</p>
+    </div>
+  </section>
+
+  <!-- 02 -->
+  <section id="have">
+    <div class="sec-head">
+      <span class="sec-num">02</span>
+      <h2 class="sec-title">What you actually built</h2>
+    </div>
+
+    <p class="lede">Read the code rather than the demo and the valuable part is obvious — and it isn&rsquo;t the leads table.</p>
+
+    <p>Everything the portal knows lives in <code>forms_data.py</code>: seventeen departments, a hundred and twelve forms, every field, and the field names that link records across registers. From that single file, <code>db.py</code> generates the database tables, and <code>app.py</code> generates the entry form, the register view, sorting, filtering, pagination, CSV export, PDF export, attachments, cross-record linking and the compliance calendar entry. Add form 113 as one dictionary entry and all of that appears with no other file touched.</p>
+
+    <p><strong>That is a metadata-driven records platform, not a CRM.</strong> The CRM is one of the seventeen things it happens to be configured to produce. This is the asset you are actually selling, and it is the thing a client cannot buy from PropSpace or Zoho — because those products let you rename fields, not define an entire regulated register in an afternoon.</p>
+
+    <h4>Already working today</h4>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Capability</th><th>Where it lives</th><th>State</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>112 auto-generated registers across 17 departments</td><td><code>forms_data.py</code> → <code>db.py</code></td><td><span class="pill have">Solid</span></td></tr>
+          <tr><td>Role-based access, seven roles, enforced server-side</td><td><code>access.py</code>, <code>auth.py</code></td><td><span class="pill have">Solid</span></td></tr>
+          <tr><td>Admin Control Tower — red/amber expiry watch across every department</td><td><code>app.py</code>, <code>insights.py</code></td><td><span class="pill have">Solid</span></td></tr>
+          <tr><td>Per-department analytic panels (pipelines, funnels, approval queues)</td><td><code>insights.py</code></td><td><span class="pill have">Solid</span></td></tr>
+          <tr><td>Compliance Calendar merging every date-tracked item</td><td><code>/calendar</code></td><td><span class="pill have">Solid</span></td></tr>
+          <tr><td>Attachments, staff photos, file library</td><td><code>instance/uploads</code></td><td><span class="pill part">Local disk</span></td></tr>
+          <tr><td>Internal chat, voice/video calls, guest call links, QR share</td><td><code>/chat</code>, <code>/call</code>, <code>/qr.svg</code></td><td><span class="pill have">Working</span></td></tr>
+          <tr><td>CSV + PDF export, print-friendly record sheets</td><td><code>pdfout.py</code></td><td><span class="pill have">Solid</span></td></tr>
+          <tr><td>Daily compliance email digest</td><td><code>email_digest.py</code></td><td><span class="pill part">Needs own SMTP</span></td></tr>
+          <tr><td>Regulations library and in-app documentation</td><td><code>regulations_data.py</code> (324 KB)</td><td><span class="pill have">Substantial</span></td></tr>
+          <tr><td>Container image and one-click cloud deploy</td><td><code>Dockerfile</code>, <code>render.yaml</code></td><td><span class="pill part">Demo-grade</span></td></tr>
+          <tr><td>Optional hosted authentication</td><td><code>supabase_auth.py</code></td><td><span class="pill part">Half-wired</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>Seventy-five routes and a 205 KB stylesheet is not a prototype. The distance to a sellable product is real but it is measured in weeks of specific work, not a rewrite.</p>
+
+    <div class="callout warn">
+      <span class="tag">Documentation drift</span>
+      <p>The README still describes &ldquo;76 forms across 10 departments&rdquo;. The library now holds <strong>112 forms across 17 departments</strong>. Fix this before the next client sees it — a system whose own documentation undercounts itself by a third is being read as smaller than it is.</p>
+    </div>
+  </section>
+
+  <!-- 03 -->
+  <section id="codes">
+    <div class="sec-head">
+      <span class="sec-num">03</span>
+      <h2 class="sec-title">The codes are in the way</h2>
+    </div>
+
+    <p class="lede">Every register carries an identifier — <code>COR-002</code>, <code>HR-007</code>, <code>MKT-015</code>. As a filing key that is correct. As the way people find things, it is the single biggest usability problem in the product, and it may be part of why the client didn&rsquo;t see past the leads screen.</p>
+
+    <h3>Why it confuses</h3>
+    <ul>
+      <li><strong>Nobody thinks in codes.</strong> A user thinks &ldquo;I need to book leave&rdquo;, not &ldquo;I need HR-007&rdquo;. Every code forces a translation step, and the translation table lives only in the person&rsquo;s head.</li>
+      <li><strong>The prefixes collide.</strong> <code>COR</code> (Corporate) against <code>CMP</code> (Compliance); <code>PRO</code> (Properties) against <code>PRJ</code> (Projects); <code>AGT</code> (Agents) against <code>ATT</code> (Attendance). Three letters is not enough space for seventeen departments that overlap in meaning.</li>
+      <li><strong>The number carries no information.</strong> <code>MKT-015</code> tells you nothing about what is inside or whether you will ever need it. Sequential numbering also implies an order that does not exist — and inserting a form between two others either renumbers everything or leaves a permanent gap.</li>
+      <li><strong>112 of anything is a wall.</strong> Most staff will genuinely use six to ten registers. Presenting all 112 as equal peers, each labelled with a code, makes a rich system look like bureaucracy.</li>
+    </ul>
+
+    <h3>What to do about it</h3>
+    <ol>
+      <li><strong>Demote the code to metadata.</strong> The register&rsquo;s <em>name</em> is the heading; the code sits underneath in small grey mono type. Keep it in URLs, CSV and PDF exports, the audit log and support conversations — that is where it earns its place.</li>
+      <li><strong>Never make the code the way in.</strong> Navigation should read as tasks: &ldquo;Book leave&rdquo;, &ldquo;Renew a licence&rdquo;, &ldquo;Onboard an employee&rdquo;, &ldquo;Open a client file&rdquo;. The register behind it is an implementation detail.</li>
+      <li><strong>Show each person their own eight.</strong> A &ldquo;Your registers&rdquo; strip — recently used, plus a few pinned by role — with the full library behind an &ldquo;All registers&rdquo; link. Same data, a tenth of the intimidation.</li>
+      <li><strong>Make search the primary route.</strong> You already have <code>/search</code>. Put it in the header on every page and teach it synonyms, so &ldquo;annual leave&rdquo; and &ldquo;vacation&rdquo; both land on HR-007.</li>
+      <li><strong>Fix the colliding prefixes now.</strong> <code>CMP</code> → <code>AML</code>, <code>PRJ</code> → <code>PJT</code>. Trivial today with no customers; a data migration once anyone is live.</li>
+      <li><strong>Move new registers to stable slugs.</strong> <code>hr-leave-request</code> rather than <code>HR-007</code> — readable in a URL, never renumbered, and it survives reordering. Keep the old codes as permanent aliases so nothing breaks.</li>
+    </ol>
+
+    <div class="callout">
+      <span class="tag">The test</span>
+      <p>Sit someone in front of the portal who has never seen it and ask them to record a new client&rsquo;s KYC file. If they scan a list of codes looking for the right one, the naming is doing the work the interface should be doing.</p>
+    </div>
+  </section>
+
+  <!-- 04 -->
+  <section id="gaps">
+    <div class="sec-head">
+      <span class="sec-num">04</span>
+      <h2 class="sec-title">Why it reads as a CRM</h2>
+    </div>
+
+    <p class="lede">Partly positioning. Partly because the parts that make software feel like <em>software</em> — rather than a very good internal tool — are the ones not yet built.</p>
+
+    <p>These are honest, specific, and every one of them is in the code today. A technical buyer will find them in the first hour, so it is much better that you name them first.</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Gap</th><th>What&rsquo;s there now</th><th>Why a buyer cares</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Single-file database</td>
+            <td><code>db.py</code> opens <code>sqlite3</code> against one file. <code>psycopg</code> is in <code>requirements.txt</code>, but there is no <code>DATABASE_URL</code> branch anywhere in <code>db.py</code>.</td>
+            <td>One file on one machine cannot serve a real office, cannot be backed up live, and cannot survive a laptop failure.</td>
+          </tr>
+          <tr>
+            <td>No tenancy</td>
+            <td>No <code>org_id</code> / <code>company_id</code> column exists on any table.</td>
+            <td>Every client needs their own copy deployed and updated by hand. That caps you at a handful of customers.</td>
+          </tr>
+          <tr>
+            <td>No audit trail</td>
+            <td>There is a <code>login_log</code> table, but no immutable record of who changed which field, from what, to what, when.</td>
+            <td>For a compliance product this is not a nice-to-have — it is the core evidence artefact.</td>
+          </tr>
+          <tr>
+            <td>Links are text matching</td>
+            <td>Records relate by matching values in same-named fields (<code>LINK_FIELD_NAMES</code>), not foreign keys. Two people named Michael Chen link to each other.</td>
+            <td>Data integrity questions in due diligence. Also blocks proper reporting and de-duplication.</td>
+          </tr>
+          <tr>
+            <td>No CSRF protection</td>
+            <td>Dozens of <code>POST</code> routes; no token check found in <code>app.py</code>.</td>
+            <td>The first thing any security review flags on a public deployment.</td>
+          </tr>
+          <tr>
+            <td>Free-tier demo wipes data</td>
+            <td><code>render.yaml</code> uses the free plan with no persistent disk; <code>start-render.sh</code> re-seeds on every boot.</td>
+            <td>If a client tried the live link and lost their test data, that alone could explain a lukewarm reaction.</td>
+          </tr>
+          <tr>
+            <td>No tests, no migrations</td>
+            <td>Schema evolves by <code>CREATE TABLE IF NOT EXISTS</code> plus column patching at startup.</td>
+            <td>Fine for one installation. Dangerous the moment twenty customers hold live data.</td>
+          </tr>
+          <tr>
+            <td>Roles are hard-coded</td>
+            <td><code>access.py</code> is one Python dictionary; changing permissions means editing code and restarting.</td>
+            <td>Every brokerage has a different org chart. They expect to configure this themselves.</td>
+          </tr>
+          <tr>
+            <td>Repository sits inside OneDrive</td>
+            <td><code>DEPLOY.md</code> flags this itself — OneDrive syncing <code>.git</code> can corrupt it.</td>
+            <td>Your source of truth should not be one sync conflict away from a bad day.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout warn">
+      <span class="tag">Worth naming</span>
+      <p>None of the above is a design flaw. They are the deliberate trade-offs of a system built to run brilliantly on one PC. Turning them around is exactly what &ldquo;making it real software&rdquo; means — and it is Phases 1 and 2 below.</p>
+    </div>
+  </section>
+
+  <!-- 05 -->
+  <section id="category">
+    <div class="sec-head">
+      <span class="sec-num">05</span>
+      <h2 class="sec-title">The category to claim</h2>
+    </div>
+
+    <p class="lede">If you let the conversation happen in the CRM category, you will be compared on CRM features against vendors with a decade of head start and priced against a commodity.</p>
+
+    <p>So do not enter that category. Dharani 360 is a <strong>real estate operations and compliance system of record</strong>. A CRM tracks the deal. Dharani 360 tracks everything the business must be able to prove it did — the deal included.</p>
+
+    <div class="pull">
+      <p class="said">Dharani 360 is the operating record for a UAE brokerage: every licence, broker card, client file, owner authorisation, transaction, staff document and vendor contract in one register, with every expiry watched and every entry attributable.</p>
+      <p style="margin-top:14px;font-size:.9rem;color:var(--muted)">Use this as your one-line description on the README, the login screen, and the first slide.</p>
+    </div>
+
+    <h3>The wedge: brokers are regulated entities, not just sales teams</h3>
+    <p>Real estate brokers and agents in the UAE fall under the DNFBP regime — registration on the goAML platform, customer due diligence, record retention, and suspicious-transaction reporting, with real financial penalties for failure. A sales CRM has no opinion about any of that. Your Corporate &amp; Licensing, AML/KYC, and Compliance registers were built for precisely that evidence trail.</p>
+    <p>That is the sentence that ends the CRM comparison: <em>&ldquo;Which of the CRMs you&rsquo;re comparing this to produces your AML file?&rdquo;</em></p>
+
+    <h4>How to draw the comparison</h4>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Capability</th>
+            <th>Generic CRM<br><span style="text-transform:none;letter-spacing:0">Zoho, HubSpot, Salesforce</span></th>
+            <th>Dubai property CRM<br><span style="text-transform:none;letter-spacing:0">PropSpace, PropCRM et al.</span></th>
+            <th>Dharani 360</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Lead &amp; client pipeline</td><td><span class="pill have">Yes</span></td><td><span class="pill have">Yes</span></td><td><span class="pill have">Yes</span></td></tr>
+          <tr><td>Portal listing feeds (Bayut, Property Finder)</td><td><span class="pill none">No</span></td><td><span class="pill have">Yes</span></td><td><span class="pill none">Not yet</span></td></tr>
+          <tr><td>Commission &amp; transaction pipeline</td><td><span class="pill part">Add-on</span></td><td><span class="pill have">Yes</span></td><td><span class="pill have">Yes</span></td></tr>
+          <tr><td>Trade licence &amp; permit expiry watch</td><td><span class="pill none">No</span></td><td><span class="pill part">Rare</span></td><td><span class="pill have">Core</span></td></tr>
+          <tr><td>Broker card / RERA credential register</td><td><span class="pill none">No</span></td><td><span class="pill part">Partial</span></td><td><span class="pill have">Core</span></td></tr>
+          <tr><td>AML risk rating &amp; KYC register</td><td><span class="pill none">No</span></td><td><span class="pill none">No</span></td><td><span class="pill have">Core</span></td></tr>
+          <tr><td>Owner authorisation &amp; POA tracking</td><td><span class="pill none">No</span></td><td><span class="pill part">Partial</span></td><td><span class="pill have">Core</span></td></tr>
+          <tr><td>HR lifecycle, leave, discipline records</td><td><span class="pill none">Separate product</span></td><td><span class="pill none">No</span></td><td><span class="pill have">Included</span></td></tr>
+          <tr><td>Asset, IT &amp; security incident register</td><td><span class="pill none">No</span></td><td><span class="pill none">No</span></td><td><span class="pill have">Included</span></td></tr>
+          <tr><td>Vendor due diligence &amp; contracts</td><td><span class="pill none">No</span></td><td><span class="pill none">No</span></td><td><span class="pill have">Included</span></td></tr>
+          <tr><td>One calendar of every expiry, company-wide</td><td><span class="pill none">No</span></td><td><span class="pill none">No</span></td><td><span class="pill have">Signature</span></td></tr>
+          <tr><td>New register defined without a developer</td><td><span class="pill part">Custom modules</span></td><td><span class="pill none">No</span></td><td><span class="pill part">Config file today</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout">
+      <span class="tag">Use it honestly</span>
+      <p>Two of those rows are red for you — portal feeds and no-developer configuration. Show them anyway. A comparison table where you lose two rows is credible; one where you win everything gets thrown away.</p>
+    </div>
+  </section>
+
+  <!-- 06 -->
+  <section id="roadmap">
+    <div class="sec-head">
+      <span class="sec-num">06</span>
+      <h2 class="sec-title">The five-phase roadmap</h2>
+    </div>
+
+    <p class="lede">Sequenced so each phase is independently demonstrable and each one unlocks a class of customer the previous phase couldn&rsquo;t serve. Durations assume one experienced developer.</p>
+
+    <div class="phases">
+
+      <article class="phase">
+        <div class="phase-mark"><span class="n">00</span><span class="dur">1–2 weeks</span></div>
+        <div>
+          <h3>Make it safe to demo</h3>
+          <p class="why">Before anything architectural, stop the demo from undermining the product. A client whose test data vanished will describe the system in exactly the deflating terms you heard.</p>
+          <ul>
+            <li>Move the repository out of OneDrive to <code>C:\Users\ramya\Projects\dharani360</code>; private GitHub becomes the backup.</li>
+            <li>Replace the free Render service with a paid instance and a persistent disk, or a Cloudflare Tunnel to a machine you control. Turn <code>DEMO_MODE</code> re-seeding off for any client-facing link.</li>
+            <li>Seed one convincing demo tenant: a fictional brokerage with 60–80 records spread across all ten departments, several deliberately expiring inside 30 days so the Control Tower opens red.</li>
+            <li>Rewrite the first paragraph of the README and the login screen to the category line in section 05. Delete the word &ldquo;CRM&rdquo; from your own materials.</li>
+            <li>Record a three-minute walkthrough that opens on the Compliance Calendar, not the leads list.</li>
+          </ul>
+          <p class="donewhen"><b>Done when</b> you can send a link to any client, at any hour, and the first screen they see is the expiry watchtower with real-looking data behind it.</p>
+        </div>
+      </article>
+
+      <article class="phase">
+        <div class="phase-mark"><span class="n">01</span><span class="dur">3–4 weeks</span></div>
+        <div>
+          <h3>Make it real multi-user software</h3>
+          <p class="why">This is the phase that converts &ldquo;an impressive internal tool&rdquo; into &ldquo;software&rdquo;. Nothing here adds a feature a user can see, and all of it is what a buyer&rsquo;s IT person checks.</p>
+          <ul>
+            <li><strong>Postgres.</strong> Add a <code>DATABASE_URL</code> branch to <code>db.py</code> — the module is already generic and driven by <code>forms_data.py</code>, so this is a connection layer and a dialect pass over the SQL, not a rewrite. Keep SQLite as the local-dev path.</li>
+            <li><strong>Real migrations.</strong> Alembic, replacing startup column-patching. Non-negotiable once customers hold data.</li>
+            <li><strong>Object storage for attachments.</strong> S3-compatible (Supabase Storage, Cloudflare R2, Backblaze B2) so files stop living on one disk. Raise gunicorn workers above 1 once SQLite is gone.</li>
+            <li><strong>Audit trail.</strong> One <code>audit_log</code> table: actor, record, field, old value, new value, timestamp, IP. Write to it from the same generic insert/update path in <code>db.py</code> so all 76 registers get it at once. Surface it as a tab on every record.</li>
+            <li><strong>Security baseline.</strong> CSRF tokens on every POST, secure/HttpOnly/SameSite session cookies, rate limiting on login, HTTPS enforced, secrets from environment only.</li>
+            <li><strong>Backups you have tested restoring.</strong> Nightly database dump plus file-store snapshot, and one documented restore drill.</li>
+            <li><strong>Error tracking and a smoke test suite</strong> covering login, submit, edit, delete, export across a sample of forms.</li>
+          </ul>
+          <p class="donewhen"><b>Done when</b> the whole system runs on a server you can lose without losing data, ten people can use it at once, and you can answer &ldquo;who changed this and when?&rdquo; for any field in any register.</p>
+        </div>
+      </article>
+
+      <article class="phase">
+        <div class="phase-mark"><span class="n">02</span><span class="dur">3–5 weeks</span></div>
+        <div>
+          <h3>Make it multi-tenant</h3>
+          <p class="why">One deployment, many brokerages. Until this exists, every new customer costs you a manual deployment and every update costs you N upgrades — which caps the business at roughly five clients.</p>
+          <ul>
+            <li><code>org_id</code> on every table, set at insert, filtered at query. Because reads and writes funnel through <code>db.py</code>, this lands in one layer rather than 75 routes.</li>
+            <li>Tenant resolution by subdomain (<code>brokerage.dharani360.ae</code>) or by an org bound to the session; a hard guard that refuses any query without a tenant scope.</li>
+            <li>Per-tenant settings: branding, logo, departments enabled, holiday calendar, SMTP, and — importantly — <strong>roles moved out of <code>access.py</code> into database rows</strong> the customer&rsquo;s director can edit.</li>
+            <li>Self-serve onboarding: create org → seed the register set → create the first director account → forced password change. This is what makes trials possible.</li>
+            <li>Subscription state on the org record (plan, seats, status, renewal) so access can be suspended without deleting anything.</li>
+            <li>A super-admin console for you: tenants, seat counts, storage, last activity, error rates.</li>
+          </ul>
+          <p class="donewhen"><b>Done when</b> you can sign up a new brokerage in under five minutes without touching a server, and shipping a fix upgrades every customer at once.</p>
+        </div>
+      </article>
+
+      <article class="phase">
+        <div class="phase-mark"><span class="n">03</span><span class="dur">4–8 weeks</span></div>
+        <div>
+          <h3>Make it something people renew</h3>
+          <p class="why">Phases 1 and 2 make it sellable. This phase makes it sticky — these are the capabilities buyers compare when they are choosing between two credible products rather than deciding whether yours is credible at all.</p>
+          <ul>
+            <li><strong>Workflow and approvals engine.</strong> You already have approval queues in <code>insights.py</code>; generalise to configurable states, assignees, SLAs and escalation on any register.</li>
+            <li><strong>Notifications beyond the daily digest.</strong> In-app, email and WhatsApp/SMS at 90/60/30/7 days before expiry, routed to the responsible person rather than one inbox. For a compliance product this <em>is</em> the product.</li>
+            <li><strong>Form builder in the browser.</strong> Turn <code>forms_data.py</code> into tenant-scoped database rows with a UI on top. This converts your engine&rsquo;s biggest advantage from an internal convenience into a customer-facing feature — and flips the last red row in your comparison table.</li>
+            <li><strong>Report builder and saved views</strong>, plus scheduled report delivery.</li>
+            <li><strong>REST API and webhooks</strong>, token-authenticated and tenant-scoped. Integration questions arrive in the second sales meeting, always.</li>
+            <li><strong>Mobile.</strong> A responsive PWA covering the four things people do away from a desk: check the calendar, look up a record, upload a photo of a document, approve something.</li>
+            <li><strong>Bulk import.</strong> CSV/Excel into any register with mapping and validation. Migration friction loses more deals than missing features.</li>
+          </ul>
+          <p class="donewhen"><b>Done when</b> a customer can configure their own registers and approval flows, and someone gets a phone notification about a licence expiring in 30 days without anyone opening the portal.</p>
+        </div>
+      </article>
+
+      <article class="phase">
+        <div class="phase-mark"><span class="n">04</span><span class="dur">Ongoing</span></div>
+        <div>
+          <h3>Make it defensible</h3>
+          <p class="why">Everything above can eventually be copied. These are the things that get harder for a competitor to match the longer you run.</p>
+          <ul>
+            <li><strong>Regulatory output formats.</strong> Export packs shaped for what a UAE regulator or auditor actually asks for, including goAML-ready client due-diligence extracts. Verify every format with a UAE compliance advisor before you claim it.</li>
+            <li><strong>Portal integrations</strong> — Bayut and Property Finder listing sync. This closes the one row where a specialist competitor genuinely beats you.</li>
+            <li><strong>E-signature</strong> on authorisations and contracts, filed straight into the record.</li>
+            <li><strong>The regulations library as a maintained service.</strong> Your 324 KB <code>regulations_data.py</code> becomes a subscription feature if it is kept current and dated — and a liability if it is not.</li>
+            <li><strong>Data residency in the UAE</strong>, a written security posture, and a documented backup/retention policy. Enterprise buyers ask for all three in writing.</li>
+            <li><strong>Benchmarks.</strong> Anonymised, aggregated compliance-health scoring across tenants. Nobody can copy this without customers.</li>
+          </ul>
+          <p class="donewhen"><b>Done when</b> a prospect&rsquo;s compliance officer, not just their sales manager, is the one asking for the demo.</p>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- 07 -->
+  <section id="audit">
+    <div class="sec-head">
+      <span class="sec-num">07</span>
+      <h2 class="sec-title">Feature audit</h2>
+    </div>
+
+    <p class="lede">What a buyer expects from commercial business software, checked against what exists in the repository today. Sort your backlog by the priority column.</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Expectation</th><th>Today</th><th>Priority</th><th>Phase</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Runs on a server, not a desk</td><td><span class="pill part">Docker exists, SQLite blocks it</span></td><td class="num">Critical</td><td class="num">01</td></tr>
+          <tr><td>Concurrent multi-user writes</td><td><span class="pill none">Single worker by design</span></td><td class="num">Critical</td><td class="num">01</td></tr>
+          <tr><td>Change history / audit log</td><td><span class="pill none">Login log only</span></td><td class="num">Critical</td><td class="num">01</td></tr>
+          <tr><td>Tested backup &amp; restore</td><td><span class="pill none">Manual folder copy</span></td><td class="num">Critical</td><td class="num">01</td></tr>
+          <tr><td>CSRF, session &amp; transport hardening</td><td><span class="pill none">Not present</span></td><td class="num">Critical</td><td class="num">01</td></tr>
+          <tr><td>Schema migrations</td><td><span class="pill part">Startup patching</span></td><td class="num">High</td><td class="num">01</td></tr>
+          <tr><td>Multi-tenant isolation</td><td><span class="pill none">Not present</span></td><td class="num">High</td><td class="num">02</td></tr>
+          <tr><td>Customer-editable roles &amp; permissions</td><td><span class="pill part">Code dictionary</span></td><td class="num">High</td><td class="num">02</td></tr>
+          <tr><td>Self-serve onboarding / trial</td><td><span class="pill none">Manual setup scripts</span></td><td class="num">High</td><td class="num">02</td></tr>
+          <tr><td>Proactive notifications &amp; escalation</td><td><span class="pill part">Daily email digest</span></td><td class="num">High</td><td class="num">03</td></tr>
+          <tr><td>Bulk data import</td><td><span class="pill none">Not present</span></td><td class="num">High</td><td class="num">03</td></tr>
+          <tr><td>Mobile / responsive access</td><td><span class="pill part">Desktop-first CSS</span></td><td class="num">Medium</td><td class="num">03</td></tr>
+          <tr><td>REST API &amp; webhooks</td><td><span class="pill none">Not present</span></td><td class="num">Medium</td><td class="num">03</td></tr>
+          <tr><td>Configurable workflows &amp; approvals</td><td><span class="pill part">Fixed approval routes</span></td><td class="num">Medium</td><td class="num">03</td></tr>
+          <tr><td>In-browser form builder</td><td><span class="pill part">Edit a Python file</span></td><td class="num">Medium</td><td class="num">03</td></tr>
+          <tr><td>Real foreign keys between records</td><td><span class="pill part">Name matching</span></td><td class="num">Medium</td><td class="num">03</td></tr>
+          <tr><td>Portal listing integration</td><td><span class="pill none">Not present</span></td><td class="num">Medium</td><td class="num">04</td></tr>
+          <tr><td>Automated test suite &amp; CI</td><td><span class="pill none">Not present</span></td><td class="num">High</td><td class="num">01</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 08 -->
+  <section id="commercial">
+    <div class="sec-head">
+      <span class="sec-num">08</span>
+      <h2 class="sec-title">How you sell it</h2>
+    </div>
+
+    <p class="lede">Dubai real estate CRMs are widely advertised in the region of a few hundred to around fifteen hundred dirhams a month. If you price inside that band you have accepted the CRM comparison by other means.</p>
+
+    <h3>Price against the risk, not the seat</h3>
+    <p>The buyer&rsquo;s alternative to Dharani 360 is not a cheaper CRM. It is a spreadsheet of expiry dates, a folder of scanned PDFs, and one administrator who remembers things. The cost of that failing once — a lapsed trade licence, an incomplete client file at exactly the wrong moment — is the number your price sits next to. Say it plainly in the first meeting.</p>
+
+    <h4>A tier structure that fits what you have</h4>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Tier</th><th>Who</th><th>What they get</th><th>Shape</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Office</td>
+            <td>Single brokerage, up to ~15 users</td>
+            <td>All ten departments, standard registers, compliance calendar, digest, exports</td>
+            <td>Annual per-organisation licence with a seat band — not per-seat, which invites the CRM comparison</td>
+          </tr>
+          <tr>
+            <td>Group</td>
+            <td>Multi-branch or multi-entity</td>
+            <td>Adds custom registers, configurable roles &amp; approvals, API access, consolidated reporting</td>
+            <td>Annual, priced by entity count</td>
+          </tr>
+          <tr>
+            <td>Enterprise / on-premise</td>
+            <td>Firms that will not put staff and client data in shared hosting</td>
+            <td>Own instance or own server, data residency commitment, named support</td>
+            <td>Annual licence plus deployment fee — your <code>Dockerfile</code> already makes this deliverable</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Charge separately for setup — and mean it</h3>
+    <p>Migrating a brokerage&rsquo;s existing records and shaping their registers is genuine work, and your metadata engine makes you unusually fast at it. A one-off implementation fee covering data import, custom register design and staff training is normal in this market, protects your margin, and quietly demonstrates the platform capability that no CRM on their list has.</p>
+
+    <h4>Housekeeping to settle before the first paying customer</h4>
+    <ul>
+      <li><strong>Licensing.</strong> There is no <code>LICENSE</code> file in the repository. Decide now whether Dharani 360 is proprietary or open source; add the file and copyright headers either way. This is the first thing a serious client&rsquo;s lawyer looks for.</li>
+      <li><strong>Contract terms.</strong> Data ownership, export on termination, uptime expectations, support hours, breach notification.</li>
+      <li><strong>The advice boundary.</strong> Your README already states that the system is not legal, tax or immigration advice. Keep that line in the product and the contract — a compliance tool that appears to give legal advice is a liability you do not want.</li>
+      <li><strong>Support model.</strong> A response-time commitment you can actually keep as one person is worth more than a generous one you cannot.</li>
+    </ul>
+  </section>
+
+  <!-- 09 -->
+  <section id="week">
+    <div class="sec-head">
+      <span class="sec-num">09</span>
+      <h2 class="sec-title">Do this week</h2>
+    </div>
+
+    <p class="lede">Five things, none of which needs a budget, all of which change the next client conversation.</p>
+
+    <ol class="week">
+      <li>
+        <b>Ask the client the three questions in section 01.</b>
+        <span>Everything else depends on which of the three readings you are actually dealing with. One message, today.</span>
+      </li>
+      <li>
+        <b>Move the repository out of OneDrive and push to private GitHub.</b>
+        <span><code>DEPLOY.md</code> already tells you how, and already warns you why. This protects the asset.</span>
+      </li>
+      <li>
+        <b>Fix the demo so it stops losing data.</b>
+        <span>Paid instance with a disk, or Cloudflare Tunnel from a machine that stays on. A demo that resets is actively arguing against you.</span>
+      </li>
+      <li>
+        <b>Add the <code>audit_log</code> table and CSRF tokens.</b>
+        <span>Two focused days. Both write into paths that already exist in <code>db.py</code> and <code>app.py</code>, and both are the answers to questions you will be asked.</span>
+      </li>
+      <li>
+        <b>Rewrite your own description of the product.</b>
+        <span>README, login screen, and the way you introduce it out loud. Lead with the expiry watchtower and the compliance registers; mention leads fourth. The word &ldquo;CRM&rdquo; does not appear.</span>
+      </li>
+    </ol>
+
+    <div class="callout crit">
+      <span class="tag">The one thing to remember</span>
+      <p>You did not build a CRM that happens to include compliance. You built a compliance system of record that happens to include a CRM. The engineering roadmap above matters — but if the sentence stays wrong, none of it lands.</p>
+    </div>
+  </section>
+
+  <footer>
+    <p>Current-state findings in sections 02, 03, 04 and 07 were read directly from the <code>dharani360-portal</code> repository on 22 August 2026 — <code>app.py</code>, <code>db.py</code>, <code>forms_data.py</code>, <code>access.py</code>, <code>render.yaml</code>, <code>Dockerfile</code>, <code>DEPLOY.md</code> and <code>README.md</code>. Effort estimates assume one experienced full-stack developer and will move with scope.</p>
+    <p>Market and regulatory context is background, not advice. Confirm UAE DNFBP, goAML and record-retention obligations with a licensed UAE compliance advisor before making any regulatory claim in your sales material.</p>
+  </footer>
+
+</div>

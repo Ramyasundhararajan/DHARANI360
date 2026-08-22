@@ -21,7 +21,7 @@
       <div class="doc-purpose">Most providers (Gmail, Outlook/Microsoft 365, Zoho) support SMTP with an app password. This is stored locally in your database, not sent anywhere else.</div>
     </div>
   </div>
-  <form method="post">
+  <form method="post"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <div class="form-grid">
       <div class="field">
         <label>SMTP Host</label>
@@ -64,7 +64,7 @@
     </div>
   </form>
 
-  <form method="post" action="{{ url_for('settings_send_test') }}">
+  <form method="post" action="{{ url_for('settings_send_test') }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <div class="btn-row" style="border-top:1px solid var(--border); padding-top:14px;">
       <button type="submit" class="btn btn-secondary">Send Test Digest Now</button>
     </div>
@@ -74,7 +74,7 @@
 <div class="section-title">Leave Policy Note</div>
 <div class="card form-card">
   <div class="doc-purpose" style="margin-bottom:12px;">Shown on every employee's personal dashboard. Use it for the plain-language leave policy summary — carry-forward rules, notice period, etc.</div>
-  <form method="post">
+  <form method="post"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <input type="hidden" name="smtp_host" value="{{ settings.smtp_host }}">
     <input type="hidden" name="smtp_port" value="{{ settings.smtp_port }}">
     <input type="hidden" name="smtp_username" value="{{ settings.smtp_username }}">
@@ -96,7 +96,7 @@
 
 <div class="section-title">Public Holidays</div>
 <div class="card form-card">
-  <form method="post" action="{{ url_for('holiday_add') }}" class="form-grid" style="margin-bottom:16px;">
+  <form method="post" action="{{ url_for('holiday_add') }}" class="form-grid" style="margin-bottom:16px;"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <div class="field">
       <label>Holiday Name</label>
       <input type="text" name="name" required>
@@ -114,7 +114,7 @@
     <div class="rag-row">
       <span>{{ h.name }}</span>
       <span class="rag-meta">{{ h.holiday_date }}</span>
-      <form method="post" action="{{ url_for('holiday_delete', holiday_id=h.id) }}" style="margin-left:auto;">
+      <form method="post" action="{{ url_for('holiday_delete', holiday_id=h.id) }}" style="margin-left:auto;"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
         <button type="submit" class="btn btn-sm btn-danger">Remove</button>
       </form>
     </div>

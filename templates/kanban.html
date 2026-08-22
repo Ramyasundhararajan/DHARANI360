@@ -32,7 +32,7 @@
         <div class="kanban-card-meta">{{ t.project_name or "—" }}</div>
         <div class="kanban-card-meta">{{ t.assigned_to or "Unassigned" }}{% if t.due_date %} &middot; due {{ t.due_date }}{% endif %}</div>
         {% if t.priority %}<span class="badge badge-{{ 'RED' if t.priority in ('High','Urgent') else ('AMBER' if t.priority == 'Medium' else 'GREY') }}">{{ t.priority }}</span>{% endif %}
-        <form method="post" action="{{ url_for('projects_kanban_status', record_id=t.id) }}" class="kanban-move-form">
+        <form method="post" action="{{ url_for('projects_kanban_status', record_id=t.id) }}" class="kanban-move-form"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
           <select name="status" onchange="this.form.submit()">
             {% for c in columns %}
             <option value="{{ c }}" {% if c == col %}selected{% endif %}>{{ c }}</option>

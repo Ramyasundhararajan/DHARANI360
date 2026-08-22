@@ -103,10 +103,10 @@
         <div class="rag-meta" style="margin-left:0; text-align:left;">{{ a.meta }}</div>
       </div>
       <div class="approval-actions">
-        <form method="post" action="{{ url_for('approval_action', form_code=a.form_code, record_id=a.record_id, action='approve') }}">
+        <form method="post" action="{{ url_for('approval_action', form_code=a.form_code, record_id=a.record_id, action='approve') }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
           <button type="submit" class="btn btn-xs btn-approve">Approve</button>
         </form>
-        <form method="post" action="{{ url_for('approval_action', form_code=a.form_code, record_id=a.record_id, action='reject') }}">
+        <form method="post" action="{{ url_for('approval_action', form_code=a.form_code, record_id=a.record_id, action='reject') }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
           <button type="submit" class="btn btn-xs btn-reject">Decline</button>
         </form>
       </div>
@@ -124,15 +124,15 @@
     <div class="todo-list">
       {% for t in todos %}
       <div class="todo-row tint-{{ t.color or 'blue' }} {% if t.done %}done{% endif %}">
-        <form method="post" action="{{ url_for('todo_toggle', todo_id=t.id) }}"><button type="submit" class="todo-check-btn" title="Mark done / not done">{{ icon('check-square') }}</button></form>
+        <form method="post" action="{{ url_for('todo_toggle', todo_id=t.id) }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button type="submit" class="todo-check-btn" title="Mark done / not done">{{ icon('check-square') }}</button></form>
         <span class="todo-text">{{ t.text }}</span>
-        <form method="post" action="{{ url_for('todo_delete', todo_id=t.id) }}"><button type="submit" class="todo-del" title="Delete">&times;</button></form>
+        <form method="post" action="{{ url_for('todo_delete', todo_id=t.id) }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button type="submit" class="todo-del" title="Delete">&times;</button></form>
       </div>
       {% else %}
       {{ ui.empty('No to-dos yet — add one below.') }}
       {% endfor %}
     </div>
-    <form method="post" action="{{ url_for('todo_add') }}" class="todo-add-row" style="margin-top:14px; margin-bottom:0;">
+    <form method="post" action="{{ url_for('todo_add') }}" class="todo-add-row" style="margin-top:14px; margin-bottom:0;"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
       <input type="text" name="text" placeholder="Add a to-do…" required>
       <select name="color" aria-label="Colour">
         <option value="blue">Blue</option>
@@ -231,7 +231,7 @@
       <div class="meeting-meta">{{ m.category or "—" }} &middot; {{ m.start_time or "—" }}{% if m.end_time %}–{{ m.end_time }}{% endif %}{% if m.attendees %} &middot; {{ m.attendees }}{% endif %}</div>
     </div>
     {% if m.link %}<a class="btn btn-xs btn-secondary" href="{{ m.link }}" target="_blank" rel="noopener">Join</a>{% endif %}
-    <form method="post" action="{{ url_for('meeting_delete', meeting_id=m.id) }}"><button type="submit" class="todo-del" title="Remove">&times;</button></form>
+    <form method="post" action="{{ url_for('meeting_delete', meeting_id=m.id) }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button type="submit" class="todo-del" title="Remove">&times;</button></form>
   </div>
   {% else %}
     {{ ui.empty('No meetings scheduled.') }}
@@ -239,7 +239,7 @@
 
   <details class="inline-form no-print">
     <summary>+ Schedule a meeting</summary>
-    <form method="post" action="{{ url_for('meeting_add') }}" class="form-grid">
+    <form method="post" action="{{ url_for('meeting_add') }}" class="form-grid"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
       <div class="field"><label>Title</label><input type="text" name="title" required></div>
       <div class="field"><label>Category</label><input type="text" name="category" placeholder="e.g. Sales, Ops"></div>
       <div class="field"><label>Date</label><input type="date" name="meeting_date" required></div>

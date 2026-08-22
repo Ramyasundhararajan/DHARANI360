@@ -22,10 +22,14 @@ VOLUME ["/app/instance"]
 
 EXPOSE 5000
 
-# One worker, several threads: SQLite is happy with many threads in one
-# process and unhappy with several processes writing at once. If you move
-# to Postgres you can safely raise --workers.
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", \
-     "--workers", "1", "--threads", "8", \
-     "--timeout", "120", "--access-logfile", "-", \
-     "app:app"]
+# SQLite is happy with many threads in one process and unhappy with several
+# processes writing at once, so the default stays at one worker. With
+# DATABASE_URL pointing at Postgres, raise it - GUNICORN_WORKERS is read at
+# start-up, so no rebuild is needed:
+#     docker run -e DATABASE_URL=... -e GUNICORN_WORKERS=4 ...
+ENV GUNICORN_WORKERS=1 GUNICORN_THREADS=8
+
+CMD ["sh", "-c", "exec gunicorn app:app \
+     --bind 0.0.0.0:${PORT:-5000} \
+     --workers ${GUNICORN_WORKERS:-1} --threads ${GUNICORN_THREADS:-8} \
+     --timeout 120 --access-logfile - --error-logfile -"]

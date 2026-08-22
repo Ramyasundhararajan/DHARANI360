@@ -79,7 +79,7 @@
           <a class="row-action" title="Edit record" href="{{ url_for('record_edit', form_code=form.code, record_id=row.id) }}">{{ icon('edit') }}</a>
           <a class="row-action" title="Download as CSV" href="{{ url_for('record_download', form_code=form.code, record_id=row.id, fmt='csv') }}">{{ icon('download') }}</a>
           <form method="post" action="{{ url_for('record_delete', form_code=form.code, record_id=row.id) }}"
-                data-confirm="Delete {{ row.doc_no }} permanently?">
+                data-confirm="Delete {{ row.doc_no }} permanently?"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
             <button type="submit" class="row-action row-action-danger" title="Delete record">{{ icon('trash') }}</button>
           </form>
         </div>

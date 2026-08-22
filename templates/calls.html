@@ -63,7 +63,7 @@
       <div class="call-start-label">A colleague</div>
       <div class="call-start-people">
         {% for c in share_colleagues %}
-        <form method="post" action="{{ url_for('call_start', username=c.username) }}" class="call-start-person">
+        <form method="post" action="{{ url_for('call_start', username=c.username) }}" class="call-start-person"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
           <input type="hidden" name="mode" value="video">
           <button type="submit" title="Video call {{ c.full_name or c.username }}">
             <span class="call-start-avatar">
@@ -82,7 +82,7 @@
 
     <div class="call-start-col">
       <div class="call-start-label">Someone outside the company</div>
-      <form method="post" action="{{ url_for('call_quick') }}" class="call-start-form">
+      <form method="post" action="{{ url_for('call_quick') }}" class="call-start-form"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
         <div class="form-row">
           <label>
             <span>Who is the call with?</span>
@@ -124,7 +124,7 @@
     <em>Records it straight into the Call Log register</em>
     <span class="rules-strip-chevron">{{ icon('chevron') }}</span>
   </summary>
-  <form method="post" action="{{ url_for('call_log_quick') }}" class="quick-log-form">
+  <form method="post" action="{{ url_for('call_log_quick') }}" class="quick-log-form"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <input type="hidden" name="return_view" value="{{ view }}">
     <div class="form-grid">
       <div class="field">
@@ -224,7 +224,7 @@
       <a class="row-action" title="Edit" href="{{ url_for('record_edit', form_code='SAL-009', record_id=r.id) }}">{{ icon('edit') }}</a>
       <a class="row-action" title="Download CSV" href="{{ url_for('record_download', form_code='SAL-009', record_id=r.id, fmt='csv') }}">{{ icon('download') }}</a>
       <form method="post" action="{{ url_for('record_delete', form_code='SAL-009', record_id=r.id) }}"
-            data-confirm="Delete the call record for {{ r.contact_name }} permanently?">
+            data-confirm="Delete the call record for {{ r.contact_name }} permanently?"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
         <button type="submit" class="row-action row-action-danger" title="Delete">{{ icon('trash') }}</button>
       </form>
     </div>

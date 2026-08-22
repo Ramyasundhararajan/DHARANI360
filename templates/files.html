@@ -30,7 +30,7 @@
     <em>Goes into the company library &mdash; up to 15MB</em>
     <span class="rules-strip-chevron">{{ icon('chevron') }}</span>
   </summary>
-  <form method="post" action="{{ url_for('library_upload') }}" enctype="multipart/form-data" class="quick-log-form">
+  <form method="post" action="{{ url_for('library_upload') }}" enctype="multipart/form-data" class="quick-log-form"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <div class="form-grid">
       <div class="field full">
         <label>File <span class="req">*</span></label>
@@ -73,7 +73,7 @@
         <div class="row-actions">
           <a class="row-action" title="Download" href="{{ url_for('library_download', file_id=f.id) }}">{{ icon('download') }}</a>
           <form method="post" action="{{ url_for('library_delete', file_id=f.id) }}"
-                data-confirm="Delete {{ f.original_name }} from the library? This cannot be undone.">
+                data-confirm="Delete {{ f.original_name }} from the library? This cannot be undone."><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
             <button type="submit" class="row-action row-action-danger" title="Delete">{{ icon('trash') }}</button>
           </form>
         </div>

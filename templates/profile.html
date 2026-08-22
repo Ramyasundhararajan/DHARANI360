@@ -18,7 +18,7 @@
 
   <div class="card profile-card">
     <form method="post" action="{{ url_for('account_photo') }}"
-          enctype="multipart/form-data" id="photo-form">
+          enctype="multipart/form-data" id="photo-form"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
       <input type="hidden" name="next" value="{{ url_for('profile') }}">
 
       <!-- The picture itself is the button. Choosing a file submits straight
@@ -55,7 +55,7 @@
 
     <div class="card form-card">
       <div class="form-section-title">Your details</div>
-      <form method="post">
+      <form method="post"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
         <div class="form-grid">
           <div class="field">
             <label>Display Name</label>

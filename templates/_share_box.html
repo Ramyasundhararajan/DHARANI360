@@ -27,7 +27,7 @@
 
     {# ---------------------------------------------------------- inside -- #}
     <section class="share-body" data-share-pane="inside">
-      <form method="post" action="{{ url_for('share_send') }}">
+      <form method="post" action="{{ url_for('share_send') }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
         <input type="hidden" name="kind" value="{{ share_kind }}">
         <input type="hidden" name="form_code" value="{{ share_form_code or '' }}">
         <input type="hidden" name="record_id" value="{{ share_record_id or '' }}">

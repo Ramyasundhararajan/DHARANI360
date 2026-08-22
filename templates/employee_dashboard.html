@@ -83,8 +83,8 @@
       {% else %}You haven't punched in yet{% endif %}
     </div>
     <div class="btn-row" style="justify-content:center;">
-      <form method="post" action="{{ url_for('attendance_punch_in') }}"><button type="submit" class="btn" {% if today_att and today_att.check_in %}disabled{% endif %}>Punch In</button></form>
-      <form method="post" action="{{ url_for('attendance_punch_out') }}"><button type="submit" class="btn btn-secondary" {% if not today_att or not today_att.check_in or today_att.check_out %}disabled{% endif %}>Punch Out</button></form>
+      <form method="post" action="{{ url_for('attendance_punch_in') }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button type="submit" class="btn" {% if today_att and today_att.check_in %}disabled{% endif %}>Punch In</button></form>
+      <form method="post" action="{{ url_for('attendance_punch_out') }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button type="submit" class="btn btn-secondary" {% if not today_att or not today_att.check_in or today_att.check_out %}disabled{% endif %}>Punch Out</button></form>
     </div>
   </div>
 
@@ -223,15 +223,15 @@
     <div class="todo-list">
       {% for t in todos %}
       <div class="todo-row tint-{{ t.color or 'blue' }} {% if t.done %}done{% endif %}">
-        <form method="post" action="{{ url_for('todo_toggle', todo_id=t.id) }}"><button type="submit" class="todo-check-btn" title="Mark done / not done"><span class="todo-dot" style="background:var(--{{ t.color or 'blue' }});"></span></button></form>
+        <form method="post" action="{{ url_for('todo_toggle', todo_id=t.id) }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button type="submit" class="todo-check-btn" title="Mark done / not done"><span class="todo-dot" style="background:var(--{{ t.color or 'blue' }});"></span></button></form>
         <span class="todo-text">{{ t.text }}</span>
-        <form method="post" action="{{ url_for('todo_delete', todo_id=t.id) }}"><button type="submit" class="todo-del">&times;</button></form>
+        <form method="post" action="{{ url_for('todo_delete', todo_id=t.id) }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button type="submit" class="todo-del">&times;</button></form>
       </div>
       {% else %}
       <div class="empty-state">No to-dos yet — add one below.</div>
       {% endfor %}
     </div>
-    <form method="post" action="{{ url_for('todo_add') }}" class="todo-add-row">
+    <form method="post" action="{{ url_for('todo_add') }}" class="todo-add-row"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
       <input type="text" name="text" placeholder="Add a to-do..." required>
       <select name="color">
         <option value="blue">Blue</option>

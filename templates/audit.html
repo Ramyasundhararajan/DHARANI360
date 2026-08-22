@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Audit Trail · DHARANI 360{% endblock %}
+{% block content %}
+
+<div class="topbar">
+  <div>
+    <h1 class="dept-title">{{ icon('lock') }}Audit Trail</h1>
+    <div class="breadcrumb">
+      <a href="{{ url_for('dashboard') }}">Home</a>{{ icon('chevron') }}
+      <span>Administration</span>{{ icon('chevron') }}
+      <span class="current">Audit Trail</span>
+    </div>
+    <div class="crumbs">
+      Every change made to every register, newest first: who changed which field,
+      what it was before, and what it became. Records are written automatically and
+      are never edited or removed from inside DHARANI 360.
+      {{ "{:,}".format(total) }} entries held.
+    </div>
+  </div>
+</div>
+
+<form method="get" class="quick-log-form" style="margin-bottom:16px;">
+  <div class="field">
+    <label for="auditq">Search</label>
+    <input id="auditq" type="search" name="q" value="{{ q or '' }}"
+           placeholder="A name, a document number, a value…">
+  </div>
+  <div class="field">
+    <label for="auditaction">Action</label>
+    <select id="auditaction" name="action">
+      <option value="">All actions</option>
+      {% for a in actions %}
+        <option value="{{ a }}" {% if a == action %}selected{% endif %}>{{ a }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="field">
+    <label for="auditactor">Person</label>
+    <select id="auditactor" name="actor">
+      <option value="">Everyone</option>
+      {% for a in actors %}
+        <option value="{{ a }}" {% if a == actor %}selected{% endif %}>{{ a }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <button type="submit" class="btn">Filter</button>
+  {% if q or action or actor %}
+    <a class="btn btn-secondary" href="{{ url_for('audit_trail') }}">Clear</a>
+  {% endif %}
+</form>
+
+<div class="table-scroll-hint">{{ icon('chevron') }}<span>Swipe the table sideways to see every column.</span></div>
+<div class="table-wrap table-sparse">
+<table>
+  <thead>
+    <tr>
+      <th>When (UTC)</th>
+      <th>Who</th>
+      <th>Action</th>
+      <th>Record</th>
+      <th>Field</th>
+      <th>Was</th>
+      <th>Became</th>
+      <th>From</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for e in entries %}
+    <tr>
+      <td style="white-space:nowrap;">{{ (e.at or "")[:16].replace("T", " ") }}</td>
+      <td>
+        {{ e.actor or "—" }}
+        {% if e.actor_role %}<div class="muted-small">{{ e.actor_role }}</div>{% endif %}
+      </td>
+      <td><span class="pill">{{ e.action }}</span></td>
+      <td>
+        {% if e.form_code and e.record_id %}
+          <a href="{{ url_for('record_view', form_code=e.form_code, record_id=e.record_id) }}">{{ e.doc_no or e.form_code }}</a>
+          <div class="muted-small">{{ e.form_code }}</div>
+        {% elif e.detail %}
+          {{ e.detail }}
+        {% else %}—{% endif %}
+      </td>
+      <td>{{ e.field_name or "—" }}</td>
+      <td class="was">{{ (e.old_value or "")[:120] or "—" }}</td>
+      <td class="became">{{ (e.new_value or "")[:120] or "—" }}</td>
+      <td>{{ e.ip_address or "—" }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="8" class="empty-state">
+      {% if q or action or actor %}
+        Nothing matches that filter.
+      {% else %}
+        No changes recorded yet. Every edit from here on will appear in this list.
+      {% endif %}
+    </td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% if entries|length >= limit %}
+  <p class="crumbs">Showing the most recent {{ limit }} entries. Narrow the search to see older ones.</p>
+{% endif %}
+
+{% endblock %}

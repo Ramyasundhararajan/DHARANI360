@@ -2,13 +2,21 @@
 """
 DHARANI 360 - Database layer
 =============================
-Every form in forms_data.FORMS becomes one real SQLite table (the
+Every form in forms_data.FORMS becomes one real database table (the
 "register"). This module creates those tables automatically on first
 run, and provides generic insert/list/get/update/delete/search
-functions driven purely by the form metadata - so adding a 77th form
+functions driven purely by the form metadata - so adding another form
 to forms_data.py is enough; nothing here needs to change.
+
+Runs on SQLite (the default, one file, no server) or on PostgreSQL when
+DATABASE_URL is set. See dbcompat.py - nothing in this module needs to
+know which engine is in use.
+
+Every write that changes a record is recorded in audit_log: who changed
+which field, from what, to what, and when.
 """
-import sqlite3
+import threading
+import dbcompat
 import hashlib
 import json
 import os
@@ -39,13 +47,16 @@ TYPE_TO_SQL = {
 
 
 def get_conn():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    return conn
+    """Open a database connection.
+
+    SQLite by default. Set DATABASE_URL to a postgres:// address and the same
+    code talks to Postgres instead - see dbcompat.py.
+    """
+    return dbcompat.connect(DB_PATH)
 
 
 def init_db():
+    dbcompat.ensure_postgres_prereqs(DB_PATH)
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""CREATE TABLE IF NOT EXISTS counters (
@@ -70,7 +81,7 @@ def init_db():
         # Migration: this table may already exist from before a field was
         # added to forms_data.py (e.g. on an install the user already ran).
         # CREATE TABLE IF NOT EXISTS won't add new columns, so do it here.
-        existing_cols = {row["name"] for row in cur.execute('PRAGMA table_info({})'.format(tname)).fetchall()}
+        existing_cols = dbcompat.table_columns(cur, tname)
         for field in form["fields"]:
             if field["name"] not in existing_cols:
                 sql_type = TYPE_TO_SQL.get(field["type"], "TEXT")
@@ -87,7 +98,7 @@ def init_db():
         created_at TEXT,
         last_login TEXT
     )""")
-    user_cols = {row["name"] for row in cur.execute('PRAGMA table_info(users)').fetchall()}
+    user_cols = dbcompat.table_columns(cur, "users")
     if "photo_path" not in user_cols:
         cur.execute('ALTER TABLE users ADD COLUMN photo_path TEXT')
     # Sign-in moved from username to work email (Supabase Auth is keyed on
@@ -100,8 +111,13 @@ def init_db():
     # itself happens in the provider the company is allowed to use.
     if "meeting_link" not in user_cols:
         cur.execute('ALTER TABLE users ADD COLUMN meeting_link TEXT')
-    cur.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email '
-                'ON users (email COLLATE NOCASE) WHERE email IS NOT NULL')
+    # One sign-in address per person, compared without regard to case.
+    if dbcompat.IS_POSTGRES:
+        cur.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email '
+                    'ON users (LOWER(email)) WHERE email IS NOT NULL')
+    else:
+        cur.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email '
+                    'ON users (email COLLATE NOCASE) WHERE email IS NOT NULL')
 
     cur.execute("""CREATE TABLE IF NOT EXISTS attachments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -132,7 +148,7 @@ def init_db():
     # rather than dropped: the dashboard widget and the toggle button still
     # read it, and an older copy of this file must keep working against a
     # database this one has already migrated.
-    todo_cols = {row["name"] for row in cur.execute('PRAGMA table_info(todos)').fetchall()}
+    todo_cols = dbcompat.table_columns(cur, "todos")
     if "status" not in todo_cols:
         cur.execute('ALTER TABLE todos ADD COLUMN status TEXT')
         cur.execute("UPDATE todos SET status = CASE WHEN done = 1 THEN 'Done' ELSE 'To Do' END")
@@ -180,7 +196,7 @@ def init_db():
     #   file   - an attachment; attach_* columns are filled
     #   share  - a record, register or call handed to a colleague
     #   call   - a call was started, joined, missed or ended
-    chat_cols = {row["name"] for row in cur.execute("PRAGMA table_info(chat_messages)").fetchall()}
+    chat_cols = dbcompat.table_columns(cur, "chat_messages")
     for col, decl in (("kind", "TEXT"), ("meta", "TEXT"), ("attach_name", "TEXT"),
                       ("attach_stored", "TEXT"), ("attach_size", "INTEGER"),
                       ("delivered_at", "TEXT")):
@@ -209,7 +225,7 @@ def init_db():
         record_id INTEGER,
         status TEXT
     )""")
-    call_cols = {row["name"] for row in cur.execute("PRAGMA table_info(call_sessions)").fetchall()}
+    call_cols = dbcompat.table_columns(cur, "call_sessions")
     if "meeting_url" not in call_cols:
         cur.execute("ALTER TABLE call_sessions ADD COLUMN meeting_url TEXT")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_call_live ON call_sessions (status, other_user, id)")
@@ -240,7 +256,32 @@ def init_db():
         at TEXT
     )""")
 
+    # The audit trail. One row per field changed, never updated, never deleted
+    # from inside the application. This is the evidence a regulator, an auditor
+    # or an internal investigation actually asks for: who changed what, from
+    # what, to what, and when.
+    cur.execute("""CREATE TABLE IF NOT EXISTS audit_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        at TEXT NOT NULL,
+        actor TEXT,
+        actor_role TEXT,
+        ip_address TEXT,
+        action TEXT NOT NULL,
+        form_code TEXT,
+        record_id INTEGER,
+        doc_no TEXT,
+        field_name TEXT,
+        old_value TEXT,
+        new_value TEXT,
+        detail TEXT
+    )""")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_audit_record "
+                "ON audit_log (form_code, record_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_audit_at ON audit_log (at)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_log (actor)")
+
     conn.commit()
+    dbcompat.schema_changed()
 
     # Seed a default administrator on first run only.
     row = cur.execute("SELECT COUNT(*) FROM users").fetchone()
@@ -255,6 +296,168 @@ def init_db():
         conn.commit()
 
     conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Audit trail
+# ---------------------------------------------------------------------------
+# Every write that changes a record leaves a row here. The application never
+# updates or deletes these rows. app.py sets the context once per request, so
+# every function below can attribute a change without being passed the user.
+
+_audit_ctx = threading.local()
+
+#: Values longer than this are stored truncated - an audit row is evidence of
+#: a change, not a second copy of the document.
+AUDIT_VALUE_LIMIT = 2000
+
+
+def set_audit_context(actor=None, actor_role=None, ip_address=None):
+    """Record who is making changes on this thread, for this request."""
+    _audit_ctx.actor = actor
+    _audit_ctx.actor_role = actor_role
+    _audit_ctx.ip_address = ip_address
+
+
+def clear_audit_context():
+    set_audit_context(None, None, None)
+
+
+def _audit_who():
+    return (getattr(_audit_ctx, "actor", None),
+            getattr(_audit_ctx, "actor_role", None),
+            getattr(_audit_ctx, "ip_address", None))
+
+
+def _audit_trim(value):
+    if value is None:
+        return None
+    text = value if isinstance(value, str) else str(value)
+    if len(text) > AUDIT_VALUE_LIMIT:
+        return text[:AUDIT_VALUE_LIMIT] + "...[truncated]"
+    return text
+
+
+def record_audit(action, form_code=None, record_id=None, doc_no=None,
+                 field_name=None, old_value=None, new_value=None, detail=None,
+                 conn=None):
+    """Write one audit row. Pass `conn` to join an open transaction."""
+    return record_audit_many([{
+        "action": action, "form_code": form_code, "record_id": record_id,
+        "doc_no": doc_no, "field_name": field_name, "old_value": old_value,
+        "new_value": new_value, "detail": detail,
+    }], conn=conn)
+
+
+def record_audit_many(entries, conn=None):
+    """Write several audit rows at once - one per field changed."""
+    entries = [e for e in entries if e]
+    if not entries:
+        return
+    actor, actor_role, ip_address = _audit_who()
+    now = datetime.utcnow().isoformat(timespec="seconds")
+    own_conn = conn is None
+    if own_conn:
+        conn = get_conn()
+    try:
+        for e in entries:
+            conn.execute(
+                "INSERT INTO audit_log (at, actor, actor_role, ip_address, action, "
+                "form_code, record_id, doc_no, field_name, old_value, new_value, detail) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (now, actor, actor_role, ip_address, e.get("action"),
+                 e.get("form_code"), e.get("record_id"), e.get("doc_no"),
+                 e.get("field_name"), _audit_trim(e.get("old_value")),
+                 _audit_trim(e.get("new_value")), e.get("detail")))
+        if own_conn:
+            conn.commit()
+    finally:
+        if own_conn:
+            conn.close()
+
+
+def _audit_comparable(value):
+    """Normalise a value so cosmetic differences are not logged as changes.
+
+    Number columns are stored as REAL, so a field entered as "90" comes back
+    as 90.0. That is the same number, not an edit, and an audit trail full of
+    "90.0 -> 90" is an audit trail nobody reads.
+    """
+    if value is None:
+        return ""
+    text = str(value).strip()
+    try:
+        as_float = float(text)
+    except (TypeError, ValueError):
+        return text
+    if as_float.is_integer():
+        return str(int(as_float))
+    return repr(as_float)
+
+
+def _diff_for_audit(before, after_data, field_names):
+    """Which of `field_names` (plus status/notes) actually changed."""
+    changes = []
+    before_keys = dict(before) if before is not None else {}
+    for name in ["status", "notes"] + list(field_names):
+        if name not in after_data and name not in ("status", "notes"):
+            continue
+        old = before_keys.get(name, "")
+        new = after_data.get(name, "")
+        if _audit_comparable(old) != _audit_comparable(new):
+            changes.append({"field_name": name,
+                            "old_value": "" if old is None else str(old),
+                            "new_value": "" if new is None else str(new)})
+    return changes
+
+
+def list_audit(form_code=None, record_id=None, actor=None, action=None,
+               q=None, limit=200):
+    """Read the audit trail, newest first."""
+    clauses, params = [], []
+    if form_code:
+        clauses.append("form_code = ?")
+        params.append(form_code)
+    if record_id is not None:
+        clauses.append("record_id = ?")
+        params.append(record_id)
+    if actor:
+        clauses.append("actor = ?")
+        params.append(actor)
+    if action:
+        clauses.append("action = ?")
+        params.append(action)
+    if q:
+        like = "%{}%".format(q)
+        clauses.append("(actor LIKE ? OR doc_no LIKE ? OR field_name LIKE ? "
+                       "OR old_value LIKE ? OR new_value LIKE ? OR detail LIKE ?)")
+        params.extend([like] * 6)
+    where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM audit_log{} ORDER BY id DESC LIMIT {}".format(where, int(limit)),
+        params).fetchall()
+    conn.close()
+    return rows
+
+
+def audit_actions():
+    """Distinct action names present in the trail, for the filter dropdown."""
+    conn = get_conn()
+    rows = conn.execute("SELECT DISTINCT action FROM audit_log ORDER BY action").fetchall()
+    conn.close()
+    return [r["action"] for r in rows if r["action"]]
+
+
+def audit_count(form_code=None, record_id=None):
+    conn = get_conn()
+    if form_code and record_id is not None:
+        n = conn.execute("SELECT COUNT(*) FROM audit_log WHERE form_code = ? AND record_id = ?",
+                         (form_code, record_id)).fetchone()[0]
+    else:
+        n = conn.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0]
+    conn.close()
+    return n
 
 
 def next_doc_no(form_code):
@@ -282,7 +485,11 @@ def insert_record(form_code, data, created_by="Admin"):
     placeholders = ", ".join(["?"] * len(columns))
     col_sql = ", ".join('"{}"'.format(c) for c in columns)
     conn = get_conn()
-    conn.execute("INSERT INTO {} ({}) VALUES ({})".format(tname, col_sql, placeholders), values)
+    cur = conn.cursor()
+    cur.execute("INSERT INTO {} ({}) VALUES ({})".format(tname, col_sql, placeholders), values)
+    new_id = cur.lastrowid
+    record_audit("create", form_code=form_code, record_id=new_id, doc_no=doc_no,
+                 detail=form.get("title", form_code), conn=conn)
     conn.commit()
     conn.close()
     return doc_no
@@ -297,7 +504,7 @@ def record_id_for_doc(form_code, doc_no):
     try:
         row = conn.execute("SELECT id FROM {} WHERE doc_no = ?".format(table_name(form_code)),
                            (doc_no,)).fetchone()
-    except sqlite3.Error:
+    except dbcompat.DBError:
         row = None
     conn.close()
     return row["id"] if row else None
@@ -315,7 +522,15 @@ def update_record(form_code, record_id, data):
         values.append(data.get(name, ""))
     values.append(record_id)
     conn = get_conn()
+    before = conn.execute("SELECT * FROM {} WHERE id = ?".format(tname), (record_id,)).fetchone()
     conn.execute("UPDATE {} SET {} WHERE id = ?".format(tname, ", ".join(set_cols)), values)
+    changes = _diff_for_audit(before, data, field_names)
+    if changes:
+        doc_no = before["doc_no"] if before is not None else None
+        for c in changes:
+            c.update({"action": "update", "form_code": form_code,
+                      "record_id": record_id, "doc_no": doc_no})
+        record_audit_many(changes, conn=conn)
     conn.commit()
     conn.close()
 
@@ -323,7 +538,13 @@ def update_record(form_code, record_id, data):
 def delete_record(form_code, record_id):
     tname = table_name(form_code)
     conn = get_conn()
+    before = conn.execute("SELECT * FROM {} WHERE id = ?".format(tname), (record_id,)).fetchone()
     conn.execute("DELETE FROM {} WHERE id = ?".format(tname), (record_id,))
+    # The record goes; the fact that it existed and who removed it does not.
+    record_audit("delete", form_code=form_code, record_id=record_id,
+                 doc_no=(before["doc_no"] if before is not None else None),
+                 old_value=(json.dumps(dict(before), default=str) if before is not None else None),
+                 detail="Record deleted", conn=conn)
     conn.commit()
     conn.close()
     for att in get_attachments(form_code, record_id):
@@ -517,7 +738,7 @@ def global_search(q):
         params = [like] * len(text_fields)
         try:
             rows = conn.execute("SELECT * FROM {} WHERE {} ORDER BY id DESC LIMIT 25".format(tname, where), params).fetchall()
-        except sqlite3.OperationalError:
+        except dbcompat.OperationalError:
             rows = []
         for r in rows:
             results.append({
@@ -548,7 +769,7 @@ def field_counts(form_code, field, limit=None):
     tname = table_name(form_code)
     conn = get_conn()
     rows = conn.execute(
-        'SELECT "{0}" as v, COUNT(*) as n FROM {1} WHERE "{0}" IS NOT NULL AND TRIM("{0}") != "" '
+        'SELECT "{0}" as v, COUNT(*) as n FROM {1} WHERE "{0}" IS NOT NULL AND TRIM("{0}") != \'\' '
         'GROUP BY "{0}" ORDER BY n DESC'.format(field, tname)
     ).fetchall()
     conn.close()
@@ -601,7 +822,7 @@ def count_where(form_code, conditions):
             clauses.append('"{}" >= ?'.format(field))
             params.append(value)
         elif op == "lt":
-            clauses.append('"{}" < ? AND "{}" IS NOT NULL AND TRIM("{}") != ""'.format(field, field, field))
+            clauses.append('"{}" < ? AND "{}" IS NOT NULL AND TRIM("{}") != \'\''.format(field, field, field))
             params.append(value)
         elif op == "not_in":
             if value:
@@ -652,7 +873,7 @@ def latest_value(form_code, field, order_by="id DESC"):
     tname = table_name(form_code)
     conn = get_conn()
     row = conn.execute(
-        'SELECT "{}" as v FROM {} WHERE "{}" IS NOT NULL AND TRIM("{}") != "" ORDER BY {} LIMIT 1'.format(
+        'SELECT "{}" as v FROM {} WHERE "{}" IS NOT NULL AND TRIM("{}") != \'\' ORDER BY {} LIMIT 1'.format(
             field, tname, field, field, order_by)
     ).fetchone()
     conn.close()
@@ -665,7 +886,7 @@ def records_upcoming(form_code, date_field, days_ahead=14, include_overdue=True,
     tname = table_name(form_code)
     conn = get_conn()
     rows = conn.execute(
-        'SELECT * FROM {} WHERE "{}" IS NOT NULL AND TRIM("{}") != ""'.format(tname, date_field, date_field)
+        'SELECT * FROM {} WHERE "{}" IS NOT NULL AND TRIM("{}") != \'\''.format(tname, date_field, date_field)
     ).fetchall()
     conn.close()
     today = date.today()
@@ -803,6 +1024,8 @@ def create_user(username, password_hash, full_name, role, must_change_password=T
          datetime.utcnow().isoformat(timespec="seconds"))
     )
     new_id = cur.lastrowid
+    record_audit("user.create", record_id=new_id, new_value=role,
+                 detail="Account created: {} ({})".format(username, role), conn=conn)
     conn.commit()
     conn.close()
     return new_id
@@ -822,7 +1045,26 @@ def update_user(user_id, full_name=None, role=None, active=None, meeting_link=No
         return
     values.append(user_id)
     conn = get_conn()
+    before = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     conn.execute("UPDATE users SET {} WHERE id = ?".format(", ".join(sets)), values)
+    # Permission and account changes are audit events in their own right.
+    proposed = {}
+    if full_name is not None:
+        proposed["full_name"] = full_name
+    if meeting_link is not None:
+        proposed["meeting_link"] = meeting_link or ""
+    if role is not None:
+        proposed["role"] = role
+    if active is not None:
+        proposed["active"] = 1 if active else 0
+    entries = []
+    for name, new in proposed.items():
+        old = "" if before is None or before[name] is None else str(before[name])
+        if old != str(new):
+            entries.append({"action": "user.update", "field_name": name,
+                            "old_value": old, "new_value": str(new),
+                            "detail": before["username"] if before is not None else str(user_id)})
+    record_audit_many(entries, conn=conn)
     conn.commit()
     conn.close()
 
@@ -840,21 +1082,32 @@ def delete_user(user_id):
     conn = get_conn()
     try:
         conn.execute("DELETE FROM todos WHERE user_id = ?", (user_id,))
-    except sqlite3.Error:
+    except dbcompat.DBError:
         pass
     try:
         conn.execute("DELETE FROM notes WHERE user_id = ?", (user_id,))
-    except sqlite3.Error:
+    except dbcompat.DBError:
         pass
+    gone = conn.execute("SELECT username, role FROM users WHERE id = ?", (user_id,)).fetchone()
     conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    record_audit("user.delete", record_id=user_id,
+                 old_value=(gone["username"] if gone is not None else None),
+                 detail="Account removed: {}".format(gone["username"] if gone is not None else user_id),
+                 conn=conn)
     conn.commit()
     conn.close()
 
 
 def set_password(user_id, password_hash, must_change_password=False):
     conn = get_conn()
+    who = conn.execute("SELECT username FROM users WHERE id = ?", (user_id,)).fetchone()
     conn.execute("UPDATE users SET password_hash = ?, must_change_password = ? WHERE id = ?",
                  (password_hash, 1 if must_change_password else 0, user_id))
+    # The password itself is never written to the audit trail - only the fact
+    # that it was changed, and by whom.
+    record_audit("user.password", record_id=user_id,
+                 detail="Password set for {}".format(who["username"] if who is not None else user_id),
+                 conn=conn)
     conn.commit()
     conn.close()
 
@@ -908,6 +1161,9 @@ def add_attachment(form_code, record_id, original_name, file_bytes, uploaded_by=
         (form_code, record_id, original_name, stored_name, len(file_bytes), uploaded_by,
          datetime.utcnow().isoformat(timespec="seconds"))
     )
+    record_audit("attach", form_code=form_code, record_id=record_id,
+                 new_value=original_name,
+                 detail="File attached ({:,} bytes)".format(len(file_bytes)), conn=conn)
     conn.commit()
     conn.close()
 
@@ -958,6 +1214,8 @@ def delete_attachment(attachment_id):
     _delete_attachment_file(att)
     conn = get_conn()
     conn.execute("DELETE FROM attachments WHERE id = ?", (attachment_id,))
+    record_audit("attach.delete", form_code=att["form_code"], record_id=att["record_id"],
+                 old_value=att["original_name"], detail="Attachment removed", conn=conn)
     conn.commit()
     conn.close()
 
@@ -1128,8 +1386,16 @@ def set_field(form_code, record_id, field_name, value):
     update flow. Used for out-of-band updates like a photo upload."""
     tname = table_name(form_code)
     conn = get_conn()
+    before = conn.execute('SELECT doc_no, "{}" AS old_val FROM {} WHERE id = ?'.format(field_name, tname),
+                          (record_id,)).fetchone()
     conn.execute('UPDATE {} SET "{}" = ?, updated_at = ? WHERE id = ?'.format(tname, field_name),
                  (value, datetime.utcnow().isoformat(timespec="seconds"), record_id))
+    old_val = "" if before is None or before["old_val"] is None else str(before["old_val"])
+    if _audit_comparable(old_val) != _audit_comparable(value):
+        record_audit("update", form_code=form_code, record_id=record_id,
+                     doc_no=(before["doc_no"] if before is not None else None),
+                     field_name=field_name, old_value=old_val, new_value=value,
+                     conn=conn)
     conn.commit()
     conn.close()
 
@@ -1193,7 +1459,7 @@ def upcoming_birthdays(form_code, dob_field, name_field, days_ahead=30, extra_wh
     (field, values) to further filter (e.g. department)."""
     tname = table_name(form_code)
     conn = get_conn()
-    sql = 'SELECT * FROM {} WHERE "{}" IS NOT NULL AND TRIM("{}") != ""'.format(tname, dob_field, dob_field)
+    sql = 'SELECT * FROM {} WHERE "{}" IS NOT NULL AND TRIM("{}") != \'\''.format(tname, dob_field, dob_field)
     params = []
     if extra_where:
         field, values = extra_where
@@ -1893,7 +2159,7 @@ def count_calls_for(contact_name):
             "SELECT COUNT(*) FROM {} WHERE contact_name = ?".format(table_name("SAL-009")),
             (contact_name,)
         ).fetchone()[0]
-    except sqlite3.Error:
+    except dbcompat.DBError:
         n = 0
     conn.close()
     return n

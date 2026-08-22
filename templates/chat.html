@@ -81,11 +81,11 @@
         </div>
       </div>
       <div class="chat-head-actions no-print">
-        <form method="post" action="{{ url_for('call_start', username=active.username) }}">
+        <form method="post" action="{{ url_for('call_start', username=active.username) }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
           <input type="hidden" name="mode" value="voice">
           <button class="icon-btn icon-btn-call" type="submit" title="Voice call">{{ icon('phone-call') }}</button>
         </form>
-        <form method="post" action="{{ url_for('call_start', username=active.username) }}">
+        <form method="post" action="{{ url_for('call_start', username=active.username) }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
           <input type="hidden" name="mode" value="video">
           <button class="btn btn-sm" type="submit">{{ icon('video') }}<span>Video call</span></button>
         </form>
@@ -133,14 +133,14 @@
 
     <div class="chat-composer-wrap no-print">
       <form class="chat-attach" method="post" enctype="multipart/form-data"
-            action="{{ url_for('chat_attach', username=active.username) }}" id="chatAttachForm">
+            action="{{ url_for('chat_attach', username=active.username) }}" id="chatAttachForm"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
         <label class="icon-btn chat-clip" title="Attach a file or photo">
           {{ icon('paperclip') }}
           <input type="file" name="file" id="chatFileInput" hidden>
         </label>
       </form>
       <form class="chat-composer" method="post"
-            action="{{ url_for('chat_send', username=active.username) }}">
+            action="{{ url_for('chat_send', username=active.username) }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
         <input type="text" name="body" id="chatBody" placeholder="Type your message..."
                autocomplete="off" required maxlength="4000">
         <button type="submit" class="btn" title="Send">{{ icon('send') }}<span>Send</span></button>

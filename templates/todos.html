@@ -40,7 +40,7 @@
 </div>
 
 {# ------------------------------------------------------------- add form -- #}
-<form method="post" action="{{ url_for('todo_add') }}" class="card todo-compose no-print">
+<form method="post" action="{{ url_for('todo_add') }}" class="card todo-compose no-print"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
   <input type="text" name="text" placeholder="What needs doing?" required aria-label="To-do text">
   <select name="color" aria-label="Colour">
     <option value="blue">Blue</option>
@@ -72,19 +72,19 @@
           {% if t.created_at %}<span class="kanban-card-meta">{{ t.created_at[:10] }}</span>{% endif %}
           <div class="todo-card-actions">
             {% if statuses.index(s) > 0 %}
-            <form method="post" action="{{ url_for('todo_status', todo_id=t.id) }}">
+            <form method="post" action="{{ url_for('todo_status', todo_id=t.id) }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
               <input type="hidden" name="status" value="{{ statuses[statuses.index(s) - 1] }}">
               <button type="submit" class="row-action" title="Move to {{ statuses[statuses.index(s) - 1] }}">&larr;</button>
             </form>
             {% endif %}
             {% if statuses.index(s) < statuses|length - 1 %}
-            <form method="post" action="{{ url_for('todo_status', todo_id=t.id) }}">
+            <form method="post" action="{{ url_for('todo_status', todo_id=t.id) }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
               <input type="hidden" name="status" value="{{ statuses[statuses.index(s) + 1] }}">
               <button type="submit" class="row-action" title="Move to {{ statuses[statuses.index(s) + 1] }}">&rarr;</button>
             </form>
             {% endif %}
             <form method="post" action="{{ url_for('todo_delete', todo_id=t.id) }}"
-                  data-confirm="Delete this to-do?">
+                  data-confirm="Delete this to-do?"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
               <button type="submit" class="row-action row-action-danger" title="Delete">{{ icon('trash') }}</button>
             </form>
           </div>
@@ -105,14 +105,14 @@
   <div class="todo-list">
     {% for t in todos %}
     <div class="todo-row tint-{{ t.color or 'blue' }} {% if t.done %}done{% endif %}">
-      <form method="post" action="{{ url_for('todo_toggle', todo_id=t.id) }}">
+      <form method="post" action="{{ url_for('todo_toggle', todo_id=t.id) }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
         <button type="submit" class="todo-check-btn" title="Mark done / not done">{{ icon('check-square') }}</button>
       </form>
       <span class="todo-text">
         {{ t.text }}
         <span class="badge badge-{{ 'GREEN' if t.status == 'Done' else ('AMBER' if t.status == 'In Progress' else 'BLUE') }}" style="margin-left:auto;">{{ t.status }}</span>
       </span>
-      <form method="post" action="{{ url_for('todo_delete', todo_id=t.id) }}" data-confirm="Delete this to-do?">
+      <form method="post" action="{{ url_for('todo_delete', todo_id=t.id) }}" data-confirm="Delete this to-do?"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
         <button type="submit" class="todo-del" title="Delete">&times;</button>
       </form>
     </div>

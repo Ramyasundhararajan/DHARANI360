@@ -36,7 +36,7 @@
     </div>
   </div>
 
-  <form method="post" enctype="multipart/form-data">
+  <form method="post" enctype="multipart/form-data"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <div class="field" style="max-width:260px; margin-bottom:18px;">
       <label>Status</label>
       <select name="status">

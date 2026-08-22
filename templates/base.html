@@ -140,6 +140,7 @@
     <div class="nav-section-title">Administration</div>
     <a class="nav-link top-link {% if request.endpoint=='users' %}active{% endif %}" href="{{ url_for('users') }}">{{ icon('user-cog') }}<span>Users &amp; Access</span></a>
     <a class="nav-link top-link {% if request.endpoint=='login_activity' %}active{% endif %}" href="{{ url_for('login_activity') }}">{{ icon('lock') }}<span>Login Activity</span></a>
+    <a class="nav-link top-link {% if request.endpoint=='audit_trail' %}active{% endif %}" href="{{ url_for('audit_trail') }}">{{ icon('lock') }}<span>Audit Trail</span></a>
     <a class="nav-link top-link {% if request.endpoint=='settings' %}active{% endif %}" href="{{ url_for('settings') }}">{{ icon('settings') }}<span>Settings &amp; Email Digest</span></a>
     {% endif %}
 
@@ -451,6 +452,7 @@ document.addEventListener('submit', function (e) {
   var toast = document.getElementById('ringToast');
   if (!toast) return;
   var URL_INCOMING = {{ url_for('call_incoming')|tojson }};
+  var CSRF_TOKEN = {{ csrf_token()|tojson }};
   var showing = null;
 
   function hide() { toast.hidden = true; showing = null; }
@@ -458,7 +460,9 @@ document.addEventListener('submit', function (e) {
   document.getElementById('ringDecline').addEventListener('click', function () {
     if (!showing) return;
     var fd = new FormData();
-    fetch(showing.decline, {method: 'POST', body: fd, credentials: 'same-origin'})
+    fd.append('_csrf', CSRF_TOKEN);
+    fetch(showing.decline, {method: 'POST', body: fd, credentials: 'same-origin',
+                            headers: {'X-CSRF-Token': CSRF_TOKEN}})
       .catch(function () {});
     hide();
   });
