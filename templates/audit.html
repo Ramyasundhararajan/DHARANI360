@@ -82,8 +82,8 @@
         {% else %}—{% endif %}
       </td>
       <td>{{ e.field_name or "—" }}</td>
-      <td class="was">{{ (e.old_value or "")[:120] or "—" }}</td>
-      <td class="became">{{ (e.new_value or "")[:120] or "—" }}</td>
+      <td class="was">{{ (e.old_value|tidy or "")[:120] or "—" }}</td>
+      <td class="became">{{ (e.new_value|tidy or "")[:120] or "—" }}</td>
       <td>{{ e.ip_address or "—" }}</td>
     </tr>
   {% else %}

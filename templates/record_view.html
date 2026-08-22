@@ -125,8 +125,8 @@
             {% if e.field_name %}{{ e.field_name.replace('_', ' ')|title }}
             {% else %}{{ e.detail or e.action }}{% endif %}
           </td>
-          <td class="was">{{ (e.old_value or "")[:90] or "—" }}</td>
-          <td class="became">{{ (e.new_value or "")[:90] or "—" }}</td>
+          <td class="was">{{ (e.old_value|tidy or "")[:90] or "—" }}</td>
+          <td class="became">{{ (e.new_value|tidy or "")[:90] or "—" }}</td>
         </tr>
         {% endfor %}
       </tbody>

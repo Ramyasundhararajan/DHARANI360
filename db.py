@@ -323,8 +323,16 @@ def clear_audit_context():
     set_audit_context(None, None, None)
 
 
-def _audit_who():
-    return (getattr(_audit_ctx, "actor", None),
+def _audit_who(fallback_actor=None):
+    """Who to attribute this change to.
+
+    Normally the signed-in user, set once per request by app.py. Setup and
+    import scripts run outside a request, so they fall back to whatever name
+    the record itself carries, and finally to "system" - an audit row with no
+    author at all is worse than one that says plainly where it came from.
+    """
+    actor = getattr(_audit_ctx, "actor", None) or fallback_actor or "system"
+    return (actor,
             getattr(_audit_ctx, "actor_role", None),
             getattr(_audit_ctx, "ip_address", None))
 
@@ -340,21 +348,21 @@ def _audit_trim(value):
 
 def record_audit(action, form_code=None, record_id=None, doc_no=None,
                  field_name=None, old_value=None, new_value=None, detail=None,
-                 conn=None):
+                 conn=None, actor=None):
     """Write one audit row. Pass `conn` to join an open transaction."""
     return record_audit_many([{
         "action": action, "form_code": form_code, "record_id": record_id,
         "doc_no": doc_no, "field_name": field_name, "old_value": old_value,
         "new_value": new_value, "detail": detail,
-    }], conn=conn)
+    }], conn=conn, actor=actor)
 
 
-def record_audit_many(entries, conn=None):
+def record_audit_many(entries, conn=None, actor=None):
     """Write several audit rows at once - one per field changed."""
     entries = [e for e in entries if e]
     if not entries:
         return
-    actor, actor_role, ip_address = _audit_who()
+    actor, actor_role, ip_address = _audit_who(actor)
     now = datetime.utcnow().isoformat(timespec="seconds")
     own_conn = conn is None
     if own_conn:
@@ -489,7 +497,8 @@ def insert_record(form_code, data, created_by="Admin"):
     cur.execute("INSERT INTO {} ({}) VALUES ({})".format(tname, col_sql, placeholders), values)
     new_id = cur.lastrowid
     record_audit("create", form_code=form_code, record_id=new_id, doc_no=doc_no,
-                 detail=form.get("title", form_code), conn=conn)
+                 detail=form.get("title", form_code), conn=conn,
+                 actor=created_by)
     conn.commit()
     conn.close()
     return doc_no

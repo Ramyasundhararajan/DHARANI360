@@ -2437,6 +2437,16 @@ def too_large(e):
                                     "smaller file, and try again."), 413
 
 
+@app.errorhandler(400)
+def bad_request(e):
+    """Mostly a rejected CSRF token: a form left open too long, or a request
+    that did not come from a DHARANI 360 page. Say which, in the app's own
+    styling, rather than dropping the person onto a bare browser error."""
+    message = getattr(e, "description", None) or (
+        "That request could not be understood. Reload the page and try again.")
+    return render_template("error.html", code=400, message=message), 400
+
+
 @app.errorhandler(403)
 def forbidden(e):
     return render_template("error.html", code=403,
