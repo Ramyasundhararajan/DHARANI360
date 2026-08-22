@@ -156,6 +156,12 @@ DIGEST_TO = get("DIGEST_TO")
 #: Marks the demo deployment, which re-seeds sample data on every start.
 DEMO_MODE = flag("DEMO_MODE", False)
 
+#: Set only by preview.py. Signs the viewer in automatically and puts a
+#: PREVIEW banner on every page. Never set this on a real installation - the
+#: guard in app.py additionally refuses it for anything but a local request,
+#: but the setting itself should not exist outside a preview.
+PREVIEW = flag("D360_PREVIEW", False)
+
 
 def is_hosted():
     """True when this process is a deployed service rather than a desk PC."""
@@ -191,6 +197,7 @@ REPORTED = [
     ("DIGEST_FROM", DIGEST_FROM, "Address the digest is sent from."),
     ("DIGEST_TO", DIGEST_TO, "Address the digest is sent to."),
     ("DEMO_MODE", DEMO_MODE, "Re-seeds sample data on every start."),
+    ("D360_PREVIEW", PREVIEW, "Preview mode: auto sign-in, sample data, local only."),
 ]
 
 
@@ -241,6 +248,9 @@ def report():
     if SUPABASE_ANON_KEY and "service_role" in str(SUPABASE_ANON_KEY):
         problems.append("SUPABASE_ANON_KEY looks like a service_role key. Never use that here - "
                         "it bypasses every security rule. Use the publishable/anon key.")
+    if PREVIEW and DATABASE_URL:
+        problems.append("Preview mode is on AND a DATABASE_URL is set. Preview must never "
+                        "reach a real database - start it with preview.py, which isolates it.")
     if not DATABASE_URL and is_hosted():
         problems.append("Hosted with no DATABASE_URL - records will be written to a file that "
                         "the host may erase on the next deploy.")

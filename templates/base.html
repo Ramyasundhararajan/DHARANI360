@@ -7,7 +7,14 @@
 <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-<body>
+<body{% if preview_mode %} class="is-preview"{% endif %}>
+{% if preview_mode %}
+<div class="preview-banner no-print" role="status">
+  <strong>PREVIEW</strong>
+  <span>Sample data. Your real records are in a separate database and are not
+  shown or changed here.</span>
+</div>
+{% endif %}
 <div class="print-header no-screen">
   <img src="{{ url_for('static', filename='images/logo.png') }}" alt="">
   <div>

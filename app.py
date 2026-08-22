@@ -80,6 +80,35 @@ security.init_security(app)
 db.init_db()
 
 
+#: Preview mode is only ever honoured for a request that came from this
+#: computer. Even if D360_PREVIEW were set by accident on a server, nobody
+#: on the network could be signed in automatically by it.
+LOCAL_ADDRESSES = {"127.0.0.1", "::1", "localhost"}
+
+
+def preview_active():
+    return config.PREVIEW and request.remote_addr in LOCAL_ADDRESSES
+
+
+@app.before_request
+def _preview_sign_in():
+    """In preview mode, open the system already signed in.
+
+    Trying a change should not begin with a login screen. This runs only for
+    a local request, only when preview.py set the flag, and only against the
+    isolated preview database it created.
+    """
+    if not preview_active():
+        return None
+    from flask import session
+    if session.get("user_id"):
+        return None
+    user = db.get_user_by_username("admin")
+    if user is not None:
+        session["user_id"] = user["id"]
+    return None
+
+
 @app.before_request
 def _set_audit_actor():
     """Tell db.py who is making changes on this request.
@@ -164,6 +193,9 @@ def inject_globals():
                              if user else []),
         "notifications": _notifications(user) if user else [],
         "today_label": date.today().strftime("%d %b %Y"),
+        # Puts the PREVIEW banner on every page, so a screenshot of sample
+        # data can never be mistaken for the company's real register.
+        "preview_mode": preview_active(),
         # _rules_strip.html is included from register, form and department
         # pages, so the obligation lookup has to be available everywhere
         # rather than passed by each individual route.

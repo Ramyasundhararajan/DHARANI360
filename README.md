@@ -24,6 +24,26 @@ up a small, private copy of Flask). Your browser opens automatically to
 **Requirement:** Python 3.9+. If `start.bat` says Python wasn't found,
 install it from python.org (tick "Add python.exe to PATH") and try again.
 
+## 1b. Seeing it without risking anything
+
+**Windows** — double-click `preview.bat`. **Mac / Linux** — `./preview.sh`.
+
+Your browser opens on a fully working DHARANI 360, already signed in, filled
+with a sample brokerage: licences expiring inside 30 days, leads, viewings,
+transactions and a compliance calendar that opens red rather than empty.
+
+It cannot touch your real records:
+
+- it uses its own database in `instance/preview/`, never `instance/dharani360.db`
+- it ignores `DATABASE_URL` completely, so it cannot reach a live server
+- it only listens on this computer; the automatic sign-in works for nothing else
+- every page carries an orange **PREVIEW** banner, so a screenshot of sample
+  data can never be mistaken for the company's real register
+
+Use it to check a change before trusting it, and to demo the system to a
+client without showing them anybody's real data. `preview.bat --fresh` throws
+the sample data away and builds it again.
+
 ## 2. Signing in
 
 The first time you open the portal you'll land on a login screen. Default
@@ -306,6 +326,8 @@ dharani360-portal/
   security.py        <- CSRF protection, session and header hardening
   backup.py          <- backup, verify and restore
   smoketest.py       <- 44 checks that the whole system still works
+  config.py          <- every setting, and where it came from
+  preview.py         <- sample-data preview, isolated from real records
   forms_data.py      <- master library: 17 departments, 112 forms/fields, linking rules
   access.py          <- roles & which departments each role can see
   auth.py            <- login/session/password handling

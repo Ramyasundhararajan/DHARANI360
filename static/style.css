@@ -2608,7 +2608,12 @@ body.nav-open .nav-toggle-bars::after  { transform: translateY(-6px) rotate(-45d
    Nothing below is size-specific: these stop horizontal overflow at every
    width, which is what actually breaks a page on a phone.
    -------------------------------------------------------------------------- */
-html, body { max-width: 100%; overflow-x: hidden; }
+/* `clip`, not `hidden`. Both stop sideways scrolling, but `overflow-x: hidden`
+   turns the element into a scroll container, and that silently disables
+   `position: sticky` for everything inside it - which is why the app header
+   and the sidebar scrolled away instead of staying put. `overflow-x: clip`
+   does the same job without creating a scroll container, so sticky works. */
+html, body { max-width: 100%; overflow-x: clip; }
 img, svg, video, canvas { max-width: 100%; height: auto; }
 table { max-width: 100%; }
 pre, code { white-space: pre-wrap; word-break: break-word; }
@@ -4301,4 +4306,56 @@ a.dept-count:hover {
 }
 @media (min-width: 1180px) {
   .dept-counts { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+/* ---------------------------------------------------------------------------
+   Preview mode
+   Shown only when the system was started with preview.py. The banner exists
+   so that a screenshot of sample data can never be mistaken for the real
+   register, and it stays legible while scrolling.
+   --------------------------------------------------------------------------- */
+
+.preview-banner {
+  /* Sticky rather than fixed: it takes up real space at the top of the
+     document, so nothing below has to be nudged out of its way, and it
+     stays visible while scrolling so a screenshot taken half way down a
+     page still says PREVIEW. */
+  position: sticky;
+  top: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 18px;
+  background: var(--warning);
+  color: #ffffff;
+  font-size: 13px;
+  line-height: 1.35;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .18);
+}
+body.is-preview { --preview-banner-h: 34px; }
+
+.preview-banner strong {
+  font-weight: 700;
+  letter-spacing: .14em;
+  font-size: 11px;
+  border: 1px solid rgba(255, 255, 255, .6);
+  border-radius: 100px;
+  padding: 2px 9px;
+  flex: none;
+}
+.preview-banner span { opacity: .95; }
+
+/* The app header and sidebar are also sticky at top: 0, so in preview mode
+   they park just below the banner instead of sliding underneath it. */
+body.is-preview .app-header,
+body.is-preview .sidebar,
+body.is-preview .brand-row { top: var(--preview-banner-h); }
+body.is-preview .sidebar { height: calc(100vh - var(--preview-banner-h)); }
+body.is-preview .reg-rail { top: calc(var(--topbar-h) + var(--preview-banner-h) + 12px); }
+
+@media (max-width: 700px) {
+  .preview-banner { font-size: 12px; padding: 6px 12px; }
+  .preview-banner span { display: none; }
+  body.is-preview { --preview-banner-h: 28px; }
 }

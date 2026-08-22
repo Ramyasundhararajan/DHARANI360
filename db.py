@@ -30,7 +30,11 @@ from forms_data import (FORMS, FORMS_BY_CODE, DEPARTMENTS, table_name,
                          FIELD_TO_FORMS, linkable_fields)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-INSTANCE_DIR = os.path.join(BASE_DIR, "instance")
+
+# Where this installation's records live. Normally instance/ next to the code.
+# Preview mode (preview.py) points it somewhere else so that trying things out
+# can never touch the real register.
+INSTANCE_DIR = os.environ.get("D360_INSTANCE_DIR") or os.path.join(BASE_DIR, "instance")
 os.makedirs(INSTANCE_DIR, exist_ok=True)
 DB_PATH = os.path.join(INSTANCE_DIR, "dharani360.db")
 UPLOADS_DIR = os.path.join(INSTANCE_DIR, "uploads")
