@@ -144,6 +144,10 @@ GUNICORN_WORKERS = number("GUNICORN_WORKERS", 1)
 BACKUP_DIR = get("BACKUP_DIR", os.path.join(BASE_DIR, "backups"))
 KEEP_DAYS = number("KEEP_DAYS", 30)
 
+#: A second location every backup is copied to. Without it, the backup sits
+#: on the same disk as the data it is protecting.
+COPY_TO = get("COPY_TO", "")
+
 #: Outgoing email for the daily compliance digest. Stored in the database
 #: today via the Settings page; these override it when hosted.
 SMTP_HOST = get("SMTP_HOST")
@@ -191,6 +195,7 @@ REPORTED = [
     ("PORT", PORT, "Port the web server listens on."),
     ("BACKUP_DIR", BACKUP_DIR, "Where backups are written."),
     ("KEEP_DAYS", KEEP_DAYS, "How long backups are kept."),
+    ("COPY_TO", COPY_TO, "Second location for every backup. Empty = same disk only."),
     ("SMTP_HOST", SMTP_HOST, "Outgoing mail server for the daily digest."),
     ("SMTP_USER", SMTP_USER, "Mail account used to send."),
     ("SMTP_PASSWORD", SMTP_PASSWORD, "App password for that account."),
@@ -251,6 +256,9 @@ def report():
     if PREVIEW and DATABASE_URL:
         problems.append("Preview mode is on AND a DATABASE_URL is set. Preview must never "
                         "reach a real database - start it with preview.py, which isolates it.")
+    if not COPY_TO:
+        problems.append("COPY_TO is not set, so every backup sits on the same disk as the "
+                        "data it protects. Point it at another drive or a synced folder.")
     if not DATABASE_URL and is_hosted():
         problems.append("Hosted with no DATABASE_URL - records will be written to a file that "
                         "the host may erase on the next deploy.")

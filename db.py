@@ -285,6 +285,18 @@ def init_db():
     cur.execute("CREATE INDEX IF NOT EXISTS idx_audit_at ON audit_log (at)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_log (actor)")
 
+    # Failed sign-in attempts, used to slow down password guessing. Kept in
+    # the database rather than in memory so a restart does not reset the
+    # count and several web workers share one view of it.
+    cur.execute("""CREATE TABLE IF NOT EXISTS login_attempts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        identifier TEXT NOT NULL,
+        ip_address TEXT,
+        at TEXT NOT NULL
+    )""")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_attempts_identifier "
+                "ON login_attempts (identifier, at)")
+
     conn.commit()
     dbcompat.schema_changed()
 
@@ -452,6 +464,78 @@ def list_audit(form_code=None, record_id=None, actor=None, action=None,
         params).fetchall()
     conn.close()
     return rows
+
+
+# ---------------------------------------------------------------------------
+# Sign-in throttling
+# ---------------------------------------------------------------------------
+# A password form on a public address will be guessed at. These functions keep
+# a short history of failures so security.py can slow an attacker down without
+# locking out the person who simply mistyped.
+
+#: Failures allowed before sign-in is refused for a while.
+LOGIN_MAX_ATTEMPTS = 8
+
+#: How far back failures are counted, and how long a lockout lasts.
+LOGIN_WINDOW_MINUTES = 15
+
+
+def record_login_failure(identifier, ip_address=None):
+    """Note one failed sign-in for this address."""
+    conn = get_conn()
+    conn.execute("INSERT INTO login_attempts (identifier, ip_address, at) VALUES (?, ?, ?)",
+                 ((identifier or "").strip().lower(), ip_address,
+                  datetime.utcnow().isoformat(timespec="seconds")))
+    conn.commit()
+    conn.close()
+
+
+def clear_login_failures(identifier):
+    """Forget the failures for this address - called on a successful sign-in."""
+    conn = get_conn()
+    conn.execute("DELETE FROM login_attempts WHERE identifier = ?",
+                 ((identifier or "").strip().lower(),))
+    conn.commit()
+    conn.close()
+
+
+def recent_login_failures(identifier, minutes=None):
+    """How many times this address has failed inside the window."""
+    minutes = LOGIN_WINDOW_MINUTES if minutes is None else minutes
+    since = (datetime.utcnow() - timedelta(minutes=minutes)).isoformat(timespec="seconds")
+    conn = get_conn()
+    n = conn.execute("SELECT COUNT(*) FROM login_attempts WHERE identifier = ? AND at >= ?",
+                     ((identifier or "").strip().lower(), since)).fetchone()[0]
+    conn.close()
+    return n
+
+
+def login_locked_for(identifier):
+    """Minutes remaining before this address may try again. 0 = not locked."""
+    if recent_login_failures(identifier) < LOGIN_MAX_ATTEMPTS:
+        return 0
+    since = (datetime.utcnow() - timedelta(minutes=LOGIN_WINDOW_MINUTES)).isoformat(timespec="seconds")
+    conn = get_conn()
+    row = conn.execute("SELECT MAX(at) FROM login_attempts WHERE identifier = ? AND at >= ?",
+                       ((identifier or "").strip().lower(), since)).fetchone()
+    conn.close()
+    if not row or not row[0]:
+        return 0
+    last = datetime.strptime(row[0], "%Y-%m-%dT%H:%M:%S")
+    remaining = LOGIN_WINDOW_MINUTES - (datetime.utcnow() - last).total_seconds() / 60.0
+    return max(0, int(remaining) + 1)
+
+
+def prune_login_attempts(older_than_hours=24):
+    """Housekeeping: the table is a rate limiter, not a permanent record.
+
+    Every failure is already in audit_log, which is the permanent one.
+    """
+    cutoff = (datetime.utcnow() - timedelta(hours=older_than_hours)).isoformat(timespec="seconds")
+    conn = get_conn()
+    conn.execute("DELETE FROM login_attempts WHERE at < ?", (cutoff,))
+    conn.commit()
+    conn.close()
 
 
 def audit_actions():

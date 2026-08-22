@@ -6,9 +6,16 @@ A backup nobody has restored is not a backup. This script does both, and
 the `verify` command proves the backup is readable before you trust it.
 
     python backup.py create            make a new backup
+    python backup.py create --to D:\\  also copy it somewhere off this disk
     python backup.py list              show what backups exist
     python backup.py verify <file>     restore into a scratch copy and check it
     python backup.py restore <file>    replace the live data (asks first)
+
+A backup sitting on the same disk as the database is not a backup - the two
+are lost together. Give `create` a --to path on a different drive, a network
+share, or a synced folder (OneDrive, Dropbox, Google Drive) and the archive
+is copied there as well. Set COPY_TO in .env to do it every time without
+having to remember the flag.
 
 What a backup contains:
 
@@ -26,6 +33,7 @@ Automating it on Windows: Task Scheduler -> Create Basic Task -> Daily ->
 Start a program -> backup.bat in this folder.
 On Linux/Mac, a cron line: 0 2 * * * cd /path/to/portal && python backup.py create
 """
+import config  # noqa: F401  - must be first: loads .env into the environment
 import os
 import sys
 import shutil
@@ -43,6 +51,11 @@ IS_POSTGRES = DATABASE_URL.startswith(("postgres://", "postgresql://"))
 
 #: Backups older than this are removed by `create`. Set KEEP_DAYS to change it.
 KEEP_DAYS = int(os.environ.get("KEEP_DAYS") or 30)
+
+#: A second location every backup is copied to - another drive, a network
+#: share, or a synced folder. This is what makes it a real backup rather than
+#: a second file on the disk that is about to fail.
+COPY_TO = (os.environ.get("COPY_TO") or "").strip()
 
 FILE_FOLDERS = ["uploads", "photos", "chatfiles", "library"]
 DUMP_NAME = "database.sql"
@@ -90,7 +103,26 @@ def _copy_sqlite(target_path):
         src.close()
 
 
-def create():
+def _copy_offsite(path, destination):
+    """Put a second copy somewhere that is not this disk."""
+    if not destination:
+        return None
+    try:
+        os.makedirs(destination, exist_ok=True)
+        target = os.path.join(destination, os.path.basename(path))
+        shutil.copy2(path, target)
+        _say("  Copied to {}".format(target))
+        return target
+    except OSError as exc:
+        # A failed off-site copy must be loud: a backup you believe exists
+        # and does not is worse than no backup at all.
+        _say("  !  COULD NOT COPY to {} ({}).".format(destination, exc))
+        _say("     The local backup was still written, but it is on the same")
+        _say("     disk as your data. Fix the destination and run this again.")
+        return None
+
+
+def create(copy_to=None):
     os.makedirs(BACKUP_DIR, exist_ok=True)
     name = "dharani360-{}-{}.zip".format("pg" if IS_POSTGRES else "sqlite", _stamp())
     path = os.path.join(BACKUP_DIR, name)
@@ -125,6 +157,14 @@ def create():
         shutil.rmtree(scratch, ignore_errors=True)
 
     _say("\nWrote {} ({:,} bytes)".format(path, os.path.getsize(path)))
+
+    destination = copy_to or COPY_TO
+    if destination:
+        _copy_offsite(path, destination)
+    else:
+        _say("  Note: this copy is on the same disk as your data. Use --to, or")
+        _say("        set COPY_TO in .env, to keep a copy somewhere safer.")
+
     _prune()
     _say("\nNow prove it works:  python backup.py verify \"{}\"".format(path))
     return path
@@ -324,7 +364,15 @@ def main(argv):
         return 1
     cmd = argv[1].lower()
     if cmd == "create":
-        create()
+        copy_to = None
+        if "--to" in argv:
+            i = argv.index("--to")
+            if i + 1 < len(argv):
+                copy_to = argv[i + 1]
+            else:
+                _say("Usage: python backup.py create --to <folder>")
+                return 1
+        create(copy_to=copy_to)
         return 0
     if cmd == "list":
         list_backups()

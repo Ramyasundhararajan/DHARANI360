@@ -30,6 +30,7 @@ import qrgen
 import auth
 import icons
 import insights
+import observability
 import regulations_data
 import security
 import supabase_auth
@@ -78,6 +79,10 @@ app.config["TEMPLATES_AUTO_RELOAD"] = True
 security.init_security(app)
 
 db.init_db()
+
+# Health check at /healthz, plus error logging to instance/logs/errors.log.
+# Registered after init_db so the instance directory exists.
+observability.init(app)
 
 
 #: Preview mode is only ever honoured for a request that came from this
@@ -365,6 +370,21 @@ def _notifications(user):
 
 
 
+def _note_failed_login(email):
+    """Count a failed sign-in and record it in the audit trail.
+
+    Called from every path that ends without a session, including an address
+    that is not on the allowlist and one with no local account - otherwise
+    those two would be an unlimited, uncounted way to probe the system.
+    """
+    db.record_login_failure(email, ip_address=security.client_ip())
+    db.set_audit_context(actor=email or None, ip_address=security.client_ip())
+    remaining = max(0, db.LOGIN_MAX_ATTEMPTS - db.recent_login_failures(email))
+    db.record_audit("login.failed",
+                    detail="Failed sign-in for {} ({} attempt{} left before lockout)".format(
+                        email or "(blank)", remaining, "" if remaining == 1 else "s"))
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     """Email sign-in, verified by Supabase, restricted to the allowlist.
@@ -378,14 +398,28 @@ def login():
         email = request.form.get("email", "").strip()
         password = request.form.get("password", "")
 
+        # A sign-in form on a public address will be guessed at. After a run of
+        # failures this address is refused for a while, whether or not it even
+        # exists - so this cannot be used to discover which addresses are real.
+        locked_minutes = db.login_locked_for(email)
+        if locked_minutes:
+            db.set_audit_context(actor=email or None, ip_address=security.client_ip())
+            db.record_audit("login.blocked",
+                            detail="Refused: too many failed attempts for {}".format(email or "(blank)"))
+            flash("Too many failed sign-in attempts. Try again in {} minute{}."
+                  .format(locked_minutes, "" if locked_minutes == 1 else "s"), "error")
+            return render_template("login.html", supabase=supabase_auth.health())
+
         if not supabase_auth.is_allowed(email):
             # Deliberately the same wording as a wrong password, so this is not
             # a way to discover which addresses exist.
+            _note_failed_login(email)
             flash("Incorrect email or password.", "error")
             return render_template("login.html", supabase=supabase_auth.health())
 
         user = db.get_user_by_email(email)
         if not user or not user["active"]:
+            _note_failed_login(email)
             flash("Incorrect email or password.", "error")
             return render_template("login.html", supabase=supabase_auth.health())
 
@@ -420,8 +454,12 @@ def login():
                 flash("Supabase could not be reached, so sign-in is unavailable. "
                       "Check the internet connection.", "error")
 
+        if not signed_in:
+            _note_failed_login(email)
+
         if signed_in:
             from flask import session
+            db.clear_login_failures(email)
             session["user_id"] = user["id"]
             db.record_login(user["id"], ip_address=security.client_ip())
             db.set_audit_context(actor=user["username"], actor_role=user["role"],

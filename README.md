@@ -278,6 +278,18 @@ rather than data.
 
 **Run `verify` at least once.** A backup nobody has restored is not a backup.
 
+### Knowing it is alive, and why it broke
+
+`GET /healthz` answers `{"status": "ok"}` without a sign-in, and reports
+whether the database and disk are actually reachable. Point a free uptime
+monitor at it and you hear about an outage before a client does.
+
+When a page fails, the person sees a short reference code and the full
+traceback goes to `instance/logs/errors.log` with the URL, the user and that
+same code. "It broke" becomes "show me reference A7F3C2".
+
+See **OPERATIONS.md** for the whole runbook.
+
 ### Security when it leaves the desk
 
 - Every form is protected against cross-site request forgery, so another
@@ -285,6 +297,9 @@ rather than data.
 - Session cookies are HttpOnly and SameSite, and marked Secure automatically
   when the site is hosted. Force it either way with `SECURE_COOKIES=1` or `0`.
 - Sign-ins expire after 12 hours of inactivity (`SESSION_HOURS` to change).
+- Eight failed sign-ins for one address inside fifteen minutes locks it out,
+  right password included. Every failure and lockout is in the Audit Trail,
+  so a run of them against several addresses is visible as what it is.
 
 Check the whole thing still works after any change:
 
@@ -293,7 +308,7 @@ python smoketest.py
 ```
 
 It signs in, opens every page, every register and every blank form, runs a
-create/edit/delete cycle, and confirms the audit trail recorded it — 44
+create/edit/delete cycle, and confirms the audit trail recorded it — 50
 checks, on whichever database is configured.
 
 ## 14. Honest limits of this version (read this)
@@ -325,7 +340,9 @@ dharani360-portal/
   dbcompat.py        <- lets the same code run on SQLite or PostgreSQL
   security.py        <- CSRF protection, session and header hardening
   backup.py          <- backup, verify and restore
-  smoketest.py       <- 44 checks that the whole system still works
+  smoketest.py       <- 50 checks that the whole system still works
+  observability.py   <- /healthz health check and error logging
+  OPERATIONS.md      <- how to run it: backups, outages, secrets, deploys
   config.py          <- every setting, and where it came from
   preview.py         <- sample-data preview, isolated from real records
   forms_data.py      <- master library: 17 departments, 112 forms/fields, linking rules

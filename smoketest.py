@@ -93,6 +93,30 @@ def main():
     check("security headers present",
           r.headers.get("X-Frame-Options") and r.headers.get("X-Content-Type-Options"))
 
+    # ---- health check ---------------------------------------------------
+    print("\nHealth check")
+    r = client.get("/healthz")
+    body = r.get_json() or {}
+    check("GET /healthz answers without a sign-in", r.status_code == 200,
+          "(got {})".format(r.status_code))
+    check("it reports the database as reachable", body.get("checks", {}).get("database") == "ok")
+    check("it says nothing it should not",
+          not any(k in str(body).lower() for k in ("postgres://", "password", "secret")))
+
+    # ---- sign-in throttling ---------------------------------------------
+    print("\nSign-in throttling")
+    throttle_email = "attacker@example.com"
+    db.clear_login_failures(throttle_email)
+    for _ in range(db.LOGIN_MAX_ATTEMPTS + 1):
+        client.post("/login", data={"email": throttle_email, "password": "guess",
+                                    "_csrf": token(client, "/login")})
+    check("repeated failures lock the address out", db.login_locked_for(throttle_email) > 0)
+    check("the lockout is recorded in the audit trail",
+          any(a["action"] == "login.blocked" for a in db.list_audit(action="login.blocked")))
+    db.clear_login_failures(throttle_email)
+    check("a successful sign-in clears the count",
+          db.recent_login_failures(throttle_email) == 0)
+
     # ---- every page a Director can open ---------------------------------
     print("\nPages")
     pages = ["/", "/me", "/calendar", "/search?q=a", "/calls", "/chat", "/files",
