@@ -39,3 +39,4 @@ _to_delete/
 .env.backup
 .env.*
 !.env.example
+supabase_config.json.bak-*
