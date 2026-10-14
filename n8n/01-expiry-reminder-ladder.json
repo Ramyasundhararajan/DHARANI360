@@ -1,0 +1,312 @@
+{
+  "name": "Dharani 360 - Expiry Reminder Ladder",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## B-02 / B-03 / B-04  Staged expiry reminders\n\nReplaces the one-a-day blob from `email_digest.py`.\n\nScans **every register in the portal that carries an expiry field** (23 of them, generated from your own `forms_data.py`) and chases the *named owner* of each document at 90 / 60 / 30 / 14 / 7 / 3 / 1 days, then daily once overdue.\n\nAt 90 and 30 days it also opens a renewal to-do on the portal's own To-Do board, assigned to that owner.\n\nInside 7 days it escalates from email to email + WhatsApp + Slack.\n\n**Turn off `send_digest.bat` in Task Scheduler once this runs.**",
+        "height": 420,
+        "width": 460
+      },
+      "id": "readme",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 7,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "every-morning-07:00",
+      "name": "Every morning 07:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -560,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a0",
+              "name": "portal_url",
+              "value": "https://dharani360.onrender.com",
+              "type": "string"
+            },
+            {
+              "id": "a1",
+              "name": "director_email",
+              "value": "admin@dharanis.ae",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "config",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -340,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, username, full_name, email, role, active\nFROM users WHERE active = 1;",
+        "options": {}
+      },
+      "id": "get-users",
+      "name": "Get Users",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        -120,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DHARANI_PG",
+          "name": "Dharani 360 - Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ok: true } }];"
+      },
+      "id": "collapse",
+      "name": "Collapse",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH tracked AS (\n  SELECT 'COR-001' AS form_code, 'Corporate Document Register' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"document_name\", ''), doc_no) AS item, NULLIF(\"responsible_person\", '') AS owner_name,\n         NULLIF(\"expiry_date\", '')::date AS due_date, COALESCE(status,'') AS status\n  FROM frm_cor_001\n  WHERE NULLIF(\"expiry_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled','Rejected','Returned','Paid','Done')\n  UNION ALL\n  SELECT 'COR-002' AS form_code, 'Licence & Permit Register' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"licence_permit\", ''), doc_no) AS item, NULLIF(\"responsible_person\", '') AS owner_name,\n         NULLIF(\"expiry_date\", '')::date AS due_date, COALESCE(status,'') AS status\n  FROM frm_cor_002\n  WHERE NULLIF(\"expiry_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled','Rejected','Returned','Paid','Done')\n  UNION ALL\n  SELECT 'COR-003' AS form_code, 'Master Compliance Calendar Item' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"compliance_item\", ''), doc_no) AS item, NULLIF(\"responsible_person\", '') AS owner_name,\n         NULLIF(\"due_date\", '')::date AS due_date, COALESCE(status,'') AS status\n  FROM frm_cor_003\n  WHERE NULLIF(\"due_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled','Rejected','Returned','Paid','Done')\n  UNION ALL\n  SELECT 'COR-005' AS form_code, 'Power of Attorney Register' AS form_title, id, doc_no,\n         doc_no AS item, NULL::text AS owner_name,\n         NULLIF(\"valid_to\", '')::date AS due_date, COALESCE(status,'') AS status\n  FROM frm_cor_005\n  WHERE NULLIF(\"valid_to\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled','Rejected','Returned','Paid','Done')\n  UNION ALL\n  SELECT 'HR-002' AS form_code, 'Employee Master Information Form' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"full_name\", ''), doc_no) AS item, NULLIF(\"full_name\", '') AS owner_name,\n         NULLIF(\"visa_expiry\", '')::date AS due_date, COALESCE(status,'') AS status\n  FROM frm_hr_002\n  WHERE NULLIF(\"visa_expiry\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled','Rejected','Returned','Paid','Done')\n  UNION ALL\n  SELECT 'AGT-002' AS form_code, 'Agent Master File' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"agent_name\", ''), doc_no) AS item, NULLIF(\"agent_name\", '') AS owner_name,\n         NULLIF(\"broker_card_expiry\", '')::date AS due_date, COALESCE(status,'') AS status\n  FROM frm_agt_002\n  WHERE NULLIF(\"broker_card_expiry\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled','Rejected','Returned','Paid','Done')\n  UNION ALL\n  SELECT 'SAL-009' AS form_code, 'Call Log' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"agent_name\", ''), doc_no) AS item, NULLIF(\"agent_name\", '') AS owner_name,\n         NULLIF(\"follow_up_date\", '')::date AS due_date, COALESCE(status,'') AS status\n  FROM frm_sal_009\n  WHERE NULLIF(\"follow_up_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled','Rejected','Returned','Paid','Done')\n  UNION ALL\n  SELECT 'PRO-003' AS form_code, 'Owner Authorization' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"property_ref\", ''), doc_no) AS item, NULLIF(\"owner_name\", '') AS owner_name,\n         NULLIF(\"valid_to\", '')::date AS due_date, COALESCE(status,'') AS status\n  FROM frm_pro_003\n  WHERE NULLIF(\"valid_to\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled','Rejected','Returned','Paid','Done')\n  UNION ALL\n  SELECT 'PRO-005' AS form_code, 'Marketing Authorization' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"property_ref\", ''), doc_no) AS item, NULLIF(\"owner_name\", '') AS owner_name,\n         NULLIF(\"valid_to\", '')::date AS due_date, COALESCE(status,'') AS status\n  FROM frm_pro_005\n  WHERE NULLIF(\"valid_to\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled','Rejected','Returned','Paid','Done')\n  UNION ALL\n  SELECT 'IT-001' AS form_code, 'Asset Register' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"asset_type\", ''), doc_no) AS item, NULLIF(\"assigned_employee\", '') AS owner_name,\n         NULLIF(\"warranty_expiry\", '')::date AS due_date, COALESCE(status,'') AS status\n  FROM frm_it_001\n  WHERE NULLIF(\"warranty_expiry\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled','Rejected','Returned','Paid','Done')\n  UNION ALL\n  SELECT 'VEN-003' AS form_code, 'Vendor Contract Register' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"vendor_name\", ''), doc_no) AS item, NULLIF(\"vendor_name\", '') AS owner_name,\n         NULLIF(\"end_date\", '')::date AS due_date, COALESCE(status,'') AS status\n  FROM frm_ven_003\n  WHERE NULLIF(\"end_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled','Rejected','Returned','Paid','Done')\n  UNION ALL\n  SELECT 'MKT-002' AS form_code, 'Marketing Plan & Strategy' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"owner_name\", ''), doc_no) AS item, NULLIF(\"owner_name\", '') AS owner_name,\n         NULLIF(\"next_review_date\", '')::date AS due_date, COALESCE(status,'') AS status\n  FROM frm_mkt_002\n  WHERE NULLIF(\"next_review_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled','Rejected','Returned','Paid','Done')\n  UNION ALL\n  SELECT 'MKT-004' AS form_code, 'Creative Brief' AS form_title, id, doc_no,\n         doc_no AS item, NULL::text AS owner_name,\n         NULLIF(\"deadline\", '')::date AS due_date, COALESCE(status,'') AS status\n  FROM frm_mkt_004\n  WHERE NULLIF(\"deadline\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled','Rejected','Returned','Paid','Done')\n  UNION ALL\n  SELECT 'MKT-005' AS form_code, 'Marketing Content Approval' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"property_ref\", ''), doc_no) AS item, NULL::text AS owner_name,\n         NULLIF(\"permit_expiry\", '')::date AS due_date, COALESCE(status,'') AS status\n  FROM frm_mkt_005\n  WHERE NULLIF(\"permit_expiry\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled','Rejected','Returned','Paid','Done')\n  UNION ALL\n  SELECT 'MKT-007' AS form_code, 'Digital Advertising Campaign Setup' AS form_title, id, doc_no,\n         doc_no AS item, NULL::text AS owner_name,\n         NULLIF(\"end_date\", '')::date AS due_date, COALESCE(status,'') AS status\n  FROM frm_mkt_007\n  WHERE NULLIF(\"end_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled','Rejected','Returned','Paid','Done')\n  UNION ALL\n  SELECT 'MKT-008' AS form_code, 'Advertisement Budget Approval' AS form_title, id, doc_no,\n         doc_no AS item, NULL::text AS owner_name,\n         NULLIF(\"period_end\", '')::date AS due_date, COALESCE(status,'') AS status\n  FROM frm_mkt_008\n  WHERE NULLIF(\"period_end\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled','Rejected','Returned','Paid','Done')\n  UNION ALL\n  SELECT 'MKT-009' AS form_code, 'Lead Generation Campaign' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"campaign_name\", ''), doc_no) AS item, NULLIF(\"owner_name\", '') AS owner_name,\n         NULLIF(\"end_date\", '')::date AS due_date, COALESCE(status,'') AS status\n  FROM frm_mkt_009\n  WHERE NULLIF(\"end_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled','Rejected','Returned','Paid','Done')\n  UNION ALL\n  SELECT 'MKT-013' AS form_code, 'Website Content Update Request' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"property_ref\", ''), doc_no) AS item, NULL::text AS owner_name,\n         NULLIF(\"required_by_date\", '')::date AS due_date, COALESCE(status,'') AS status\n  FROM frm_mkt_013\n  WHERE NULLIF(\"required_by_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled','Rejected','Returned','Paid','Done')\n  UNION ALL\n  SELECT 'MKT-014' AS form_code, 'Social Media Account Access & Authorization' AS form_title, id, doc_no,\n         doc_no AS item, NULL::text AS owner_name,\n         NULLIF(\"review_due_date\", '')::date AS due_date, COALESCE(status,'') AS status\n  FROM frm_mkt_014\n  WHERE NULLIF(\"review_due_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled','Rejected','Returned','Paid','Done')\n  UNION ALL\n  SELECT 'MKT-015' AS form_code, 'Marketing Vendor / Agency Onboarding' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"vendor_name\", ''), doc_no) AS item, NULLIF(\"vendor_name\", '') AS owner_name,\n         NULLIF(\"licence_expiry\", '')::date AS due_date, COALESCE(status,'') AS status\n  FROM frm_mkt_015\n  WHERE NULLIF(\"licence_expiry\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled','Rejected','Returned','Paid','Done')\n  UNION ALL\n  SELECT 'MKT-017' AS form_code, 'Event / Roadshow Marketing Request' AS form_title, id, doc_no,\n         doc_no AS item, NULL::text AS owner_name,\n         NULLIF(\"event_date\", '')::date AS due_date, COALESCE(status,'') AS status\n  FROM frm_mkt_017\n  WHERE NULLIF(\"event_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled','Rejected','Returned','Paid','Done')\n  UNION ALL\n  SELECT 'MKT-018' AS form_code, 'Marketing Material Printing Request' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"vendor_name\", ''), doc_no) AS item, NULLIF(\"vendor_name\", '') AS owner_name,\n         NULLIF(\"required_by_date\", '')::date AS due_date, COALESCE(status,'') AS status\n  FROM frm_mkt_018\n  WHERE NULLIF(\"required_by_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled','Rejected','Returned','Paid','Done')\n  UNION ALL\n  SELECT 'MKT-019' AS form_code, 'Brand Asset Usage Approval' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"asset_type\", ''), doc_no) AS item, NULL::text AS owner_name,\n         NULLIF(\"valid_until\", '')::date AS due_date, COALESCE(status,'') AS status\n  FROM frm_mkt_019\n  WHERE NULLIF(\"valid_until\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled','Rejected','Returned','Paid','Done')\n)\nSELECT form_code, form_title, id, doc_no, item, owner_name, status,\n       to_char(due_date, 'YYYY-MM-DD') AS due_date,\n       (due_date - CURRENT_DATE) AS days_left\nFROM tracked\nWHERE due_date <= CURRENT_DATE + 95\nORDER BY due_date ASC;",
+        "options": {}
+      },
+      "id": "scan-expiry-registers",
+      "name": "Scan Expiry Registers",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        320,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DHARANI_PG",
+          "name": "Dharani 360 - Postgres"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// B-02: each document type chases the person who owns it, on a ladder,\n// instead of one daily blob to one shared inbox.\nconst LADDER = [90, 60, 30, 14, 7, 3, 1];\nconst OVERDUE_EVERY_N_DAYS = 1;          // once overdue, chase daily\nconst PORTAL = $('Config').first().json.portal_url;\nconst DIRECTOR = $('Config').first().json.director_email;\n\nconst users = $('Get Users').all().map(u => u.json);\nconst findUser = (name) => {\n  if (!name) return null;\n  const k = String(name).trim().toLowerCase();\n  return users.find(u =>\n    String(u.full_name || '').toLowerCase() === k ||\n    String(u.username || '').toLowerCase() === k ||\n    String(u.email || '').toLowerCase() === k) || null;\n};\n\nconst out = [];\nfor (const item of $input.all()) {\n  const r = item.json;\n  const d = Number(r.days_left);\n  const overdue = d < 0;\n  const onLadder = LADDER.includes(d);\n  if (!overdue && !onLadder) continue;\n  if (overdue && (Math.abs(d) % OVERDUE_EVERY_N_DAYS !== 0)) continue;\n\n  const u = findUser(r.owner_name);\n  const who = r.owner_name || 'nobody named';\n  const url = `${PORTAL}/record/${r.form_code}/${r.id}`;\n  const head = overdue\n    ? `OVERDUE by ${Math.abs(d)} day(s)`\n    : `Expires in ${d} day(s)`;\n\n  const message =\n`${head}: ${r.item}\n\nRegister  : ${r.form_title} (${r.form_code})\nDocument  : ${r.doc_no}\nExpiry    : ${r.due_date}\nOwner     : ${who}\nStatus    : ${r.status || '-'}\n\nOpen the record: ${url}\n\nRenew it and upload the replacement against this record. The reminder stops\nby itself once the new expiry date is saved.`;\n\n  out.push({ json: {\n    channel: overdue || d <= 7 ? 'email,whatsapp,slack' : 'email',\n    to_email: u ? u.email : DIRECTOR,\n    to_phone: u ? (u.phone || '') : '',\n    subject: `[DHARANI 360] ${head} - ${r.item}`,\n    message,\n    // passed through for the renewal-task branch\n    form_code: r.form_code, record_id: r.id, doc_no: r.doc_no,\n    item: r.item, owner_name: r.owner_name, days_left: d,\n    due_date: r.due_date, record_url: url,\n    open_renewal_task: d === 90 || d === 30,\n  }});\n}\nreturn out;"
+      },
+      "id": "build-reminder-ladder",
+      "name": "Build Reminder Ladder",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        540,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "DISPATCHER_WORKFLOW_ID",
+          "mode": "id",
+          "cachedResultName": "Dharani 360 - Notification Dispatcher"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {}
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "notify-owner",
+      "name": "Notify Owner",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        780,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.open_renewal_task }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "open-renewal-task?",
+      "name": "Open renewal task?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        780,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO todos (user_id, text, color, done, created_at, status)\nSELECT\n  COALESCE(\n    (SELECT id FROM users\n      WHERE lower(COALESCE(full_name,'')) = lower($1)\n         OR lower(COALESCE(username,''))  = lower($1)\n      LIMIT 1),\n    (SELECT id FROM users WHERE role ILIKE 'Director%' ORDER BY id LIMIT 1),\n    (SELECT id FROM users ORDER BY id LIMIT 1)),\n  $2, '#f59e0b', 0,\n  to_char(now() AT TIME ZONE 'utc', 'YYYY-MM-DD\"T\"HH24:MI:SS'), 'To Do'\nWHERE NOT EXISTS (SELECT 1 FROM todos WHERE text = $2 AND COALESCE(status,'') <> 'Done')\nRETURNING id, text;",
+        "options": {
+          "queryReplacement": "={{ $json.owner_name }},=RENEWAL: {{ $json.item }} ({{ $json.doc_no }}) expires {{ $json.due_date }} - {{ $json.record_url }}"
+        }
+      },
+      "id": "create-renewal-task",
+      "name": "Create Renewal Task",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        1000,
+        420
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DHARANI_PG",
+          "name": "Dharani 360 - Postgres"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every morning 07:00": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Get Users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Users": {
+      "main": [
+        [
+          {
+            "node": "Collapse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collapse": {
+      "main": [
+        [
+          {
+            "node": "Scan Expiry Registers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scan Expiry Registers": {
+      "main": [
+        [
+          {
+            "node": "Build Reminder Ladder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Reminder Ladder": {
+      "main": [
+        [
+          {
+            "node": "Notify Owner",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Open renewal task?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Open renewal task?": {
+      "main": [
+        [
+          {
+            "node": "Create Renewal Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "dharani360"
+  }
+}

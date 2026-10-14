@@ -1,0 +1,774 @@
+<title>Dharani 360 AI Agents</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+  :root {
+    --paper:      #F5F7F5;
+    --surface:    #FFFFFF;
+    --sunken:     #ECEFEC;
+    --ink:        #10201E;
+    --ink-soft:   #4A5C58;
+    --ink-faint:  #7C8C88;
+    --rule:       #D8DFDB;
+    --accent:     #0C6B60;
+    --accent-soft:#E2F0EC;
+    --warn:       #8C6212;
+    --warn-soft:  #F7EEDC;
+    --shadow:     0 1px 2px rgba(16,32,30,.05), 0 10px 30px -22px rgba(16,32,30,.5);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #0C1210;
+      --surface:    #141C1A;
+      --sunken:     #1B2422;
+      --ink:        #E6EDEA;
+      --ink-soft:   #A3B3AE;
+      --ink-faint:  #6F817C;
+      --rule:       #26312E;
+      --accent:     #55C9B4;
+      --accent-soft:#12302B;
+      --warn:       #DDB264;
+      --warn-soft:  #2E2515;
+      --shadow:     0 1px 2px rgba(0,0,0,.45), 0 10px 30px -22px rgba(0,0,0,.9);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:      #0C1210;
+    --surface:    #141C1A;
+    --sunken:     #1B2422;
+    --ink:        #E6EDEA;
+    --ink-soft:   #A3B3AE;
+    --ink-faint:  #6F817C;
+    --rule:       #26312E;
+    --accent:     #55C9B4;
+    --accent-soft:#12302B;
+    --warn:       #DDB264;
+    --warn-soft:  #2E2515;
+    --shadow:     0 1px 2px rgba(0,0,0,.45), 0 10px 30px -22px rgba(0,0,0,.9);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
+    font-size: 16.5px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 0 24px 96px; }
+
+  header.masthead {
+    padding: 56px 0 26px;
+    border-bottom: 1px solid var(--rule);
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .eyebrow {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-size: 11.5px; font-weight: 600; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--accent);
+  }
+  h1 {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-weight: 700; font-size: clamp(33px, 5vw, 52px);
+    line-height: 1.04; letter-spacing: -.022em; margin: 0; text-wrap: balance;
+  }
+  .standfirst { max-width: 64ch; color: var(--ink-soft); font-size: 18px; margin: 0; }
+
+  h2.section {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-size: 22px; font-weight: 700; letter-spacing: -.015em;
+    margin: 60px 0 0; padding-bottom: 10px; border-bottom: 2px solid var(--ink);
+  }
+  .section-note { color: var(--ink-soft); font-size: 15.5px; max-width: 70ch; margin: 14px 0 0; }
+
+  code {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .84em; background: var(--sunken);
+    padding: 1px 5px; border-radius: 3px; word-break: break-word;
+  }
+
+  /* ---- rules panel ---- */
+  .rules { margin: 24px 0 0; display: grid; gap: 1px; background: var(--rule);
+           border: 1px solid var(--rule); border-radius: 3px; overflow: hidden; }
+  .rule-item { background: var(--surface); padding: 16px 20px; display: grid;
+               grid-template-columns: 30px 1fr; gap: 0 14px; align-items: start; }
+  .rule-item .n {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12.5px; color: var(--accent); padding-top: 4px;
+  }
+  .rule-item h3 {
+    font-family: "Archivo", system-ui, sans-serif; font-size: 15.5px;
+    font-weight: 600; margin: 0 0 3px;
+  }
+  .rule-item p { margin: 0; color: var(--ink-soft); font-size: 15px; max-width: 70ch; }
+
+  /* ---- setup steps ---- */
+  ol.steps { counter-reset: s; list-style: none; margin: 22px 0 0; padding: 0; }
+  ol.steps > li {
+    counter-increment: s;
+    position: relative;
+    padding: 0 0 18px 44px;
+    border-left: 1px solid var(--rule);
+    margin-left: 13px;
+  }
+  ol.steps > li:last-child { border-left-color: transparent; padding-bottom: 0; }
+  ol.steps > li::before {
+    content: counter(s);
+    position: absolute; left: -13px; top: 0;
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--surface); border: 1px solid var(--rule);
+    color: var(--accent);
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12px; font-variant-numeric: tabular-nums;
+    display: flex; align-items: center; justify-content: center;
+  }
+  ol.steps > li h4 {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-size: 15.5px; font-weight: 600; margin: 2px 0 4px; letter-spacing: -.005em;
+  }
+  ol.steps > li p { margin: 0; color: var(--ink-soft); font-size: 15.5px; max-width: 72ch; }
+  pre {
+    margin: 8px 0 0; padding: 11px 14px; overflow-x: auto;
+    background: var(--sunken); border-radius: 3px;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12.5px; line-height: 1.6; color: var(--ink);
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+
+  /* ---- agent cards ---- */
+  .agent {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    box-shadow: var(--shadow);
+    margin: 20px 0 0;
+    overflow: hidden;
+  }
+  .agent-head {
+    display: grid; grid-template-columns: 54px 1fr auto;
+    gap: 0 16px; align-items: baseline;
+    padding: 18px 22px 14px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .agent-num {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 13px; color: var(--accent); font-variant-numeric: tabular-nums;
+  }
+  .agent-head h3 {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-size: 19px; font-weight: 700; letter-spacing: -.014em; margin: 0;
+  }
+  .agent-head p { grid-column: 2; margin: 5px 0 0; color: var(--ink-soft); font-size: 15.5px; max-width: 66ch; }
+  .service {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-size: 10.5px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
+    color: var(--accent); background: var(--accent-soft);
+    padding: 4px 9px; border-radius: 3px; white-space: nowrap;
+  }
+  .agent-body { display: grid; grid-template-columns: 1fr 1.25fr; gap: 0; }
+  .facts { padding: 18px 22px; border-right: 1px solid var(--rule); }
+  .connect { padding: 18px 22px; background: var(--paper); }
+  .facts dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; }
+  .facts dt {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--ink-faint); padding-top: 4px;
+  }
+  .facts dd { margin: 0; font-size: 15px; color: var(--ink-soft); }
+  .guard {
+    margin: 16px 0 0; padding: 11px 13px;
+    background: var(--warn-soft); border-left: 2px solid var(--warn);
+    border-radius: 0 3px 3px 0;
+    font-size: 14.5px; color: var(--ink-soft);
+  }
+  .guard b {
+    display: block;
+    font-family: "Archivo", system-ui, sans-serif;
+    font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--warn); margin-bottom: 3px;
+  }
+  .connect .label {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--ink-faint); display: block; margin-bottom: 10px;
+  }
+  ol.mini { list-style: none; counter-reset: m; margin: 0; padding: 0; }
+  ol.mini li {
+    counter-increment: m;
+    position: relative; padding: 0 0 9px 26px;
+    font-size: 15px; color: var(--ink-soft);
+  }
+  ol.mini li:last-child { padding-bottom: 0; }
+  ol.mini li::before {
+    content: counter(m) ".";
+    position: absolute; left: 0; top: 0;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12.5px; color: var(--accent); font-variant-numeric: tabular-nums;
+  }
+
+  /* ---- accounts table ---- */
+  .table-scroll { overflow-x: auto; margin: 22px 0 0; border: 1px solid var(--rule); border-radius: 3px; }
+  table { border-collapse: collapse; width: 100%; min-width: 640px; background: var(--surface); }
+  th, td { text-align: left; padding: 11px 16px; border-bottom: 1px solid var(--rule); font-size: 15px; }
+  th {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--ink-faint); background: var(--sunken);
+  }
+  td:first-child { font-family: "Archivo", system-ui, sans-serif; font-weight: 600; font-size: 14.5px; }
+  td { color: var(--ink-soft); }
+  tr:last-child td { border-bottom: none; }
+
+  .closing {
+    margin: 60px 0 0; padding: 26px 30px;
+    background: var(--surface); border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent); border-radius: 3px; box-shadow: var(--shadow);
+  }
+  .closing h2 { font-family: "Archivo", system-ui, sans-serif; font-size: 18px; font-weight: 700; margin: 0 0 10px; }
+  .closing ol { margin: 0; padding-left: 20px; }
+  .closing li { margin-bottom: 7px; color: var(--ink-soft); }
+  .closing li strong { color: var(--ink); font-weight: 600; }
+
+  footer.foot {
+    margin-top: 44px; padding-top: 16px; border-top: 1px solid var(--rule);
+    font-family: "Archivo", system-ui, sans-serif;
+    font-size: 12px; color: var(--ink-faint); letter-spacing: .02em;
+  }
+
+  @media (max-width: 760px) {
+    .agent-body { grid-template-columns: 1fr; }
+    .facts { border-right: none; border-bottom: 1px solid var(--rule); }
+    .agent-head { grid-template-columns: 40px 1fr; }
+    .service { grid-column: 2; justify-self: start; margin-top: 8px; }
+    .agent-head p { grid-column: 2; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="eyebrow">Dharani 360 · companion to the automation register</div>
+    <h1>Fourteen agents, and how to wire each one in</h1>
+    <p class="standfirst">An automation follows a rule. An agent makes a judgement — reads a scanned licence, decides a risk rating, writes the chasing email. This is every agent worth building into the portal, what each one is allowed to touch, and the steps to connect it to the code you already have.</p>
+  </header>
+
+  <h2 class="section">Four rules that apply to all fourteen</h2>
+  <div class="rules">
+    <div class="rule-item"><span class="n">01</span><div><h3>The model never produces a number, a date or a recipient</h3><p>Code computes the commission, reads the expiry, decides who owns the record. The model writes the sentences and makes judgements it can explain. This one rule is why the system stays auditable.</p></div></div>
+    <div class="rule-item"><span class="n">02</span><div><h3>Every agent starts in propose-only mode</h3><p>It suggests; a person confirms. An agent is promoted to writing on its own only after its proposals have been measured against real records — per document type, per form, not all at once.</p></div></div>
+    <div class="rule-item"><span class="n">03</span><div><h3>Every run is on the record</h3><p>One row in a new <code>agent_runs</code> table per run — input, output, tokens, cost, who accepted or rejected it — and every write stamped in the audit trail as <code>agent:&lt;name&gt;</code>, never as a person.</p></div></div>
+    <div class="rule-item"><span class="n">04</span><div><h3>Decide deliberately what leaves the building</h3><p>Passports, Emirates IDs and client contracts going to a model is a data-processing decision, not a technical one. Sign the DPA, turn off training on your data, and keep the highest-sensitivity documents on the shortest path.</p></div></div>
+  </div>
+
+  <h2 class="section">Step 0 — the runtime every agent shares</h2>
+  <p class="section-note">Build this once. Each agent afterwards is a single file plus a hook, because the key handling, the cost cap, the tool layer and the logging already exist.</p>
+  <ol class="steps">
+    <li>
+      <h4>Get an API key</h4>
+      <p>Sign in at <code>console.anthropic.com</code> → API Keys → Create Key. Copy it once; it is not shown again. Set a monthly spend limit on the same screen — it is the cheapest safety net you will ever configure.</p>
+    </li>
+    <li>
+      <h4>Add the dependency</h4>
+      <p>One line in <code>requirements.txt</code>, in the same optional style the file already uses for <code>boto3</code>.</p>
+      <pre><code>pip install anthropic
+# requirements.txt
+anthropic&gt;=0.40</code></pre>
+    </li>
+    <li>
+      <h4>Put the settings where every other setting lives</h4>
+      <p>Add to <code>.env</code> and to <code>.env.example</code> (no real value), then register them in <code>config.py</code> — add the key to <code>SECRET_SETTINGS</code> so it is masked, and to <code>REPORTED</code> so <code>python config.py</code> shows it.</p>
+      <pre><code>AI_ENABLED=1
+ANTHROPIC_API_KEY=sk-ant-...
+AI_MODEL=claude-sonnet-4-5
+AI_MONTHLY_CAP_USD=50
+AI_PROPOSE_ONLY=1</code></pre>
+    </li>
+    <li>
+      <h4>Create the runtime module</h4>
+      <p><code>agents/runtime.py</code> with one function every agent calls — <code>ask(system, messages, tools=None)</code>. It reads the config, refuses when <code>AI_ENABLED</code> is off or the monthly cap is spent, retries once on a timeout, and returns the answer plus the token count.</p>
+    </li>
+    <li>
+      <h4>Create the tool layer</h4>
+      <p><code>agents/tools.py</code> — thin, read-only wrappers over the functions <code>db.py</code> already exposes: <code>get_records</code>, <code>count_where</code>, <code>expiring_items</code>, <code>global_search</code>, <code>related_records</code>, <code>get_attachments</code>. Every wrapper takes the acting user's role and filters departments through <code>access.py</code> before returning a single row. An agent must never see more than the person it is acting for.</p>
+    </li>
+    <li>
+      <h4>Add the runs table</h4>
+      <p>A numbered step in <code>migrations.py</code> creating <code>agent_runs</code>: agent name, trigger, input reference, output, tokens, cost, status, decided_by, decided_at. Nothing is dropped, in keeping with how the rest of the schema behaves.</p>
+    </li>
+    <li>
+      <h4>Make the audit trail tell the truth</h4>
+      <p>Wrap every agent write in the audit context the code already has, so the History panel on a record says an agent did it.</p>
+      <pre><code>db.set_audit_context("agent:doc_reader")
+db.update_record(form_code, record_id, values)
+db.clear_audit_context()</code></pre>
+    </li>
+    <li>
+      <h4>Add a review queue</h4>
+      <p>One page listing everything agents have proposed and nobody has decided on, with Accept / Edit / Reject. While <code>AI_PROPOSE_ONLY=1</code> this page is the only way an agent's work reaches a register — and it is also how you measure whether an agent is good enough to promote.</p>
+    </li>
+    <li>
+      <h4>Prove it end to end before writing agent one</h4>
+      <p>A ping command that calls the model, writes an <code>agent_runs</code> row and prints the cost. Then add it to <code>smoketest.py</code> so a broken key is caught by the same 50 checks as everything else.</p>
+      <pre><code>python -m agents.runtime --ping</code></pre>
+    </li>
+  </ol>
+
+  <h2 class="section">The agents</h2>
+  <p class="section-note">Numbered in the order they are worth building. Each assumes Step 0 is done; where an agent also needs an automation from the register, it says so.</p>
+
+  <!-- 01 -->
+  <div class="agent">
+    <div class="agent-head">
+      <span class="agent-num">01</span>
+      <h3>Document Reader</h3>
+      <span class="service">Vision model</span>
+      <p>Turns a scan into fields. The single biggest reduction in typing anywhere in the portal — and it makes every expiry date trustworthy, because it came off the document rather than off a keyboard.</p>
+    </div>
+    <div class="agent-body">
+      <div class="facts">
+        <dl>
+          <dt>Reads</dt><dd>New attachments through <code>storage.get()</code> — Emirates ID, passport, visa, trade licence, title deed, Ejari</dd>
+          <dt>Writes</dt><dd>Proposed values for that form's fields, with a confidence per field</dd>
+          <dt>Judges</dt><dd>Which document type it is, and which field each value belongs to</dd>
+        </dl>
+        <div class="guard"><b>Guardrail</b>An expiry date never reaches a register unconfirmed. Confidence below your threshold goes to the review queue, not the record.</div>
+      </div>
+      <div class="connect">
+        <span class="label">Connect it</span>
+        <ol class="mini">
+          <li>Create <code>agents/doc_reader.py</code> with one entry point: <code>read(attachment_id)</code>.</li>
+          <li>Build the prompt from <code>forms_data.FORMS</code> — the form's own field list is the schema you ask the model to fill, so a new form is supported the day it is added.</li>
+          <li>Hook <code>/record/&lt;form_code&gt;/&lt;id&gt;/attach</code> in <code>app.py</code>: after <code>db.add_attachment()</code>, queue the run. Never block the upload on it.</li>
+          <li>Add a "Read from this document" strip to <code>record_view.html</code> with Confirm / Edit / Discard per field.</li>
+          <li>On confirm, write through <code>db.update_record()</code> under the agent audit context.</li>
+          <li>Measure on 20 real scans per document type before enabling that type. Emirates ID and trade licence first; handwritten anything last.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- 02 -->
+  <div class="agent">
+    <div class="agent-head">
+      <span class="agent-num">02</span>
+      <h3>Compliance Watchdog</h3>
+      <span class="service">Text model + scheduler</span>
+      <p>Turns your daily digest from a list into a chase. It decides what to say to each person about each expiring document, and keeps saying it until the replacement is on file.</p>
+    </div>
+    <div class="agent-body">
+      <div class="facts">
+        <dl>
+          <dt>Reads</dt><dd><code>db.expiring_items()</code>, the record owner, what was already sent, and the matching text in <code>regulations_data.py</code></dd>
+          <dt>Writes</dt><dd>A per-person message, a renewal task with the right checklist, an escalation note</dd>
+          <dt>Judges</dt><dd>Tone, urgency and what the renewal actually requires</dd>
+        </dl>
+        <div class="guard"><b>Guardrail</b>Rules choose the recipient and the deadline. The model only writes the words. A missed deadline must never be a model's fault.</div>
+      </div>
+      <div class="connect">
+        <span class="label">Connect it</span>
+        <ol class="mini">
+          <li>Needs the in-app scheduler first (A-01 in the automation register).</li>
+          <li><code>agents/watchdog.py</code> — daily: pull <code>expiring_items</code>, group by owning person.</li>
+          <li>For each group, ask the model for one message plus the renewal checklist for that document type, grounded in <code>regulations_data.py</code>.</li>
+          <li>Send through the notification dispatcher (A-03), not directly through <code>mailer.py</code>.</li>
+          <li>Write the resulting task into the todos register via the same path <code>/todo/add</code> uses.</li>
+          <li>Keep <code>email_digest.py</code> running unchanged until the agent has been right for a month.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- 03 -->
+  <div class="agent">
+    <div class="agent-head">
+      <span class="agent-num">03</span>
+      <h3>Register Analyst</h3>
+      <span class="service">Text model + tool use</span>
+      <p>Plain-language questions across all 112 registers — "which licences expire in Q4?", "which agents have leads nobody has touched?" — answered with links to the records the answer came from.</p>
+    </div>
+    <div class="agent-body">
+      <div class="facts">
+        <dl>
+          <dt>Reads</dt><dd>Read-only tools over <code>db.get_records</code>, <code>count_where</code>, <code>expiring_items</code>, <code>global_search</code></dd>
+          <dt>Writes</dt><dd>Nothing. Answers only.</dd>
+          <dt>Judges</dt><dd>Which registers the question is about and how to phrase the answer</dd>
+        </dl>
+        <div class="guard"><b>Guardrail</b>Every tool call carries the signed-in user's role and is filtered through <code>access.py</code> first. A receptionist asking about payroll gets the same 403 the URL would give them.</div>
+      </div>
+      <div class="connect">
+        <span class="label">Connect it</span>
+        <ol class="mini">
+          <li><code>agents/analyst.py</code> defining the read-only tools from Step 0's tool layer.</li>
+          <li>Pass <code>session</code>'s user and role into every tool call — scope before query, never filter the answer afterwards.</li>
+          <li>Add an <code>/ask</code> route and put the entry point in the existing Search Everything box.</li>
+          <li>Render every answer with the record links underneath, so any claim can be opened and checked.</li>
+          <li>Log each question and answer to <code>agent_runs</code>; questions asked reveal what the dashboards are missing.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- 04 -->
+  <div class="agent">
+    <div class="agent-head">
+      <span class="agent-num">04</span>
+      <h3>Staff Helpdesk</h3>
+      <span class="service">Retrieval + text model</span>
+      <p>Answers "how do I…" and "what does the regulation require for…" from your own material. You already ship 324 KB of regulation text in <code>regulations_data.py</code> that almost nobody reads — this is what makes it usable.</p>
+    </div>
+    <div class="agent-body">
+      <div class="facts">
+        <dl>
+          <dt>Reads</dt><dd><code>regulations_data.py</code>, the Documentation page, <code>README.md</code>, <code>OPERATIONS.md</code></dd>
+          <dt>Writes</dt><dd>An answer with a citation to the exact source paragraph</dd>
+          <dt>Judges</dt><dd>Which passage answers the question, and when nothing does</dd>
+        </dl>
+        <div class="guard"><b>Guardrail</b>No citation, no answer. It quotes your library; it does not give legal, tax or immigration advice — the same limit section 14 of the README already states.</div>
+      </div>
+      <div class="connect">
+        <span class="label">Connect it</span>
+        <ol class="mini">
+          <li>Index the sources into chunks with their headings kept as the citation label.</li>
+          <li>Store the index in the existing database rather than adding a vector service — at this size, keyword plus embedding search in Postgres is enough.</li>
+          <li><code>agents/helpdesk.py</code>: retrieve first, answer only from what was retrieved.</li>
+          <li>Add it to the sidebar next to Documentation, where people already go when stuck.</li>
+          <li>Log unanswered questions — they are your documentation backlog, written by the people who needed it.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- 05 -->
+  <div class="agent">
+    <div class="agent-head">
+      <span class="agent-num">05</span>
+      <h3>KYC &amp; AML Risk Analyst</h3>
+      <span class="service">Screening API + text model</span>
+      <p>Rates a client Low, Medium or High with a written rationale, and lets the rating set its own re-screening interval instead of someone remembering to.</p>
+    </div>
+    <div class="agent-body">
+      <div class="facts">
+        <dl>
+          <dt>Reads</dt><dd>The KYC record, its attached ID and company documents, and the sanctions/PEP screening result</dd>
+          <dt>Writes</dt><dd>A proposed rating, the rationale, and an escalation record when High</dd>
+          <dt>Judges</dt><dd>Risk, and whether a screening hit is genuinely the same person</dd>
+        </dl>
+        <div class="guard"><b>Guardrail</b>The agent may raise a rating on its own. It may never lower one — only a named compliance officer can, and that decision is logged.</div>
+      </div>
+      <div class="connect">
+        <span class="label">Connect it</span>
+        <ol class="mini">
+          <li>Open a screening account (OpenSanctions, ComplyAdvantage or Dow Jones) and put the key in <code>.env</code> alongside the others.</li>
+          <li><code>agents/aml.py</code> runs the list check first — that part must stay deterministic and repeatable.</li>
+          <li>Give the model the record, the documents and the screening result, and ask for a rating plus reasons.</li>
+          <li>Hook the KYC form's submit path; write the result as a proposal on the record.</li>
+          <li>Store the confirmed rating so the scheduler can drive re-screening — annual, six-monthly, quarterly.</li>
+          <li>Keep every input and output for the retention period; this is the file a regulator asks for.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- 06 -->
+  <div class="agent">
+    <div class="agent-head">
+      <span class="agent-num">06</span>
+      <h3>Inbox &amp; WhatsApp Triage</h3>
+      <span class="service">WhatsApp Business API + IMAP</span>
+      <p>Reads the shared mailbox and the company WhatsApp, works out what each message is, and files it — the end of "forward it to me and I'll upload it".</p>
+    </div>
+    <div class="agent-body">
+      <div class="facts">
+        <dl>
+          <dt>Reads</dt><dd>Incoming mail and WhatsApp messages with their attachments</dd>
+          <dt>Writes</dt><dd>Attachments onto the matched record, new leads, tasks, or a review-queue item</dd>
+          <dt>Judges</dt><dd>New lead, document for record X, invoice, or noise — and how confident it is</dd>
+        </dl>
+        <div class="guard"><b>Guardrail</b>Confident matches file themselves; anything uncertain waits in the queue. Nothing is ever auto-deleted or auto-replied to on the company's behalf.</div>
+      </div>
+      <div class="connect">
+        <span class="label">Connect it</span>
+        <ol class="mini">
+          <li>Register a WhatsApp Business number through 360dialog or Twilio; approve your message templates with Meta — this takes days, so start it early.</li>
+          <li>Point an IMAP mailbox at the same handler for email.</li>
+          <li><code>agents/triage.py</code> classifies the message, then matches sender and references against <code>db.global_search()</code>.</li>
+          <li>File through <code>db.add_attachment()</code>, or open a lead, or park it for review.</li>
+          <li>Show the confidence and the reason on every filed item so a wrong match is obvious and one click to undo.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- 07 -->
+  <div class="agent">
+    <div class="agent-head">
+      <span class="agent-num">07</span>
+      <h3>Lead Responder</h3>
+      <span class="service">Text model + portal feeds</span>
+      <p>Answers a new enquiry in minutes rather than hours, in the language it arrived in, with three real listings from your own register attached.</p>
+    </div>
+    <div class="agent-body">
+      <div class="facts">
+        <dl>
+          <dt>Reads</dt><dd>The inbound lead, and matching stock from the properties register</dd>
+          <dt>Writes</dt><dd>A draft first reply, a suggested agent, a qualification score</dd>
+          <dt>Judges</dt><dd>Budget, intent, area and urgency from a two-line enquiry</dd>
+        </dl>
+        <div class="guard"><b>Guardrail</b>Auto-send only for an out-of-hours acknowledgement using an approved template. Everything substantive is the agent's own send, from their phone, one tap.</div>
+      </div>
+      <div class="connect">
+        <span class="label">Connect it</span>
+        <ol class="mini">
+          <li>Needs lead capture and assignment first (D-01 and D-02).</li>
+          <li><code>agents/lead.py</code>: score the lead, then pick matching properties with <code>db.get_records()</code>.</li>
+          <li>Draft the reply in the language of the enquiry — Arabic, English, Russian, Hindi as your market requires.</li>
+          <li>Push "Send / Edit / Discard" to the assigned agent through the dispatcher.</li>
+          <li>Record whether the draft was sent as written — that number tells you when to trust it further.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- 08 -->
+  <div class="agent">
+    <div class="agent-head">
+      <span class="agent-num">08</span>
+      <h3>Follow-up Writer</h3>
+      <span class="service">Text model</span>
+      <p>Writes the day-3, day-7 and day-30 message using what actually happened — the viewing, the feedback, the objection — instead of the same template everyone ignores.</p>
+    </div>
+    <div class="agent-body">
+      <div class="facts">
+        <dl>
+          <dt>Reads</dt><dd>The lead's history, viewing feedback, last contact, current stock</dd>
+          <dt>Writes</dt><dd>The next message in the sequence, ready to approve</dd>
+          <dt>Judges</dt><dd>Whether there is anything worth saying this week, and stays quiet when there isn't</dd>
+        </dl>
+        <div class="guard"><b>Guardrail</b>Stops instantly on any inbound reply. An automated follow-up sent after a client has already answered is worse than none.</div>
+      </div>
+      <div class="connect">
+        <span class="label">Connect it</span>
+        <ol class="mini">
+          <li>Needs the follow-up sequence engine (D-04).</li>
+          <li><code>agents/followup.py</code> drafts from the thread, not from a template.</li>
+          <li>Batch them: one morning screen where an agent approves fourteen messages in a minute.</li>
+          <li>Wire the auto-stop to inbound events from the triage agent.</li>
+          <li>Cap frequency in code, not in the prompt.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- 09 -->
+  <div class="agent">
+    <div class="agent-head">
+      <span class="agent-num">09</span>
+      <h3>Contract &amp; Document Drafter</h3>
+      <span class="service">Text model + pdfout.py</span>
+      <p>Produces the tenancy contract, MOU, NOC or offer letter from the record, and tells you what is missing before it is sent rather than after it is signed.</p>
+    </div>
+    <div class="agent-body">
+      <div class="facts">
+        <dl>
+          <dt>Reads</dt><dd>The record and your approved template library</dd>
+          <dt>Writes</dt><dd>A numbered PDF attached to the record, plus a list of gaps</dd>
+          <dt>Judges</dt><dd>Free-text clauses, and whether anything required is absent</dd>
+        </dl>
+        <div class="guard"><b>Guardrail</b>Legal wording comes from your approved template. The model fills gaps and reviews; it does not invent clauses.</div>
+      </div>
+      <div class="connect">
+        <span class="label">Connect it</span>
+        <ol class="mini">
+          <li>Load your real templates into a template register with named merge fields.</li>
+          <li>Merge record → template in code. Deterministic, testable, no model involved.</li>
+          <li><code>agents/drafter.py</code> handles only the free-text sections and the completeness review.</li>
+          <li>Render with the existing <code>pdfout.py</code>, number it with <code>db.next_doc_no()</code>, attach it to the record.</li>
+          <li>Hand off to e-signature (C-03) so the signed copy files itself back.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- 10 -->
+  <div class="agent">
+    <div class="agent-head">
+      <span class="agent-num">10</span>
+      <h3>Call &amp; Meeting Notetaker</h3>
+      <span class="service">Transcription + text model</span>
+      <p>The portal already has calls, meetings and notes. This turns them into a summary, a next action and a date on the client's record — without anyone typing after the call.</p>
+    </div>
+    <div class="agent-body">
+      <div class="facts">
+        <dl>
+          <dt>Reads</dt><dd>Call recordings and meeting notes from <code>/calls</code> and <code>/notes</code></dd>
+          <dt>Writes</dt><dd>A summary onto the linked client or lead record, and a todo for the next action</dd>
+          <dt>Judges</dt><dd>What was agreed, what was promised, and by when</dd>
+        </dl>
+        <div class="guard"><b>Guardrail</b>Recording needs consent and a notice at the start of the call. Keep the transcript with the record — a summary nobody can check is a rumour.</div>
+      </div>
+      <div class="connect">
+        <span class="label">Connect it</span>
+        <ol class="mini">
+          <li>Store recordings through <code>storage.py</code> so they follow the same object-storage path as attachments.</li>
+          <li>Transcribe with Deepgram or Whisper — pick one with solid Gulf Arabic and accented English.</li>
+          <li><code>agents/notetaker.py</code>: summary, decisions, next action, due date.</li>
+          <li>Attach the note to the record found through <code>db.related_records()</code>.</li>
+          <li>Create the next action as a real todo, assigned and dated.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- 11 -->
+  <div class="agent">
+    <div class="agent-head">
+      <span class="agent-num">11</span>
+      <h3>Listing Copywriter</h3>
+      <span class="service">Text model</span>
+      <p>Writes portal-ready listing copy in English and Arabic from the property record, in your house tone, within each portal's length and claim rules.</p>
+    </div>
+    <div class="agent-body">
+      <div class="facts">
+        <dl>
+          <dt>Reads</dt><dd>The property record, the media checklist, your tone guide</dd>
+          <dt>Writes</dt><dd>Title and description per portal, in both languages</dd>
+          <dt>Judges</dt><dd>What to lead with for that property and that buyer</dd>
+        </dl>
+        <div class="guard"><b>Guardrail</b>Never states a fact the record does not contain — no invented views, sizes, handover dates or amenities. Facts are merged in, not written.</div>
+      </div>
+      <div class="connect">
+        <span class="label">Connect it</span>
+        <ol class="mini">
+          <li><code>agents/copywriter.py</code>, triggered when a property reaches "Ready to list".</li>
+          <li>Give it the permitted claim rules for each portal as part of the prompt.</li>
+          <li>Marketing approves both languages on one screen.</li>
+          <li>Approved copy travels with the portal feed (E-01), never pasted by hand.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- 12 -->
+  <div class="agent">
+    <div class="agent-head">
+      <span class="agent-num">12</span>
+      <h3>Data Quality Auditor</h3>
+      <span class="service">Rules first, model second</span>
+      <p>Runs weekly across every register and hands back one list a person can actually clear: duplicates, impossible dates, missing mandatory fields, records that should be linked and aren't.</p>
+    </div>
+    <div class="agent-body">
+      <div class="facts">
+        <dl>
+          <dt>Reads</dt><dd>Every register, plus the orphan-column report from <code>migrations.py status</code></dd>
+          <dt>Writes</dt><dd>A cleanup list with one-click fix and merge links</dd>
+          <dt>Judges</dt><dd>Only the ambiguous cases — "are these two Michael Chens the same person?"</dd>
+        </dl>
+        <div class="guard"><b>Guardrail</b>It never merges anything. Merging records in a compliance system is a human decision, and the README is already honest that linking is name-matching, not keys.</div>
+      </div>
+      <div class="connect">
+        <span class="label">Connect it</span>
+        <ol class="mini">
+          <li>Write the deterministic checks first — they are cheap and catch most of it.</li>
+          <li>Send only the genuinely ambiguous pairs to the model, in batches.</li>
+          <li><code>agents/quality.py</code> on a weekly schedule, output to one page.</li>
+          <li>Track the list's size week over week; it should fall, and if it climbs something upstream is broken.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- 13 -->
+  <div class="agent">
+    <div class="agent-head">
+      <span class="agent-num">13</span>
+      <h3>Audit &amp; Security Watch</h3>
+      <span class="service">Rules first, model second</span>
+      <p>Reads the audit trail the way an auditor would, and says something only when there is something to say.</p>
+    </div>
+    <div class="agent-body">
+      <div class="facts">
+        <dl>
+          <dt>Reads</dt><dd><code>db.list_audit()</code>, <code>db.list_login_log()</code>, <code>db.recent_login_failures()</code></dd>
+          <dt>Writes</dt><dd>A short note to the director — and nothing at all on a normal day</dd>
+          <dt>Judges</dt><dd>Whether a pattern is unusual for this company, and how to describe it plainly</dd>
+        </dl>
+        <div class="guard"><b>Guardrail</b>Silence is the expected output. An agent that produces a daily "all normal" email trains everyone to ignore it.</div>
+      </div>
+      <div class="connect">
+        <span class="label">Connect it</span>
+        <ol class="mini">
+          <li>Baseline from thirty days of existing audit history — you already have the data.</li>
+          <li>Deterministic thresholds decide what counts as unusual: lockout runs, bulk deletions, out-of-hours director access, sign-in from a new country.</li>
+          <li><code>agents/watch.py</code> asks the model only to describe the pattern in plain words.</li>
+          <li>Send through the dispatcher to the director, with links into the Audit Trail page.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- 14 -->
+  <div class="agent">
+    <div class="agent-head">
+      <span class="agent-num">14</span>
+      <h3>Management Report Writer</h3>
+      <span class="service">Text model</span>
+      <p>Writes the commentary on the monthly pack — what moved, what didn't, and what deserves a look — around numbers it is given and never allowed to compute.</p>
+    </div>
+    <div class="agent-body">
+      <div class="facts">
+        <dl>
+          <dt>Reads</dt><dd>The computed panel output from <code>insights.py</code>, as JSON, plus the previous period</dd>
+          <dt>Writes</dt><dd>The narrative section of the daily, weekly and monthly reports</dd>
+          <dt>Judges</dt><dd>What is worth pointing out, and what is noise</dd>
+        </dl>
+        <div class="guard"><b>Guardrail</b>The model receives finished numbers and returns only sentences. If a figure in the commentary is wrong, the bug is in <code>insights.py</code> — which is exactly where you can fix it.</div>
+      </div>
+      <div class="connect">
+        <span class="label">Connect it</span>
+        <ol class="mini">
+          <li>Needs scheduled reports first (K-02).</li>
+          <li><code>agents/reporter.py</code> takes the JSON <code>insights.build()</code> already produces.</li>
+          <li>Ask for commentary against the prior period, with an explicit instruction to state no figure not in the input.</li>
+          <li>Render into the report PDF above the charts; the director reviews before it goes wider.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="section">Accounts you will need to open</h2>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Service</th><th>Used by</th><th>Set-up note</th></tr></thead>
+      <tbody>
+        <tr><td>Model provider</td><td>All fourteen</td><td>One API key, a monthly spend cap, and data-training turned off for your account.</td></tr>
+        <tr><td>WhatsApp Business API</td><td>06, 07, 08</td><td>Via 360dialog or Twilio. Number verification and template approval by Meta take days — start first.</td></tr>
+        <tr><td>Sanctions / PEP screening</td><td>05</td><td>OpenSanctions, ComplyAdvantage or Dow Jones. Keep the raw result, not just the verdict.</td></tr>
+        <tr><td>Transcription</td><td>10</td><td>Deepgram or Whisper. Test on real Gulf Arabic and accented English before committing.</td></tr>
+        <tr><td>E-signature</td><td>09</td><td>DocuSign or UAE Pass, depending on what your counterparties accept.</td></tr>
+        <tr><td>OCR fallback</td><td>01</td><td>Optional. Azure Document Intelligence or Google Document AI if volume or Arabic accuracy demands it.</td></tr>
+        <tr><td>Object storage</td><td>01, 10</td><td>Already supported — <code>S3_BUCKET</code> in <code>.env</code>. Configure it before agents start creating files.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="closing">
+    <h2>The order I would build them in</h2>
+    <ol>
+      <li><strong>Step 0, then agent 01.</strong> The Document Reader pays for the runtime on its own, and every field it fills makes agents 02, 05 and 12 more accurate.</li>
+      <li><strong>03 and 04 next — Register Analyst and Staff Helpdesk.</strong> Both are read-only, so they can go live while everything else is still propose-only, and they teach the office what an agent is safe to be asked.</li>
+      <li><strong>Then 02 and 05.</strong> Compliance is where the portal is strongest; these two make it act instead of report.</li>
+      <li><strong>06 to 08 once WhatsApp is approved.</strong> The client-facing agents are the ones with a revenue number attached, and the ones a bad answer is most visible in — so they go after you trust the review queue.</li>
+      <li><strong>09 to 14 last.</strong> Each is genuinely useful and none is load-bearing. Build them when the first eight have stopped surprising you.</li>
+    </ol>
+  </div>
+
+  <footer class="foot">Dharani 360 · AI agent plan · 24 August 2026 · steps written against the current codebase — app.py, db.py, config.py, storage.py, insights.py, forms_data.py, migrations.py</footer>
+</div>

@@ -1,0 +1,282 @@
+{
+  "name": "Dharani 360 - Weekly Management Pack",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## K-02  Scheduled reports, without being asked for\n\nMonday 08:00. Four aggregate queries against the registers - pipeline, money waiting on somebody, the full compliance horizon and a 30-day agent leaderboard - rendered into one HTML email with an inline funnel and the 15 worst-expiring items named, with their owners.\n\nNothing is typed and nothing is estimated: every number is a `COUNT` over your own tables.\n\nAdd addresses to `recipients` in the **Config** node, comma separated. For a monthly director pack, duplicate the workflow and change the schedule to *Months*.",
+        "height": 420,
+        "width": 460
+      },
+      "id": "readme",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "weeksInterval": 1,
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 8,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "monday-08:00",
+      "name": "Monday 08:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a0",
+              "name": "portal_url",
+              "value": "https://dharani360.onrender.com",
+              "type": "string"
+            },
+            {
+              "id": "a1",
+              "name": "recipients",
+              "value": "admin@dharanis.ae, sales@dharanis.ae",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "config",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  (SELECT COUNT(*) FROM frm_sal_001 WHERE COALESCE(status,'') = 'New')        AS leads_new,\n  (SELECT COUNT(*) FROM frm_sal_001 WHERE COALESCE(status,'') = 'Contacted')  AS leads_contacted,\n  (SELECT COUNT(*) FROM frm_sal_001 WHERE COALESCE(status,'') = 'Qualified')  AS leads_qualified,\n  (SELECT COUNT(*) FROM frm_sal_001 WHERE COALESCE(status,'') = 'Converted')  AS leads_converted,\n  (SELECT COUNT(*) FROM frm_sal_001 WHERE COALESCE(status,'') = 'Lost')       AS leads_lost,\n  (SELECT COUNT(*) FROM frm_sal_005 WHERE COALESCE(status,'') = 'Scheduled')  AS viewings_booked,\n  (SELECT COUNT(*) FROM frm_sal_007 WHERE COALESCE(status,'') = 'Pending')    AS offers_open,\n  (SELECT COUNT(*) FROM frm_txn_001 WHERE COALESCE(status,'') = 'Open')       AS deals_open,\n  (SELECT COUNT(*) FROM frm_txn_005 WHERE COALESCE(status,'') = 'Closed'\n     AND NULLIF(closing_date,'') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n     AND closing_date::date >= CURRENT_DATE - 7)                              AS deals_closed_7d,\n  (SELECT COUNT(*) FROM frm_sal_001\n     WHERE created_at >= to_char((now() AT TIME ZONE 'utc') - interval '7 days',\n                                 'YYYY-MM-DD\"T\"HH24:MI:SS'))                  AS leads_this_week,\n  (SELECT COUNT(*) FROM frm_sal_001\n     WHERE COALESCE(status,'') IN ('New','Contacted')\n       AND COALESCE(NULLIF(agent_assigned,''), '') = '')                      AS leads_unassigned;",
+        "options": {}
+      },
+      "id": "pipeline",
+      "name": "Pipeline",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        -260,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DHARANI_PG",
+          "name": "Dharani 360 - Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  (SELECT COUNT(*) FROM frm_txn_004 WHERE COALESCE(status,'') IN ('Pending','Finance Verified'))\n                                                                              AS commissions_awaiting,\n  (SELECT COALESCE(SUM(COALESCE(net_commission,0)),0)::numeric FROM frm_txn_004\n     WHERE COALESCE(status,'') IN ('Pending','Finance Verified'))             AS commissions_value,\n  (SELECT COUNT(*) FROM frm_fin_001 WHERE COALESCE(status,'') = 'Pending')    AS claims_pending,\n  (SELECT COUNT(*) FROM frm_fin_004 WHERE COALESCE(status,'') IN ('Pending','Verified'))\n                                                                              AS payments_pending,\n  (SELECT COUNT(*) FROM frm_cmp_002 WHERE COALESCE(status,'') = 'High Risk')  AS aml_high_risk,\n  (SELECT COUNT(*) FROM frm_cmp_005 WHERE COALESCE(status,'') IN ('Open','Investigating'))\n                                                                              AS compliance_open,\n  (SELECT COUNT(*) FROM frm_it_008 WHERE COALESCE(status,'') IN ('Open','Investigating'))\n                                                                              AS security_open;",
+        "options": {}
+      },
+      "id": "money-&-risk",
+      "name": "Money & Risk",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        -60,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DHARANI_PG",
+          "name": "Dharani 360 - Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH tracked AS (\n  SELECT 'COR-001' AS form_code, 'Corporate Document Register' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"document_name\", ''), doc_no) AS item, NULLIF(\"responsible_person\", '') AS owner_name,\n         NULLIF(\"expiry_date\", '')::date AS due_date\n  FROM frm_cor_001\n  WHERE NULLIF(\"expiry_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'COR-002' AS form_code, 'Licence & Permit Register' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"licence_permit\", ''), doc_no) AS item, NULLIF(\"responsible_person\", '') AS owner_name,\n         NULLIF(\"expiry_date\", '')::date AS due_date\n  FROM frm_cor_002\n  WHERE NULLIF(\"expiry_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'COR-003' AS form_code, 'Master Compliance Calendar Item' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"compliance_item\", ''), doc_no) AS item, NULLIF(\"responsible_person\", '') AS owner_name,\n         NULLIF(\"due_date\", '')::date AS due_date\n  FROM frm_cor_003\n  WHERE NULLIF(\"due_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'COR-005' AS form_code, 'Power of Attorney Register' AS form_title, id, doc_no,\n         doc_no AS item, NULL::text AS owner_name,\n         NULLIF(\"valid_to\", '')::date AS due_date\n  FROM frm_cor_005\n  WHERE NULLIF(\"valid_to\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'HR-002' AS form_code, 'Employee Master Information Form' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"full_name\", ''), doc_no) AS item, NULLIF(\"full_name\", '') AS owner_name,\n         NULLIF(\"visa_expiry\", '')::date AS due_date\n  FROM frm_hr_002\n  WHERE NULLIF(\"visa_expiry\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'AGT-002' AS form_code, 'Agent Master File' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"agent_name\", ''), doc_no) AS item, NULLIF(\"agent_name\", '') AS owner_name,\n         NULLIF(\"broker_card_expiry\", '')::date AS due_date\n  FROM frm_agt_002\n  WHERE NULLIF(\"broker_card_expiry\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'SAL-009' AS form_code, 'Call Log' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"agent_name\", ''), doc_no) AS item, NULLIF(\"agent_name\", '') AS owner_name,\n         NULLIF(\"follow_up_date\", '')::date AS due_date\n  FROM frm_sal_009\n  WHERE NULLIF(\"follow_up_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'PRO-003' AS form_code, 'Owner Authorization' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"property_ref\", ''), doc_no) AS item, NULLIF(\"owner_name\", '') AS owner_name,\n         NULLIF(\"valid_to\", '')::date AS due_date\n  FROM frm_pro_003\n  WHERE NULLIF(\"valid_to\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'PRO-005' AS form_code, 'Marketing Authorization' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"property_ref\", ''), doc_no) AS item, NULLIF(\"owner_name\", '') AS owner_name,\n         NULLIF(\"valid_to\", '')::date AS due_date\n  FROM frm_pro_005\n  WHERE NULLIF(\"valid_to\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'IT-001' AS form_code, 'Asset Register' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"asset_type\", ''), doc_no) AS item, NULLIF(\"assigned_employee\", '') AS owner_name,\n         NULLIF(\"warranty_expiry\", '')::date AS due_date\n  FROM frm_it_001\n  WHERE NULLIF(\"warranty_expiry\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'VEN-003' AS form_code, 'Vendor Contract Register' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"vendor_name\", ''), doc_no) AS item, NULLIF(\"vendor_name\", '') AS owner_name,\n         NULLIF(\"end_date\", '')::date AS due_date\n  FROM frm_ven_003\n  WHERE NULLIF(\"end_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'MKT-002' AS form_code, 'Marketing Plan & Strategy' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"owner_name\", ''), doc_no) AS item, NULLIF(\"owner_name\", '') AS owner_name,\n         NULLIF(\"next_review_date\", '')::date AS due_date\n  FROM frm_mkt_002\n  WHERE NULLIF(\"next_review_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'MKT-004' AS form_code, 'Creative Brief' AS form_title, id, doc_no,\n         doc_no AS item, NULL::text AS owner_name,\n         NULLIF(\"deadline\", '')::date AS due_date\n  FROM frm_mkt_004\n  WHERE NULLIF(\"deadline\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'MKT-005' AS form_code, 'Marketing Content Approval' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"property_ref\", ''), doc_no) AS item, NULL::text AS owner_name,\n         NULLIF(\"permit_expiry\", '')::date AS due_date\n  FROM frm_mkt_005\n  WHERE NULLIF(\"permit_expiry\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'MKT-007' AS form_code, 'Digital Advertising Campaign Setup' AS form_title, id, doc_no,\n         doc_no AS item, NULL::text AS owner_name,\n         NULLIF(\"end_date\", '')::date AS due_date\n  FROM frm_mkt_007\n  WHERE NULLIF(\"end_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'MKT-008' AS form_code, 'Advertisement Budget Approval' AS form_title, id, doc_no,\n         doc_no AS item, NULL::text AS owner_name,\n         NULLIF(\"period_end\", '')::date AS due_date\n  FROM frm_mkt_008\n  WHERE NULLIF(\"period_end\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'MKT-009' AS form_code, 'Lead Generation Campaign' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"campaign_name\", ''), doc_no) AS item, NULLIF(\"owner_name\", '') AS owner_name,\n         NULLIF(\"end_date\", '')::date AS due_date\n  FROM frm_mkt_009\n  WHERE NULLIF(\"end_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'MKT-013' AS form_code, 'Website Content Update Request' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"property_ref\", ''), doc_no) AS item, NULL::text AS owner_name,\n         NULLIF(\"required_by_date\", '')::date AS due_date\n  FROM frm_mkt_013\n  WHERE NULLIF(\"required_by_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'MKT-014' AS form_code, 'Social Media Account Access & Authorization' AS form_title, id, doc_no,\n         doc_no AS item, NULL::text AS owner_name,\n         NULLIF(\"review_due_date\", '')::date AS due_date\n  FROM frm_mkt_014\n  WHERE NULLIF(\"review_due_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'MKT-015' AS form_code, 'Marketing Vendor / Agency Onboarding' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"vendor_name\", ''), doc_no) AS item, NULLIF(\"vendor_name\", '') AS owner_name,\n         NULLIF(\"licence_expiry\", '')::date AS due_date\n  FROM frm_mkt_015\n  WHERE NULLIF(\"licence_expiry\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'MKT-017' AS form_code, 'Event / Roadshow Marketing Request' AS form_title, id, doc_no,\n         doc_no AS item, NULL::text AS owner_name,\n         NULLIF(\"event_date\", '')::date AS due_date\n  FROM frm_mkt_017\n  WHERE NULLIF(\"event_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'MKT-018' AS form_code, 'Marketing Material Printing Request' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"vendor_name\", ''), doc_no) AS item, NULLIF(\"vendor_name\", '') AS owner_name,\n         NULLIF(\"required_by_date\", '')::date AS due_date\n  FROM frm_mkt_018\n  WHERE NULLIF(\"required_by_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'MKT-019' AS form_code, 'Brand Asset Usage Approval' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"asset_type\", ''), doc_no) AS item, NULL::text AS owner_name,\n         NULLIF(\"valid_until\", '')::date AS due_date\n  FROM frm_mkt_019\n  WHERE NULLIF(\"valid_until\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n)\nSELECT\n  COUNT(*) FILTER (WHERE due_date < CURRENT_DATE) AS overdue,\n  COUNT(*) FILTER (WHERE due_date BETWEEN CURRENT_DATE AND CURRENT_DATE + 30) AS red,\n  COUNT(*) FILTER (WHERE due_date BETWEEN CURRENT_DATE + 31 AND CURRENT_DATE + 90) AS amber,\n  COALESCE(json_agg(json_build_object(\n    'item', item, 'form_code', form_code, 'id', id, 'doc_no', doc_no,\n    'owner', owner_name, 'due', to_char(due_date,'YYYY-MM-DD'),\n    'days', (due_date - CURRENT_DATE))\n    ORDER BY due_date) FILTER (WHERE due_date <= CURRENT_DATE + 30), '[]') AS worst\nFROM tracked;",
+        "options": {}
+      },
+      "id": "compliance",
+      "name": "Compliance",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        140,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DHARANI_PG",
+          "name": "Dharani 360 - Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COALESCE(json_agg(x ORDER BY x.leads DESC), '[]') AS agents FROM (\n  SELECT COALESCE(NULLIF(agent_assigned,''), '(unassigned)') AS agent,\n         COUNT(*) AS leads,\n         COUNT(*) FILTER (WHERE COALESCE(status,'') = 'Converted') AS converted,\n         COUNT(*) FILTER (WHERE COALESCE(status,'') = 'Lost') AS lost\n  FROM frm_sal_001\n  WHERE created_at >= to_char((now() AT TIME ZONE 'utc') - interval '30 days',\n                              'YYYY-MM-DD\"T\"HH24:MI:SS')\n  GROUP BY 1\n) x;",
+        "options": {}
+      },
+      "id": "leaderboard",
+      "name": "Leaderboard",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        340,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DHARANI_PG",
+          "name": "Dharani 360 - Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg  = $('Config').first().json;\nconst p    = $('Pipeline').first().json;\nconst m    = $('Money & Risk').first().json;\nconst comp = $('Compliance').first().json;\nconst lb   = ($('Leaderboard').first().json.agents) || [];\nconst worst = comp.worst || [];\n\nconst n = (v) => Number(v || 0).toLocaleString();\nconst bar = (label, value, max) => {\n  const w = max > 0 ? Math.round((Number(value) / max) * 220) : 0;\n  return `<tr><td style=\"padding:4px 10px 4px 0;white-space:nowrap;color:#374151\">${label}</td>\n  <td style=\"padding:4px 0\"><span style=\"display:inline-block;height:14px;width:${w}px;background:#0f766e;border-radius:3px;vertical-align:middle\"></span>\n  <b style=\"margin-left:8px\">${n(value)}</b></td></tr>`;\n};\nconst funnel = [\n  ['Leads - new', p.leads_new], ['Contacted', p.leads_contacted],\n  ['Qualified', p.leads_qualified], ['Viewings booked', p.viewings_booked],\n  ['Offers open', p.offers_open], ['Converted', p.leads_converted],\n];\nconst max = Math.max(...funnel.map(f => Number(f[1] || 0)), 1);\n\nconst rows = worst.slice(0, 15).map(w =>\n  `<tr><td style=\"padding:5px 10px 5px 0\">${w.item}</td>\n   <td style=\"padding:5px 10px 5px 0;color:#6b7280\">${w.owner || '<i>nobody named</i>'}</td>\n   <td style=\"padding:5px 10px 5px 0\">${w.due}</td>\n   <td style=\"padding:5px 0;font-weight:600;color:${Number(w.days) < 0 ? '#b91c1c' : '#b45309'}\">\n   ${Number(w.days) < 0 ? Math.abs(w.days) + 'd overdue' : 'in ' + w.days + 'd'}</td></tr>`).join('');\n\nconst agents = lb.slice(0, 10).map(a =>\n  `<tr><td style=\"padding:5px 10px 5px 0\">${a.agent}</td>\n   <td style=\"padding:5px 10px 5px 0\">${a.leads}</td>\n   <td style=\"padding:5px 10px 5px 0;color:#047857\">${a.converted}</td>\n   <td style=\"padding:5px 0;color:#9ca3af\">${a.lost}</td></tr>`).join('');\n\nconst html = `\n<div style=\"font-family:system-ui,Segoe UI,sans-serif;max-width:720px;color:#111827\">\n<h2 style=\"margin:0 0 2px\">DHARANI 360 - weekly pack</h2>\n<div style=\"color:#6b7280;font-size:13px;margin-bottom:20px\">\nWeek ending ${new Date().toISOString().slice(0,10)} &middot; computed from the registers, not typed by anyone</div>\n\n<h3 style=\"margin:22px 0 8px;font-size:15px\">Sales pipeline</h3>\n<table style=\"border-collapse:collapse;font-size:14px\">${funnel.map(f => bar(f[0], f[1], max)).join('')}</table>\n<p style=\"font-size:13px;color:#374151\">\n${n(p.leads_this_week)} new leads this week &middot; ${n(p.deals_closed_7d)} deals closed &middot;\n<b style=\"color:${Number(p.leads_unassigned) > 0 ? '#b91c1c' : '#047857'}\">${n(p.leads_unassigned)} unassigned</b></p>\n\n<h3 style=\"margin:22px 0 8px;font-size:15px\">Compliance</h3>\n<p style=\"font-size:14px\">\n<b style=\"color:#b91c1c\">${n(comp.overdue)} overdue</b> &middot;\n<b style=\"color:#b45309\">${n(comp.red)} due inside 30 days</b> &middot;\n${n(comp.amber)} due in 31-90 days</p>\n${rows ? `<table style=\"border-collapse:collapse;font-size:13px\">\n<tr style=\"text-align:left;color:#6b7280\"><th>Item</th><th>Owner</th><th>Expires</th><th></th></tr>${rows}</table>` : '<p style=\"font-size:13px;color:#047857\">Nothing red. Genuinely.</p>'}\n\n<h3 style=\"margin:22px 0 8px;font-size:15px\">Money waiting on somebody</h3>\n<p style=\"font-size:14px\">\n${n(m.commissions_awaiting)} commissions awaiting approval (AED ${n(m.commissions_value)}) &middot;\n${n(m.claims_pending)} expense claims &middot; ${n(m.payments_pending)} payments</p>\n\n<h3 style=\"margin:22px 0 8px;font-size:15px\">Risk</h3>\n<p style=\"font-size:14px\">\n${n(m.aml_high_risk)} clients rated High Risk &middot;\n${n(m.compliance_open)} open compliance incidents &middot;\n${n(m.security_open)} open security incidents</p>\n\n<h3 style=\"margin:22px 0 8px;font-size:15px\">Agents - last 30 days</h3>\n${agents ? `<table style=\"border-collapse:collapse;font-size:13px\">\n<tr style=\"text-align:left;color:#6b7280\"><th>Agent</th><th>Leads</th><th>Converted</th><th>Lost</th></tr>${agents}</table>` : '<p style=\"font-size:13px;color:#6b7280\">No leads in the last 30 days.</p>'}\n\n<p style=\"margin-top:26px;font-size:12px;color:#9ca3af\">\nOpen the Control Tower: <a href=\"${cfg.portal_url}\">${cfg.portal_url}</a></p>\n</div>`;\n\nconst plain = `Weekly pack: ${n(p.leads_this_week)} new leads, ${n(p.deals_closed_7d)} closed, `\n  + `${n(comp.overdue)} overdue and ${n(comp.red)} red compliance items, `\n  + `${n(m.commissions_awaiting)} commissions awaiting approval.`;\n\nreturn String(cfg.recipients).split(',').map(to => ({ json: {\n  channel: 'email', to_email: to.trim(),\n  subject: `[DHARANI 360] Weekly pack - ${n(comp.overdue)} overdue, ${n(p.leads_unassigned)} leads unassigned`,\n  message: plain, html,\n}}));"
+      },
+      "id": "build-the-pack",
+      "name": "Build The Pack",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        540,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "DISPATCHER_WORKFLOW_ID",
+          "mode": "id",
+          "cachedResultName": "Dharani 360 - Notification Dispatcher"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {}
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "email-it",
+      "name": "Email It",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        760,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Monday 08:00": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Pipeline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pipeline": {
+      "main": [
+        [
+          {
+            "node": "Money & Risk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Money & Risk": {
+      "main": [
+        [
+          {
+            "node": "Compliance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compliance": {
+      "main": [
+        [
+          {
+            "node": "Leaderboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leaderboard": {
+      "main": [
+        [
+          {
+            "node": "Build The Pack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build The Pack": {
+      "main": [
+        [
+          {
+            "node": "Email It",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "dharani360"
+  }
+}

@@ -1,0 +1,206 @@
+{
+  "name": "Dharani 360 - Anomaly Watch",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## K-04  Flags, not hindsight\n\nEvery 6 hours it takes five readings straight from the portal's own tables:\n\n- failed sign-ins in the last hour, and across how many accounts (a run against several accounts is password guessing)\n- delete actions in the audit trail in 24 hours\n- compliance items that went overdue this week - a growing backlog, not a static one\n- lead volume halving against the previous day, which usually means a portal feed or an ad account has broken quietly\n- leads sitting unassigned\n\n**It sends nothing when nothing is wrong** - so an email from it always means something. Every threshold is in the Config node.",
+        "height": 420,
+        "width": 460
+      },
+      "id": "readme",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6,
+              "triggerAtMinute": 10
+            }
+          ]
+        }
+      },
+      "id": "every-6-hours",
+      "name": "Every 6 hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a0",
+              "name": "portal_url",
+              "value": "https://dharani360.onrender.com",
+              "type": "string"
+            },
+            {
+              "id": "a1",
+              "name": "director_email",
+              "value": "admin@dharanis.ae",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "failed_login_threshold",
+              "value": "12",
+              "type": "string"
+            },
+            {
+              "id": "a3",
+              "name": "deletion_threshold",
+              "value": "10",
+              "type": "string"
+            },
+            {
+              "id": "a4",
+              "name": "overdue_threshold",
+              "value": "5",
+              "type": "string"
+            },
+            {
+              "id": "a5",
+              "name": "unassigned_threshold",
+              "value": "10",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "config",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -260,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH tracked AS (\n  SELECT 'COR-001' AS form_code, 'Corporate Document Register' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"document_name\", ''), doc_no) AS item, NULLIF(\"responsible_person\", '') AS owner_name,\n         NULLIF(\"expiry_date\", '')::date AS due_date\n  FROM frm_cor_001\n  WHERE NULLIF(\"expiry_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'COR-002' AS form_code, 'Licence & Permit Register' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"licence_permit\", ''), doc_no) AS item, NULLIF(\"responsible_person\", '') AS owner_name,\n         NULLIF(\"expiry_date\", '')::date AS due_date\n  FROM frm_cor_002\n  WHERE NULLIF(\"expiry_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'COR-003' AS form_code, 'Master Compliance Calendar Item' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"compliance_item\", ''), doc_no) AS item, NULLIF(\"responsible_person\", '') AS owner_name,\n         NULLIF(\"due_date\", '')::date AS due_date\n  FROM frm_cor_003\n  WHERE NULLIF(\"due_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'COR-005' AS form_code, 'Power of Attorney Register' AS form_title, id, doc_no,\n         doc_no AS item, NULL::text AS owner_name,\n         NULLIF(\"valid_to\", '')::date AS due_date\n  FROM frm_cor_005\n  WHERE NULLIF(\"valid_to\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'HR-002' AS form_code, 'Employee Master Information Form' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"full_name\", ''), doc_no) AS item, NULLIF(\"full_name\", '') AS owner_name,\n         NULLIF(\"visa_expiry\", '')::date AS due_date\n  FROM frm_hr_002\n  WHERE NULLIF(\"visa_expiry\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'AGT-002' AS form_code, 'Agent Master File' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"agent_name\", ''), doc_no) AS item, NULLIF(\"agent_name\", '') AS owner_name,\n         NULLIF(\"broker_card_expiry\", '')::date AS due_date\n  FROM frm_agt_002\n  WHERE NULLIF(\"broker_card_expiry\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'SAL-009' AS form_code, 'Call Log' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"agent_name\", ''), doc_no) AS item, NULLIF(\"agent_name\", '') AS owner_name,\n         NULLIF(\"follow_up_date\", '')::date AS due_date\n  FROM frm_sal_009\n  WHERE NULLIF(\"follow_up_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'PRO-003' AS form_code, 'Owner Authorization' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"property_ref\", ''), doc_no) AS item, NULLIF(\"owner_name\", '') AS owner_name,\n         NULLIF(\"valid_to\", '')::date AS due_date\n  FROM frm_pro_003\n  WHERE NULLIF(\"valid_to\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'PRO-005' AS form_code, 'Marketing Authorization' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"property_ref\", ''), doc_no) AS item, NULLIF(\"owner_name\", '') AS owner_name,\n         NULLIF(\"valid_to\", '')::date AS due_date\n  FROM frm_pro_005\n  WHERE NULLIF(\"valid_to\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'IT-001' AS form_code, 'Asset Register' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"asset_type\", ''), doc_no) AS item, NULLIF(\"assigned_employee\", '') AS owner_name,\n         NULLIF(\"warranty_expiry\", '')::date AS due_date\n  FROM frm_it_001\n  WHERE NULLIF(\"warranty_expiry\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'VEN-003' AS form_code, 'Vendor Contract Register' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"vendor_name\", ''), doc_no) AS item, NULLIF(\"vendor_name\", '') AS owner_name,\n         NULLIF(\"end_date\", '')::date AS due_date\n  FROM frm_ven_003\n  WHERE NULLIF(\"end_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'MKT-002' AS form_code, 'Marketing Plan & Strategy' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"owner_name\", ''), doc_no) AS item, NULLIF(\"owner_name\", '') AS owner_name,\n         NULLIF(\"next_review_date\", '')::date AS due_date\n  FROM frm_mkt_002\n  WHERE NULLIF(\"next_review_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'MKT-004' AS form_code, 'Creative Brief' AS form_title, id, doc_no,\n         doc_no AS item, NULL::text AS owner_name,\n         NULLIF(\"deadline\", '')::date AS due_date\n  FROM frm_mkt_004\n  WHERE NULLIF(\"deadline\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'MKT-005' AS form_code, 'Marketing Content Approval' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"property_ref\", ''), doc_no) AS item, NULL::text AS owner_name,\n         NULLIF(\"permit_expiry\", '')::date AS due_date\n  FROM frm_mkt_005\n  WHERE NULLIF(\"permit_expiry\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'MKT-007' AS form_code, 'Digital Advertising Campaign Setup' AS form_title, id, doc_no,\n         doc_no AS item, NULL::text AS owner_name,\n         NULLIF(\"end_date\", '')::date AS due_date\n  FROM frm_mkt_007\n  WHERE NULLIF(\"end_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'MKT-008' AS form_code, 'Advertisement Budget Approval' AS form_title, id, doc_no,\n         doc_no AS item, NULL::text AS owner_name,\n         NULLIF(\"period_end\", '')::date AS due_date\n  FROM frm_mkt_008\n  WHERE NULLIF(\"period_end\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'MKT-009' AS form_code, 'Lead Generation Campaign' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"campaign_name\", ''), doc_no) AS item, NULLIF(\"owner_name\", '') AS owner_name,\n         NULLIF(\"end_date\", '')::date AS due_date\n  FROM frm_mkt_009\n  WHERE NULLIF(\"end_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'MKT-013' AS form_code, 'Website Content Update Request' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"property_ref\", ''), doc_no) AS item, NULL::text AS owner_name,\n         NULLIF(\"required_by_date\", '')::date AS due_date\n  FROM frm_mkt_013\n  WHERE NULLIF(\"required_by_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'MKT-014' AS form_code, 'Social Media Account Access & Authorization' AS form_title, id, doc_no,\n         doc_no AS item, NULL::text AS owner_name,\n         NULLIF(\"review_due_date\", '')::date AS due_date\n  FROM frm_mkt_014\n  WHERE NULLIF(\"review_due_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'MKT-015' AS form_code, 'Marketing Vendor / Agency Onboarding' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"vendor_name\", ''), doc_no) AS item, NULLIF(\"vendor_name\", '') AS owner_name,\n         NULLIF(\"licence_expiry\", '')::date AS due_date\n  FROM frm_mkt_015\n  WHERE NULLIF(\"licence_expiry\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'MKT-017' AS form_code, 'Event / Roadshow Marketing Request' AS form_title, id, doc_no,\n         doc_no AS item, NULL::text AS owner_name,\n         NULLIF(\"event_date\", '')::date AS due_date\n  FROM frm_mkt_017\n  WHERE NULLIF(\"event_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'MKT-018' AS form_code, 'Marketing Material Printing Request' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"vendor_name\", ''), doc_no) AS item, NULLIF(\"vendor_name\", '') AS owner_name,\n         NULLIF(\"required_by_date\", '')::date AS due_date\n  FROM frm_mkt_018\n  WHERE NULLIF(\"required_by_date\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n  UNION ALL\n  SELECT 'MKT-019' AS form_code, 'Brand Asset Usage Approval' AS form_title, id, doc_no,\n         COALESCE(NULLIF(\"asset_type\", ''), doc_no) AS item, NULL::text AS owner_name,\n         NULLIF(\"valid_until\", '')::date AS due_date\n  FROM frm_mkt_019\n  WHERE NULLIF(\"valid_until\", '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n    AND COALESCE(status,'') NOT IN ('Superseded','Expired','Revoked','Terminated','Closed','Completed','Archived','Exited','Cancelled')\n)\nSELECT\n  (SELECT COUNT(*) FROM login_attempts\n     WHERE at > to_char((now() AT TIME ZONE 'utc') - interval '1 hour',\n                        'YYYY-MM-DD\"T\"HH24:MI:SS'))                AS failed_logins_1h,\n  (SELECT COUNT(DISTINCT identifier) FROM login_attempts\n     WHERE at > to_char((now() AT TIME ZONE 'utc') - interval '1 hour',\n                        'YYYY-MM-DD\"T\"HH24:MI:SS'))                AS failed_login_accounts,\n  (SELECT COUNT(*) FROM audit_log\n     WHERE action ILIKE '%delete%'\n       AND at > to_char((now() AT TIME ZONE 'utc') - interval '24 hours',\n                        'YYYY-MM-DD\"T\"HH24:MI:SS'))                AS deletions_24h,\n  (SELECT COUNT(*) FROM audit_log\n     WHERE at > to_char((now() AT TIME ZONE 'utc') - interval '24 hours',\n                        'YYYY-MM-DD\"T\"HH24:MI:SS'))                AS audit_events_24h,\n  (SELECT COUNT(*) FROM tracked WHERE due_date < CURRENT_DATE)      AS overdue_now,\n  (SELECT COUNT(*) FROM tracked\n     WHERE due_date BETWEEN CURRENT_DATE - 7 AND CURRENT_DATE - 1)  AS newly_overdue_7d,\n  (SELECT COUNT(*) FROM frm_sal_001\n     WHERE created_at >= to_char((now() AT TIME ZONE 'utc') - interval '24 hours',\n                                 'YYYY-MM-DD\"T\"HH24:MI:SS'))       AS leads_24h,\n  (SELECT COUNT(*) FROM frm_sal_001\n     WHERE created_at >= to_char((now() AT TIME ZONE 'utc') - interval '48 hours',\n                                 'YYYY-MM-DD\"T\"HH24:MI:SS')\n       AND created_at <  to_char((now() AT TIME ZONE 'utc') - interval '24 hours',\n                                 'YYYY-MM-DD\"T\"HH24:MI:SS'))       AS leads_prev_24h,\n  (SELECT COUNT(*) FROM frm_sal_001\n     WHERE COALESCE(status,'') IN ('New','Contacted')\n       AND COALESCE(NULLIF(agent_assigned,''), '') = '')            AS leads_unassigned;",
+        "options": {}
+      },
+      "id": "take-the-readings",
+      "name": "Take The Readings",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        -60,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DHARANI_PG",
+          "name": "Dharani 360 - Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// K-04: a flag raised, rather than a problem waiting to be noticed.\nconst cfg = $('Config').first().json;\nconst s = $json;\nconst flags = [];\nconst num = (v) => Number(v || 0);\n\nif (num(s.failed_logins_1h) >= Number(cfg.failed_login_threshold)) {\n  flags.push(`${s.failed_logins_1h} failed sign-ins in the last hour across `\n    + `${s.failed_login_accounts} account(s). A run against several accounts is `\n    + `password guessing, not somebody being forgetful.`);\n}\nif (num(s.deletions_24h) >= Number(cfg.deletion_threshold)) {\n  flags.push(`${s.deletions_24h} delete actions in the audit trail in 24 hours `\n    + `(out of ${s.audit_events_24h} events). Worth a look at who and why.`);\n}\nif (num(s.newly_overdue_7d) >= Number(cfg.overdue_threshold)) {\n  flags.push(`${s.newly_overdue_7d} compliance items went overdue in the last 7 days `\n    + `- ${s.overdue_now} are overdue in total. The backlog is growing, not clearing.`);\n}\nconst prev = num(s.leads_prev_24h), now_ = num(s.leads_24h);\nif (prev >= 5 && now_ <= Math.floor(prev / 2)) {\n  flags.push(`Lead volume halved: ${now_} in the last 24h against ${prev} the day `\n    + `before. Check the portal feeds and the ad accounts before assuming it is a quiet day.`);\n}\nif (num(s.leads_unassigned) >= Number(cfg.unassigned_threshold)) {\n  flags.push(`${s.leads_unassigned} leads are sitting unassigned in New or Contacted.`);\n}\n\nif (!flags.length) return [];\nreturn [{ json: {\n  channel: 'email,slack',\n  to_email: cfg.director_email,\n  slack_channel: 'dharani-alerts',\n  subject: `[DHARANI 360] ${flags.length} thing(s) worth looking at`,\n  message: `Automatic check at ${new Date().toISOString().slice(0,16).replace('T',' ')} UTC found:\\n\\n`\n    + flags.map((f, i) => `${i + 1}. ${f}`).join('\\n\\n')\n    + `\\n\\nControl Tower: ${cfg.portal_url}\\nAudit Trail: ${cfg.portal_url}/audit`,\n}}];"
+      },
+      "id": "anything-odd?",
+      "name": "Anything Odd?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        160,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "DISPATCHER_WORKFLOW_ID",
+          "mode": "id",
+          "cachedResultName": "Dharani 360 - Notification Dispatcher"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {}
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "raise-it",
+      "name": "Raise It",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        380,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Every 6 hours": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Take The Readings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Take The Readings": {
+      "main": [
+        [
+          {
+            "node": "Anything Odd?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anything Odd?": {
+      "main": [
+        [
+          {
+            "node": "Raise It",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "dharani360"
+  }
+}

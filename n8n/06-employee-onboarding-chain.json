@@ -1,0 +1,411 @@
+{
+  "name": "Dharani 360 - Employee Onboarding Chain",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## G-01 + G-07  One HR event, one chain of consequences\n\nFires the instant an **HR-002 Employee Master** record is created - it listens on the same `record-created` webhook the portal hook posts to, and ignores every other form code.\n\nIt then opens, with real `DR-...` document numbers:\n\n- **HR-003** Employee Document Checklist\n- **HR-006** IT Access Request\n- **HR-005** Company Property Handover\n- **7 to-dos** on the portal's own board - passport/EID/visa copies, PRO visa application, payroll, email account, induction, probation review and first appraisal\n\nProbation is dated at start + 90 days and the appraisal at start + 365, computed from the join date rather than remembered.\n\n**Needs `n8n_hooks.py` installed in the portal** - see the webhook setup note.",
+        "height": 420,
+        "width": 460
+      },
+      "id": "readme",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "dharani/record-created",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "new-employee",
+      "name": "New Employee",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -700,
+        300
+      ],
+      "webhookId": "dharani/record-created"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a0",
+              "name": "portal_url",
+              "value": "https://dharani360.onrender.com",
+              "type": "string"
+            },
+            {
+              "id": "a1",
+              "name": "hr_email",
+              "value": "hr@dharanis.ae",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "it_email",
+              "value": "it@dharanis.ae",
+              "type": "string"
+            },
+            {
+              "id": "a3",
+              "name": "director_email",
+              "value": "admin@dharanis.ae",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "config",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.body.form_code }}",
+              "rightValue": "HR-002",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "is-it-a-new-employee?",
+      "name": "Is it a new employee?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -300,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, handled: false } }}",
+        "options": {}
+      },
+      "id": "ignore-everything-else",
+      "name": "Ignore Everything Else",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -80,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH seq AS (\n  INSERT INTO counters (form_code, seq) VALUES ('HR-003', 1)\n  ON CONFLICT (form_code) DO UPDATE SET seq = counters.seq + 1\n  RETURNING seq\n)\nINSERT INTO frm_hr_003\n  (doc_no, created_at, updated_at, created_by, status, notes, \"employee_name\")\nSELECT 'DR-HR-003-' || lpad(seq.seq::text, 4, '0'),\n       to_char(now() AT TIME ZONE 'utc', 'YYYY-MM-DD\"T\"HH24:MI:SS'),\n       to_char(now() AT TIME ZONE 'utc', 'YYYY-MM-DD\"T\"HH24:MI:SS'),\n       'n8n', 'Incomplete', $1,$2\nFROM seq\nRETURNING id, doc_no;",
+        "options": {
+          "queryReplacement": "=Opened automatically when {{ $('New Employee').item.json.body.doc_no }} was created.,={{ $('New Employee').item.json.body.data.full_name }}"
+        }
+      },
+      "id": "open-document-checklist",
+      "name": "Open Document Checklist",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        -80,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DHARANI_PG",
+          "name": "Dharani 360 - Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH seq AS (\n  INSERT INTO counters (form_code, seq) VALUES ('HR-006', 1)\n  ON CONFLICT (form_code) DO UPDATE SET seq = counters.seq + 1\n  RETURNING seq\n)\nINSERT INTO frm_hr_006\n  (doc_no, created_at, updated_at, created_by, status, notes, \"employee_name\", \"systems_requested\", \"access_level\", \"requested_by\")\nSELECT 'DR-HR-006-' || lpad(seq.seq::text, 4, '0'),\n       to_char(now() AT TIME ZONE 'utc', 'YYYY-MM-DD\"T\"HH24:MI:SS'),\n       to_char(now() AT TIME ZONE 'utc', 'YYYY-MM-DD\"T\"HH24:MI:SS'),\n       'n8n', 'Requested', $1,$2, $3, $4, $5\nFROM seq\nRETURNING id, doc_no;",
+        "options": {
+          "queryReplacement": "=Raised automatically by the onboarding chain for {{ $('New Employee').item.json.body.data.position || 'new joiner' }}.,={{ $('New Employee').item.json.body.data.full_name }},=Email, DHARANI 360 portal, shared drive, CRM, phone extension,=Standard,={{ $('New Employee').item.json.body.actor || 'n8n' }}"
+        }
+      },
+      "id": "raise-it-access-request",
+      "name": "Raise IT Access Request",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        140,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DHARANI_PG",
+          "name": "Dharani 360 - Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH seq AS (\n  INSERT INTO counters (form_code, seq) VALUES ('HR-005', 1)\n  ON CONFLICT (form_code) DO UPDATE SET seq = counters.seq + 1\n  RETURNING seq\n)\nINSERT INTO frm_hr_005\n  (doc_no, created_at, updated_at, created_by, status, notes, \"employee_name\", \"items_issued\", \"date_issued\")\nSELECT 'DR-HR-005-' || lpad(seq.seq::text, 4, '0'),\n       to_char(now() AT TIME ZONE 'utc', 'YYYY-MM-DD\"T\"HH24:MI:SS'),\n       to_char(now() AT TIME ZONE 'utc', 'YYYY-MM-DD\"T\"HH24:MI:SS'),\n       'n8n', 'Issued', $1,$2, $3, $4\nFROM seq\nRETURNING id, doc_no;",
+        "options": {
+          "queryReplacement": "=Raised automatically by the onboarding chain. Amend the item list before signing.,={{ $('New Employee').item.json.body.data.full_name }},=Laptop, phone, SIM, access card, business cards - confirm and amend,={{ $('New Employee').item.json.body.data.start_date }}"
+        }
+      },
+      "id": "raise-kit-handover",
+      "name": "Raise Kit Handover",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        360,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DHARANI_PG",
+          "name": "Dharani 360 - Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const e = $('New Employee').first().json.body;\nconst d = e.data || {};\nconst start = d.start_date && /^\\d{4}-\\d{2}-\\d{2}$/.test(d.start_date)\n  ? new Date(d.start_date + 'T00:00:00Z') : new Date();\nconst plus = (days) => {\n  const x = new Date(start); x.setUTCDate(x.getUTCDate() + days);\n  return x.toISOString().slice(0, 10);\n};\nreturn [{ json: {\n  full_name: d.full_name || '(unnamed employee)',\n  position: d.position || '', department: d.department || '',\n  email: d.email || '', start_date: start.toISOString().slice(0, 10),\n  probation_due: plus(90), appraisal_due: plus(365),\n  visa_expiry: d.visa_expiry || '', doc_no: e.doc_no, record_id: e.record_id,\n}}];"
+      },
+      "id": "work-out-the-dates",
+      "name": "Work Out The Dates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        580,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH target AS (\n  SELECT COALESCE(\n    (SELECT id FROM users WHERE lower(COALESCE(full_name,'')) = lower($1) LIMIT 1),\n    (SELECT id FROM users WHERE role ILIKE 'Admin%' OR role ILIKE '%Operations%'\n       ORDER BY id LIMIT 1),\n    (SELECT id FROM users ORDER BY id LIMIT 1)) AS uid\n), rows_to_add AS (\n  SELECT * FROM (VALUES\n    ($2 || ' - collect passport, Emirates ID and visa copies', '#ef4444'),\n    ($2 || ' - PRO: start visa / labour card application',      '#ef4444'),\n    ($2 || ' - Finance: add to payroll and open salary record', '#f59e0b'),\n    ($2 || ' - IT: create email account and portal login',      '#f59e0b'),\n    ($2 || ' - Induction plan and policy sign-off',             '#3b82f6'),\n    ($2 || ' - PROBATION REVIEW due ' || $3,                    '#8b5cf6'),\n    ($2 || ' - First annual appraisal due ' || $4,              '#8b5cf6')\n  ) AS v(text, color)\n)\nINSERT INTO todos (user_id, text, color, done, created_at, status)\nSELECT target.uid, rows_to_add.text, rows_to_add.color, 0,\n       to_char(now() AT TIME ZONE 'utc', 'YYYY-MM-DD\"T\"HH24:MI:SS'), 'To Do'\nFROM target, rows_to_add\nWHERE NOT EXISTS (\n  SELECT 1 FROM todos t WHERE t.text = rows_to_add.text AND COALESCE(t.status,'') <> 'Done')\nRETURNING id, text;",
+        "options": {
+          "queryReplacement": "={{ $json.full_name }},={{ $json.full_name }},={{ $json.probation_due }},={{ $json.appraisal_due }}"
+        }
+      },
+      "id": "open-the-task-chain",
+      "name": "Open The Task Chain",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        800,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DHARANI_PG",
+          "name": "Dharani 360 - Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $('Work Out The Dates').first().json;\nconst cfg = $('Config').first().json;\nconst url = `${cfg.portal_url}/record/HR-002/${d.record_id}`;\nconst msg =\n`${d.full_name} has been added to the Employee Master register (${d.doc_no}).\n\nPosition   : ${d.position || '-'}\nDepartment : ${d.department || '-'}\nStart date : ${d.start_date}\nVisa expiry: ${d.visa_expiry || 'not recorded yet'}\n\nOpened automatically, nothing needs to be created by hand:\n  - HR-003 Employee Document Checklist  (${$('Open Document Checklist').first().json.doc_no})\n  - HR-006 IT Access Request            (${$('Raise IT Access Request').first().json.doc_no})\n  - HR-005 Company Property Handover    (${$('Raise Kit Handover').first().json.doc_no})\n  - 7 dated to-dos across HR, PRO, Finance and IT\n\nDiarised from the start date:\n  Probation review  ${d.probation_due}\n  First appraisal   ${d.appraisal_due}\n\nEmployee record: ${url}`;\nreturn [\n  { json: { channel: 'email,slack', to_email: cfg.hr_email, slack_channel: 'dharani-hr',\n            subject: `[ONBOARDING] ${d.full_name} - chain opened`, message: msg } },\n  { json: { channel: 'email', to_email: cfg.it_email,\n            subject: `[ONBOARDING] ${d.full_name} - IT access requested`, message: msg } },\n  { json: { channel: 'email', to_email: cfg.director_email,\n            subject: `[ONBOARDING] ${d.full_name} joins ${d.start_date}`, message: msg } },\n];"
+      },
+      "id": "write-the-briefing",
+      "name": "Write The Briefing",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1020,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "DISPATCHER_WORKFLOW_ID",
+          "mode": "id",
+          "cachedResultName": "Dharani 360 - Notification Dispatcher"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {}
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "tell-hr,-it-and-the-director",
+      "name": "Tell HR, IT and the Director",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, handled: true, employee: $('Work Out The Dates').item.json.full_name } }}",
+        "options": {}
+      },
+      "id": "reply-done",
+      "name": "Reply Done",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1460,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "New Employee": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Is it a new employee?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is it a new employee?": {
+      "main": [
+        [
+          {
+            "node": "Open Document Checklist",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ignore Everything Else",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Open Document Checklist": {
+      "main": [
+        [
+          {
+            "node": "Raise IT Access Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Raise IT Access Request": {
+      "main": [
+        [
+          {
+            "node": "Raise Kit Handover",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Raise Kit Handover": {
+      "main": [
+        [
+          {
+            "node": "Work Out The Dates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Work Out The Dates": {
+      "main": [
+        [
+          {
+            "node": "Open The Task Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Open The Task Chain": {
+      "main": [
+        [
+          {
+            "node": "Write The Briefing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write The Briefing": {
+      "main": [
+        [
+          {
+            "node": "Tell HR, IT and the Director",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tell HR, IT and the Director": {
+      "main": [
+        [
+          {
+            "node": "Reply Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "dharani360"
+  }
+}

@@ -1,0 +1,178 @@
+{
+  "name": "Dharani 360 - Rules Engine / Event Router",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## A-02  \"When this happens, do that\"\n\nThe portal posts every record created or changed to this one webhook. The **Match Rules** node holds a plain table of rules - add a line, and a new automation exists. No other node changes.\n\nSeven rules ship with it: a closed transaction tells finance, a High Risk AML rating pages compliance, a goAML escalation, a security incident, a property going Under Offer, a grievance, and a vendor bank-detail change that tells finance to verify by phone on a number they already hold.\n\n`to: 'OWNER'` routes to whoever the record itself names.\n\n**Needs `n8n_hooks.py` installed in the portal.**",
+        "height": 420,
+        "width": 460
+      },
+      "id": "readme",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "dharani/event",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "portal-event",
+      "name": "Portal Event",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        300
+      ],
+      "webhookId": "dharani/event"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a0",
+              "name": "portal_url",
+              "value": "https://dharani360.onrender.com",
+              "type": "string"
+            },
+            {
+              "id": "a1",
+              "name": "fallback_email",
+              "value": "admin@dharanis.ae",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "slack_channel",
+              "value": "dharani-alerts",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "config",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -360,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// A-02, in the only form that does not need a settings screen: one table you\n// edit here. Every record created or changed in the portal arrives at this\n// webhook; each rule that matches produces one notification.\n//\n//   when   : 'created' | 'changed' | 'any'\n//   form   : form code, or '*' for every register\n//   field  : (changed only) the field that must have changed\n//   equals : (optional) the new value it must have become\n//   to     : email address, or 'OWNER' to use the record's own owner field\n//   also   : optional extra channels - 'whatsapp', 'slack'\n//   say    : the message, with {field} placeholders from the record\nconst RULES = [\n  { when: 'changed', form: 'TXN-005', field: 'status', equals: 'Closed',\n    to: 'finance@dharanis.ae', also: 'slack',\n    say: 'Transaction {transaction_ref} closed on {closing_date}. Raise the commission calculation and the invoice.' },\n\n  { when: 'changed', form: 'CMP-002', field: 'status', equals: 'High Risk',\n    to: 'compliance@dharanis.ae', also: 'whatsapp,slack',\n    say: 'AML risk on {client_name} has been rated HIGH. Enhanced due diligence and a re-screening date are needed now, before the transaction proceeds.' },\n\n  { when: 'created', form: 'CMP-006',\n    to: 'compliance@dharanis.ae', also: 'whatsapp,slack',\n    say: 'A suspicious activity escalation has been raised. This is a goAML clock - open it immediately.' },\n\n  { when: 'created', form: 'IT-008',\n    to: 'it@dharanis.ae', also: 'slack',\n    say: 'Security incident logged: {subject}. Severity {priority}.' },\n\n  { when: 'changed', form: 'PRO-001', field: 'status', equals: 'Under Offer',\n    to: 'OWNER', also: 'slack',\n    say: 'Property {property_ref} is now Under Offer. Pull it from the portals and tell the owner.' },\n\n  { when: 'created', form: 'HR-012',\n    to: 'hr@dharanis.ae',\n    say: 'A grievance has been filed by {employee_name}. Acknowledge it within the policy window.' },\n\n  { when: 'created', form: 'FIN-007',\n    to: 'finance@dharanis.ae', also: 'whatsapp',\n    say: 'BANK DETAIL CHANGE requested for {vendor_name}. Verify by phone on a number you already hold - never one from the request itself - before approving.' },\n];\n\nconst cfg = $('Config').first().json;\nconst e = $json.body || $json;\nconst data = e.data || {};\nconst changed = e.changed_fields || {};\nconst kind = String(e.event || '').includes('created') ? 'created' : 'changed';\n\nconst fill = (tpl) => String(tpl).replace(/\\{(\\w+)\\}/g, (_, k) =>\n  (data[k] !== undefined && data[k] !== null && data[k] !== '') ? data[k] : '-');\n\nconst OWNER_FIELDS = ['responsible_person','owner_name','agent_name','assigned_employee',\n                      'employee_name','agent_assigned','vendor_name','requested_by'];\n\nconst out = [];\nfor (const r of RULES) {\n  if (r.when !== 'any' && r.when !== kind) continue;\n  if (r.form !== '*' && r.form !== e.form_code) continue;\n  if (r.when === 'changed' && r.field) {\n    if (!(r.field in changed)) continue;\n    if (r.equals !== undefined && String(changed[r.field]) !== String(r.equals)) continue;\n  }\n  let to = r.to;\n  if (to === 'OWNER') {\n    const f = OWNER_FIELDS.find(k => data[k]);\n    to = f ? (data[f] + '') : cfg.fallback_email;\n    if (!to.includes('@')) to = cfg.fallback_email;   // it was a name, not an address\n  }\n  out.push({ json: {\n    channel: ['email'].concat(String(r.also || '').split(',').filter(Boolean)).join(','),\n    to_email: to,\n    slack_channel: cfg.slack_channel,\n    subject: `[DHARANI 360] ${e.form_code} ${e.doc_no}`,\n    message: fill(r.say)\n      + `\\n\\nRecord: ${cfg.portal_url}/record/${e.form_code}/${e.record_id}`\n      + `\\nChanged by: ${e.actor || 'unknown'}`,\n  }});\n}\nreturn out;"
+      },
+      "id": "match-rules",
+      "name": "Match Rules",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "DISPATCHER_WORKFLOW_ID",
+          "mode": "id",
+          "cachedResultName": "Dharani 360 - Notification Dispatcher"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {}
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "act-on-them",
+      "name": "Act On Them",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        60,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true } }}",
+        "options": {}
+      },
+      "id": "acknowledge",
+      "name": "Acknowledge",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        280,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Portal Event": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Match Rules",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Match Rules": {
+      "main": [
+        [
+          {
+            "node": "Act On Them",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Act On Them": {
+      "main": [
+        [
+          {
+            "node": "Acknowledge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "dharani360"
+  }
+}

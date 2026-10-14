@@ -34,7 +34,10 @@ echo Keep this window open while you are using DHARANI 360.
 echo Close this window (or press Ctrl+C) to stop the system.
 echo.
 
-start "" http://127.0.0.1:5000
+REM Wait until the server is actually listening before opening the browser.
+REM Opening it immediately shows "localhost refused to connect" on the first
+REM run, because pip install has not finished yet.
+start "" /min powershell -NoProfile -WindowStyle Hidden -Command "$n=0; while($n -lt 180){ try { $t=New-Object Net.Sockets.TcpClient; $t.Connect('127.0.0.1',5000); $t.Close(); Start-Process 'http://127.0.0.1:5000'; break } catch { Start-Sleep -Seconds 2; $n++ } }"
 python app.py
 
 pause

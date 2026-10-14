@@ -1,0 +1,239 @@
+{
+  "name": "Dharani 360 - Agent Morning Follow-up List",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## D-05 Follow-ups, pushed rather than pulled\n\n07:30 every day, each agent gets **their own** list - not the company's - built from three registers at once:\n\n- **SAL-006** follow-ups whose `next_follow_up` has arrived\n- **SAL-009** call logs with a `follow_up_date` due\n- **SAL-001** leads assigned to them that have sat in New or Contacted for more than 3 days\n\nSplit into OVERDUE / TODAY / THIS WEEK, each line linking straight to the record. Logging the outcome clears the line from tomorrow's list - nothing to tick off separately.",
+        "height": 420,
+        "width": 460
+      },
+      "id": "readme",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 7,
+              "triggerAtMinute": 30
+            }
+          ]
+        }
+      },
+      "id": "every-morning-07:30",
+      "name": "Every morning 07:30",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -560,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a0",
+              "name": "portal_url",
+              "value": "https://dharani360.onrender.com",
+              "type": "string"
+            },
+            {
+              "id": "a1",
+              "name": "sales_manager_email",
+              "value": "sales@dharanis.ae",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "config",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -360,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, username, full_name, email, role FROM users WHERE active = 1;",
+        "options": {}
+      },
+      "id": "get-users",
+      "name": "Get Users",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        -160,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DHARANI_PG",
+          "name": "Dharani 360 - Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ok: true } }];"
+      },
+      "id": "collapse",
+      "name": "Collapse",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        40,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH due AS (\n  SELECT 'SAL-006' AS form_code, id, doc_no,\n         COALESCE(NULLIF(client_name,''), '(no name)') AS who,\n         COALESCE(NULLIF(agent,''), '') AS agent_name,\n         COALESCE(NULLIF(next_follow_up,''), NULLIF(follow_up_date,'')) AS due_txt,\n         COALESCE(NULLIF(method,''), 'Follow-up') AS what\n  FROM frm_sal_006\n  WHERE COALESCE(status,'') <> 'Completed'\n    AND COALESCE(NULLIF(next_follow_up,''), NULLIF(follow_up_date,''))\n        ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n  UNION ALL\n  SELECT 'SAL-009', id, doc_no,\n         COALESCE(NULLIF(contact_name,''), '(no name)'),\n         COALESCE(NULLIF(agent_name,''), ''),\n         NULLIF(follow_up_date,''),\n         'Call back - ' || COALESCE(NULLIF(outcome,''), 'no outcome logged')\n  FROM frm_sal_009\n  WHERE COALESCE(status,'') <> 'Closed'\n    AND NULLIF(follow_up_date,'') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'\n  UNION ALL\n  SELECT 'SAL-001', id, doc_no,\n         COALESCE(NULLIF(client_name,''), '(no name)'),\n         COALESCE(NULLIF(agent_assigned,''), ''),\n         to_char(CURRENT_DATE, 'YYYY-MM-DD'),\n         'Untouched lead from ' || COALESCE(NULLIF(source,''), 'unknown source')\n  FROM frm_sal_001\n  WHERE COALESCE(status,'') IN ('New','Contacted')\n    AND NULLIF(agent_assigned,'') IS NOT NULL\n    AND created_at < to_char((now() AT TIME ZONE 'utc') - interval '3 days',\n                             'YYYY-MM-DD\"T\"HH24:MI:SS')\n)\nSELECT form_code, id, doc_no, who, agent_name, what,\n       due_txt AS due_date, (due_txt::date - CURRENT_DATE) AS days_until\nFROM due\nWHERE due_txt::date <= CURRENT_DATE + 7\nORDER BY agent_name, due_txt;",
+        "options": {}
+      },
+      "id": "follow-ups-due",
+      "name": "Follow-ups Due",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        240,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DHARANI_PG",
+          "name": "Dharani 360 - Postgres"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// D-05: the dashboard already computes this. This pushes it to the phone\n// instead of waiting for somebody to notice it.\nconst cfg = $('Config').first().json;\nconst users = $('Get Users').all().map(u => u.json);\nconst findUser = (name) => {\n  const k = String(name || '').trim().toLowerCase();\n  if (!k) return null;\n  return users.find(u => String(u.full_name || '').toLowerCase() === k ||\n                         String(u.username || '').toLowerCase() === k) || null;\n};\n\nconst byAgent = {};\nfor (const it of $input.all()) {\n  const r = it.json;\n  const key = r.agent_name || '(unassigned)';\n  (byAgent[key] = byAgent[key] || []).push(r);\n}\n\nconst out = [];\nfor (const [agent, rows] of Object.entries(byAgent)) {\n  const u = findUser(agent);\n  const overdue = rows.filter(r => Number(r.days_until) < 0);\n  const today   = rows.filter(r => Number(r.days_until) === 0);\n  const soon    = rows.filter(r => Number(r.days_until) > 0);\n  const fmt = (list) => list.map(r =>\n      `  - ${r.who} - ${r.what} (${r.doc_no}, due ${r.due_date})\\n    ${cfg.portal_url}/record/${r.form_code}/${r.id}`\n    ).join('\\n');\n\n  const body =\n`Good morning${u && u.full_name ? ' ' + u.full_name.split(' ')[0] : ''}.\n\n${overdue.length} overdue, ${today.length} due today, ${soon.length} due this week.\n` +\n(overdue.length ? `\\nOVERDUE\\n${fmt(overdue)}\\n` : '') +\n(today.length   ? `\\nTODAY\\n${fmt(today)}\\n`     : '') +\n(soon.length    ? `\\nTHIS WEEK\\n${fmt(soon)}\\n`  : '') +\n`\\nLog the outcome against the record as you go - anything you log clears\nitself from tomorrow's list.`;\n\n  out.push({ json: {\n    channel: 'email,whatsapp',\n    to_email: u ? u.email : cfg.sales_manager_email,\n    to_phone: '',\n    subject: `[DHARANI 360] Your day: ${overdue.length + today.length} to clear`,\n    message: body,\n  }});\n}\nreturn out;"
+      },
+      "id": "group-by-agent",
+      "name": "Group By Agent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "DISPATCHER_WORKFLOW_ID",
+          "mode": "id",
+          "cachedResultName": "Dharani 360 - Notification Dispatcher"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {}
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "send-each-agent-their-day",
+      "name": "Send Each Agent Their Day",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        660,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Every morning 07:30": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Get Users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Users": {
+      "main": [
+        [
+          {
+            "node": "Collapse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collapse": {
+      "main": [
+        [
+          {
+            "node": "Follow-ups Due",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Follow-ups Due": {
+      "main": [
+        [
+          {
+            "node": "Group By Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Group By Agent": {
+      "main": [
+        [
+          {
+            "node": "Send Each Agent Their Day",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "dharani360"
+  }
+}

@@ -1,0 +1,306 @@
+{
+  "name": "Dharani 360 - Portal & Website Lead Capture",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## D-01 Lead capture, deduplicated\n\nOne webhook URL that Property Finder, Bayut, Dubizzle, Meta lead ads and your own site can all POST to. It understands each of their payload shapes.\n\nDeduplicates on the **last 9 digits of the phone** (so +971 50 123 4567 and 0501234567 are the same person) and on email, over a 180-day window.\n\nNew leads are written straight into register **SAL-001** with a correct `DR-SAL-001-nnnn` document number taken from the portal's own `counters` table - so they are indistinguishable from a hand-typed lead.\n\nThen it hands off to flow 03 for assignment.\n\n**Give the portals this URL** (Production URL, once activated):\n`https://<your-n8n>/webhook/dharani/lead-intake`",
+        "height": 420,
+        "width": 460
+      },
+      "id": "readme",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "dharani/lead-intake",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "lead-webhook",
+      "name": "Lead Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        300
+      ],
+      "webhookId": "dharani/lead-intake"
+    },
+    {
+      "parameters": {
+        "jsCode": "// D-01: one endpoint for Property Finder, Bayut, Dubizzle, Meta lead ads,\n// the company website and anything else that can POST JSON.\nconst b = $json.body || $json;\nconst q = $json.query || {};\nconst pick = (...k) => { for (const x of k) { if (x !== undefined && x !== null && String(x).trim() !== '') return String(x).trim(); } return ''; };\n\n// Meta / Facebook lead-ads arrive as field_data[{name,values[]}]\nconst meta = {};\nif (Array.isArray(b.field_data)) {\n  for (const f of b.field_data) meta[f.name] = (f.values || [])[0];\n}\n\nconst source = pick(q.source, b.source, b.portal, b.origin,\n                    b.lead_source, meta.source, 'Website');\nconst name   = pick(b.name, b.full_name, b.client_name, b.customer_name,\n                    b.lead && b.lead.name, meta.full_name, meta.name);\nconst phone  = pick(b.phone, b.mobile, b.contact, b.phone_number,\n                    b.lead && b.lead.phone, meta.phone_number).replace(/[^0-9+]/g, '');\nconst emailA = pick(b.email, b.email_address, b.lead && b.lead.email, meta.email).toLowerCase();\nconst prop   = pick(b.property_reference, b.propertyReference, b.reference,\n                    b.property_ref, b.listing_reference, b.property, b.message,\n                    meta.property);\n\nif (!name && !phone && !emailA) {\n  throw new Error('Lead payload had no name, phone or email: ' + JSON.stringify(b).slice(0, 300));\n}\n\nreturn [{ json: {\n  source, client_name: name || '(no name given)',\n  contact: phone, email: emailA,\n  property_interest: prop,\n  lead_id: 'L-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' +\n           Math.random().toString(36).slice(2, 7).toUpperCase(),\n  raw: JSON.stringify(b).slice(0, 4000),\n}}];"
+      },
+      "id": "normalise-lead",
+      "name": "Normalise Lead",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -340,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COUNT(*)::int AS dupe_count,\n       COALESCE(MAX(doc_no), '') AS existing_doc_no,\n       COALESCE(MAX(agent_assigned), '') AS existing_agent\nFROM frm_sal_001\nWHERE created_at > to_char((now() AT TIME ZONE 'utc') - interval '180 days',\n                           'YYYY-MM-DD\"T\"HH24:MI:SS')\n  AND (\n    ( $1 <> '' AND regexp_replace(COALESCE(contact,''), '[^0-9]', '', 'g')\n                   LIKE '%' || right(regexp_replace($1, '[^0-9]', '', 'g'), 9) )\n    OR ( $2 <> '' AND lower(COALESCE(notes,'')) LIKE '%' || lower($2) || '%' )\n    OR ( $3 <> '' AND lower(COALESCE(client_name,'')) = lower($3) AND $1 <> ''\n         AND regexp_replace(COALESCE(contact,''), '[^0-9]', '', 'g')\n             = regexp_replace($1, '[^0-9]', '', 'g') )\n  );",
+        "options": {
+          "queryReplacement": "={{ $json.contact }},={{ $json.email }},={{ $json.client_name }}"
+        }
+      },
+      "id": "check-duplicate",
+      "name": "Check Duplicate",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        -120,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DHARANI_PG",
+          "name": "Dharani 360 - Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.dupe_count }}",
+              "rightValue": "={{ 0 }}",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "already-known?",
+      "name": "Already known?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "dharani-leads",
+          "mode": "name"
+        },
+        "text": "=:repeat: Duplicate lead ignored - *{{ $('Normalise Lead').item.json.client_name }}* ({{ $('Normalise Lead').item.json.contact }}) already exists as {{ $json.existing_doc_no }}, owned by {{ $json.existing_agent || 'nobody yet' }}.",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "id": "flag-duplicate",
+      "name": "Flag Duplicate",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        340,
+        160
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "DHARANI_SLACK",
+          "name": "Dharani 360 - Slack"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, duplicate: true, existing: $json.existing_doc_no } }}",
+        "options": {}
+      },
+      "id": "reply-duplicate",
+      "name": "Reply Duplicate",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        560,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH seq AS (\n  INSERT INTO counters (form_code, seq) VALUES ('SAL-001', 1)\n  ON CONFLICT (form_code) DO UPDATE SET seq = counters.seq + 1\n  RETURNING seq\n)\nINSERT INTO frm_sal_001\n  (doc_no, created_at, updated_at, created_by, status, notes,\n   lead_id, date_received, source, client_name, contact,\n   property_interest, agent_assigned)\nSELECT 'DR-SAL-001-' || lpad(seq.seq::text, 4, '0'),\n       to_char(now() AT TIME ZONE 'utc', 'YYYY-MM-DD\"T\"HH24:MI:SS'),\n       to_char(now() AT TIME ZONE 'utc', 'YYYY-MM-DD\"T\"HH24:MI:SS'),\n       'n8n', 'New',\n       'email: ' || $1 || E'\\n' || $2,\n       $3, to_char(now(), 'YYYY-MM-DD'), $4, $5, $6, $7, ''\nFROM seq\nRETURNING id, doc_no, client_name, contact, source, property_interest;",
+        "options": {
+          "queryReplacement": "={{ $('Normalise Lead').item.json.email }},={{ $('Normalise Lead').item.json.raw }},={{ $('Normalise Lead').item.json.lead_id }},={{ $('Normalise Lead').item.json.source }},={{ $('Normalise Lead').item.json.client_name }},={{ $('Normalise Lead').item.json.contact }},={{ $('Normalise Lead').item.json.property_interest }}"
+        }
+      },
+      "id": "insert-lead",
+      "name": "Insert Lead",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        340,
+        440
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DHARANI_PG",
+          "name": "Dharani 360 - Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "ASSIGN_WORKFLOW_ID",
+          "mode": "id",
+          "cachedResultName": "Dharani 360 - Lead Assignment & First-Response SLA"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {}
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "assign-it",
+      "name": "Assign It",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        560,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, doc_no: $('Insert Lead').item.json.doc_no } }}",
+        "options": {}
+      },
+      "id": "reply-created",
+      "name": "Reply Created",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        780,
+        440
+      ]
+    }
+  ],
+  "connections": {
+    "Lead Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalise Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalise Lead": {
+      "main": [
+        [
+          {
+            "node": "Check Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Duplicate": {
+      "main": [
+        [
+          {
+            "node": "Already known?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Already known?": {
+      "main": [
+        [
+          {
+            "node": "Flag Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Insert Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flag Duplicate": {
+      "main": [
+        [
+          {
+            "node": "Reply Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Lead": {
+      "main": [
+        [
+          {
+            "node": "Assign It",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assign It": {
+      "main": [
+        [
+          {
+            "node": "Reply Created",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "dharani360"
+  }
+}

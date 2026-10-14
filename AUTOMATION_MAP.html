@@ -1,0 +1,609 @@
+<title>Dharani 360 Automation Register</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+  :root {
+    --paper:      #F5F7F5;
+    --surface:    #FFFFFF;
+    --sunken:     #ECEFEC;
+    --ink:        #10201E;
+    --ink-soft:   #4A5C58;
+    --ink-faint:  #7C8C88;
+    --rule:       #D8DFDB;
+    --accent:     #0C6B60;
+    --accent-soft:#E2F0EC;
+    --red:        #A82F26;
+    --red-soft:   #F7E6E4;
+    --amber:      #8C6212;
+    --amber-soft: #F7EEDC;
+    --green:      #2C6B48;
+    --green-soft: #E3F0E8;
+    --shadow:     0 1px 2px rgba(16,32,30,.05), 0 8px 24px -16px rgba(16,32,30,.25);
+    --maxw: 1080px;
+  }
+  :root:not([data-theme="light"]) {
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #0C1210;
+      --surface:    #141C1A;
+      --sunken:     #1B2422;
+      --ink:        #E6EDEA;
+      --ink-soft:   #A3B3AE;
+      --ink-faint:  #6F817C;
+      --rule:       #26312E;
+      --accent:     #55C9B4;
+      --accent-soft:#12302B;
+      --red:        #E88379;
+      --red-soft:   #341916;
+      --amber:      #DDB264;
+      --amber-soft: #2E2515;
+      --green:      #7FC79B;
+      --green-soft: #16291F;
+      --shadow:     0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:      #0C1210;
+    --surface:    #141C1A;
+    --sunken:     #1B2422;
+    --ink:        #E6EDEA;
+    --ink-soft:   #A3B3AE;
+    --ink-faint:  #6F817C;
+    --rule:       #26312E;
+    --accent:     #55C9B4;
+    --accent-soft:#12302B;
+    --red:        #E88379;
+    --red-soft:   #341916;
+    --amber:      #DDB264;
+    --amber-soft: #2E2515;
+    --green:      #7FC79B;
+    --green-soft: #16291F;
+    --shadow:     0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
+    font-size: 16.5px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: 0 24px 96px;
+  }
+
+  /* ---------- masthead ---------- */
+  header.masthead {
+    border-bottom: 1px solid var(--rule);
+    padding: 56px 0 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .eyebrow {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  h1 {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-weight: 700;
+    font-size: clamp(34px, 5.2vw, 54px);
+    line-height: 1.03;
+    letter-spacing: -.022em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  .standfirst {
+    max-width: 62ch;
+    color: var(--ink-soft);
+    font-size: 18px;
+    margin: 0;
+  }
+
+  /* ---------- counters ---------- */
+  .counters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 28px 0 0;
+  }
+  .counter {
+    background: var(--surface);
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .counter b {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 26px;
+    font-weight: 500;
+    letter-spacing: -.03em;
+    font-variant-numeric: tabular-nums;
+  }
+  .counter span {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .counter.is-live b   { color: var(--green); }
+  .counter.is-half b   { color: var(--amber); }
+  .counter.is-new b    { color: var(--red); }
+
+  /* ---------- filter bar ---------- */
+  .toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: color-mix(in srgb, var(--paper) 88%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--rule);
+    margin: 40px 0 0;
+    padding: 12px 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  .toolbar .label {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-right: 4px;
+  }
+  button.chip {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: .01em;
+    color: var(--ink-soft);
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    padding: 5px 13px;
+    cursor: pointer;
+    transition: border-color .15s, color .15s, background .15s;
+  }
+  button.chip:hover { border-color: var(--accent); color: var(--ink); }
+  button.chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button.chip[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--paper);
+  }
+  :root[data-theme="dark"] button.chip[aria-pressed="true"],
+  :root:not([data-theme="light"]) button.chip[aria-pressed="true"] { color: #08110F; }
+
+  /* ---------- group ---------- */
+  section.group { margin: 52px 0 0; scroll-margin-top: 70px; }
+  .group-head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--ink);
+  }
+  .group-key {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 13px;
+    color: var(--accent);
+    font-weight: 500;
+  }
+  .group-head h2 {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-size: 21px;
+    font-weight: 700;
+    letter-spacing: -.012em;
+    margin: 0;
+    flex: 1;
+  }
+  .group-note {
+    color: var(--ink-soft);
+    font-size: 15.5px;
+    max-width: 68ch;
+    margin: 14px 0 4px;
+  }
+
+  /* ---------- rows ---------- */
+  ol.rows { list-style: none; margin: 0; padding: 0; }
+  li.row {
+    display: grid;
+    grid-template-columns: 62px 1fr 140px;
+    gap: 0 18px;
+    align-items: start;
+    padding: 15px 0 15px;
+    border-bottom: 1px solid var(--rule);
+  }
+  li.row.hidden { display: none; }
+  .id {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+    padding-top: 3px;
+  }
+  .body h3 {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -.006em;
+    margin: 0 0 3px;
+    color: var(--ink);
+  }
+  .body p {
+    margin: 0;
+    color: var(--ink-soft);
+    font-size: 15.5px;
+    max-width: 74ch;
+  }
+  .flow {
+    display: block;
+    margin-top: 6px;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12px;
+    color: var(--ink-faint);
+    line-height: 1.5;
+  }
+  .flow em { font-style: normal; color: var(--accent); }
+  code {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .86em;
+    background: var(--sunken);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+  .meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    padding-top: 2px;
+  }
+  .status {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+  .status.live { background: var(--green-soft); color: var(--green); }
+  .status.half { background: var(--amber-soft); color: var(--amber); }
+  .status.new  { background: var(--red-soft);   color: var(--red); }
+  .phase {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11.5px;
+    color: var(--ink-faint);
+    white-space: nowrap;
+  }
+
+  /* ---------- closing ---------- */
+  .closing {
+    margin: 64px 0 0;
+    padding: 28px 30px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent);
+    border-radius: 3px;
+    box-shadow: var(--shadow);
+  }
+  .closing h2 {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0 0 10px;
+  }
+  .closing ol { margin: 0; padding-left: 20px; }
+  .closing li { margin-bottom: 7px; color: var(--ink-soft); }
+  .closing li strong { color: var(--ink); font-weight: 600; }
+
+  footer.foot {
+    margin-top: 44px;
+    padding-top: 16px;
+    border-top: 1px solid var(--rule);
+    font-family: "Archivo", system-ui, sans-serif;
+    font-size: 12px;
+    color: var(--ink-faint);
+    letter-spacing: .02em;
+  }
+
+  @media (max-width: 720px) {
+    li.row { grid-template-columns: 46px 1fr; }
+    .meta { grid-column: 2; flex-direction: row; align-items: center; padding-top: 8px; }
+    .counters { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="eyebrow">Dharani 360 · Operations &amp; Compliance System</div>
+    <h1>Every automation the portal still needs</h1>
+    <p class="standfirst">The registers are already digital — 112 forms, 17 departments, one permanent database. What is still manual is the <em>work around</em> the registers: the chasing, the reminding, the re-typing, the approving. This is that list, one by one, with what already runs today marked as such.</p>
+  </header>
+
+  <div class="counters">
+    <div class="counter"><b id="c-total">83</b><span>Automations</span></div>
+    <div class="counter is-live"><b id="c-live">0</b><span>Running today</span></div>
+    <div class="counter is-half"><b id="c-half">0</b><span>Half-built</span></div>
+    <div class="counter is-new"><b id="c-new">0</b><span>To build</span></div>
+    <div class="counter"><b>14</b><span>Areas</span></div>
+  </div>
+
+  <div class="toolbar">
+    <span class="label">Show</span>
+    <button class="chip" data-filter="all" aria-pressed="true">Everything</button>
+    <button class="chip" data-filter="live" aria-pressed="false">Running today</button>
+    <button class="chip" data-filter="half" aria-pressed="false">Half-built</button>
+    <button class="chip" data-filter="new" aria-pressed="false">To build</button>
+    <button class="chip" data-filter="p1" aria-pressed="false">Phase 1 only</button>
+  </div>
+
+  <!-- A -->
+  <section class="group">
+    <div class="group-head"><span class="group-key">A</span><h2>The automation engine itself</h2></div>
+    <p class="group-note">Nothing below works reliably until this exists. Today automation means a <code>.bat</code> file in Windows Task Scheduler on one PC — if that PC is off, nothing runs and nobody is told.</p>
+    <ol class="rows">
+      <li class="row" data-status="new" data-phase="1"><span class="id">A-01</span><div class="body"><h3>In-app job scheduler</h3><p>A scheduler that lives inside the application, not on somebody's desktop, running every timed job with a record of each run and an alert when one fails.</p><span class="flow">Replaces <em>send_digest.bat</em> + <em>backup.bat</em> in Task Scheduler</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 1</span></div></li>
+      <li class="row" data-status="new" data-phase="1"><span class="id">A-02</span><div class="body"><h3>Rules engine — "when this happens, do that"</h3><p>A rules table so a director can create an automation from a settings screen instead of a developer editing Python: pick a register, a condition, an action.</p><span class="flow">Trigger <em>record created / field changed / date reached</em> → Action <em>notify, create task, generate doc, escalate</em></span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 1</span></div></li>
+      <li class="row" data-status="half" data-phase="1"><span class="id">A-03</span><div class="body"><h3>One notification dispatcher</h3><p>A single place that knows how to reach a person — email, WhatsApp, SMS, in-portal bell, mobile push — so every automation just says "tell this person" and never re-implements sending.</p><span class="flow">Extends <code>mailer.py</code>, adds WhatsApp Business API + in-app inbox</span></div><div class="meta"><span class="status half">Half-built</span><span class="phase">Phase 1</span></div></li>
+      <li class="row" data-status="new" data-phase="1"><span class="id">A-04</span><div class="body"><h3>Message &amp; document templates with merge fields</h3><p>Reusable templates in Arabic and English that pull real values from a record, so reminders and contracts stop being written by hand each time.</p><span class="flow">Template + record → rendered email, WhatsApp or PDF</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 1</span></div></li>
+      <li class="row" data-status="new" data-phase="2"><span class="id">A-05</span><div class="body"><h3>Escalation ladder</h3><p>Every automated request has an owner and a clock. Ignored for two days it goes to the manager, five days to the director — automatically, with the delay recorded.</p><span class="flow">Unactioned <em>N days</em> → line manager → director → audit entry</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 2</span></div></li>
+    </ol>
+  </section>
+
+  <!-- B -->
+  <section class="group">
+    <div class="group-head"><span class="group-key">B</span><h2>Compliance, licensing &amp; expiry</h2></div>
+    <p class="group-note">The strongest part of the portal today, and still one email a day to one address. An expiry should chase a named person until the new document is on file.</p>
+    <ol class="rows">
+      <li class="row" data-status="live" data-phase="1"><span class="id">B-01</span><div class="body"><h3>Daily red/amber compliance digest</h3><p>Already running: everything due or overdue inside the horizon, emailed each morning whether or not the portal is open.</p><span class="flow"><code>email_digest.py</code> — configured on the Settings page</span></div><div class="meta"><span class="status live">Running</span><span class="phase">Live</span></div></li>
+      <li class="row" data-status="half" data-phase="1"><span class="id">B-02</span><div class="body"><h3>Staged reminders, not one daily blob</h3><p>Each document type gets its own ladder — 90, 60, 30, 14, 7, 1 day and then daily once overdue — sent to the person who owns that document, not to one shared inbox.</p><span class="flow">Expiry field → per-type reminder schedule → owner + manager</span></div><div class="meta"><span class="status half">Half-built</span><span class="phase">Phase 1</span></div></li>
+      <li class="row" data-status="new" data-phase="1"><span class="id">B-03</span><div class="body"><h3>Renewal turns itself into a task</h3><p>An approaching expiry opens a renewal task with a checklist, an assignee and a due date, and closes only when the replacement document is uploaded and its new expiry read back into the register.</p><span class="flow">90 days out → task → upload → new expiry → close loop</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 1</span></div></li>
+      <li class="row" data-status="new" data-phase="1"><span class="id">B-04</span><div class="body"><h3>Trade licence, RERA &amp; broker card calendars</h3><p>Statutory dates generated from issue dates rather than typed in — establishment card, immigration card, RERA broker cards per agent, Ejari, office tenancy, insurance.</p><span class="flow">Issue date + document type → full renewal calendar</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 1</span></div></li>
+      <li class="row" data-status="half" data-phase="2"><span class="id">B-05</span><div class="body"><h3>AML risk scoring on submission</h3><p>A KYC record scores itself Low / Medium / High from the answers given, and the score sets the re-screening interval — annual, six-monthly, quarterly — without anyone remembering to set it.</p><span class="flow">Panel exists in <code>insights.py</code>; scoring + scheduling do not</span></div><div class="meta"><span class="status half">Half-built</span><span class="phase">Phase 2</span></div></li>
+      <li class="row" data-status="new" data-phase="2"><span class="id">B-06</span><div class="body"><h3>Sanctions &amp; PEP screening</h3><p>Every new client and beneficial owner screened against sanctions and PEP lists at onboarding and re-screened on schedule, with hits routed straight to the compliance officer.</p><span class="flow">Client created → screening API → hit → escalation record</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 2</span></div></li>
+      <li class="row" data-status="new" data-phase="2"><span class="id">B-07</span><div class="body"><h3>Retention clock on every record</h3><p>Records that pass their retention period are flagged for review and archived deliberately, instead of sitting forever or being deleted by guess.</p><span class="flow">Closed date + retention rule → archive queue</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 2</span></div></li>
+      <li class="row" data-status="new" data-phase="2"><span class="id">B-08</span><div class="body"><h3>One-click inspection pack</h3><p>A dated PDF bundle — licences, KYC files, transaction records, audit trail extract — assembled on demand for a regulator or auditor instead of assembled overnight by hand.</p><span class="flow">Date range + scope → signed, page-numbered PDF pack</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 2</span></div></li>
+    </ol>
+  </section>
+
+  <!-- C -->
+  <section class="group">
+    <div class="group-head"><span class="group-key">C</span><h2>Documents — the actual paper-to-digital work</h2></div>
+    <p class="group-note">Attachments are stored today, but nothing is read out of them. This group is what turns a scan into data, and a data record back into a signed document.</p>
+    <ol class="rows">
+      <li class="row" data-status="new" data-phase="1"><span class="id">C-01</span><div class="body"><h3>OCR on upload — the form fills itself</h3><p>Emirates ID, passport, visa, trade licence, title deed: the scan is read, the name, number and expiry are extracted and offered back into the form for one-tap confirmation.</p><span class="flow">Upload → OCR → suggested field values → human confirms</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 1</span></div></li>
+      <li class="row" data-status="new" data-phase="1"><span class="id">C-02</span><div class="body"><h3>Documents generated from records</h3><p>Tenancy contracts, MOUs, listing agreements, NOCs, offer letters, commission invoices — produced from the register with correct numbering, never re-typed in Word.</p><span class="flow">Record + template → numbered PDF, filed against the record</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 1</span></div></li>
+      <li class="row" data-status="new" data-phase="1"><span class="id">C-03</span><div class="body"><h3>E-signature round trip</h3><p>Send for signature from inside the record, and let the signature come back on its own — status, signed copy and timestamp land in the register without anyone chasing a PDF by email.</p><span class="flow">Send → signed → status + file written back automatically</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 1</span></div></li>
+      <li class="row" data-status="half" data-phase="2"><span class="id">C-04</span><div class="body"><h3>Verification QR on every document</h3><p>Each generated document carries a QR that resolves to its record, so a printed page can be proven current rather than trusted.</p><span class="flow"><code>qrgen.py</code> exists — extend it to generated documents</span></div><div class="meta"><span class="status half">Half-built</span><span class="phase">Phase 2</span></div></li>
+      <li class="row" data-status="new" data-phase="2"><span class="id">C-05</span><div class="body"><h3>Versioning and supersession</h3><p>A replacement document supersedes the old one automatically: the previous version is locked, kept, and clearly marked, so nobody signs last year's copy.</p><span class="flow">New upload → prior version archived + watermarked</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 2</span></div></li>
+      <li class="row" data-status="new" data-phase="2"><span class="id">C-06</span><div class="body"><h3>Email intake</h3><p>A monitored mailbox that reads incoming attachments, works out which record they belong to, and files them — the end of "forward it to me and I'll upload it".</p><span class="flow">Inbox → parse subject/sender/content → attach to record</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 2</span></div></li>
+      <li class="row" data-status="new" data-phase="2"><span class="id">C-07</span><div class="body"><h3>WhatsApp document intake</h3><p>A client photographs their passport and sends it; it arrives in their KYC record with the sender matched. This is how documents actually reach a brokerage.</p><span class="flow">WhatsApp media → matched by number → filed to client record</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 2</span></div></li>
+      <li class="row" data-status="new" data-phase="3"><span class="id">C-08</span><div class="body"><h3>Completeness checks per record type</h3><p>Each record type knows which documents it must hold. Anything missing shows as a gap on the dashboard rather than being discovered at closing.</p><span class="flow">Required-document list → live gap report</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 3</span></div></li>
+    </ol>
+  </section>
+
+  <!-- D -->
+  <section class="group">
+    <div class="group-head"><span class="group-key">D</span><h2>Leads &amp; sales</h2></div>
+    <p class="group-note">The register holds leads once someone types them in. Everything before and after that typing is still manual — and that is where deals are lost.</p>
+    <ol class="rows">
+      <li class="row" data-status="new" data-phase="1"><span class="id">D-01</span><div class="body"><h3>Portal &amp; website lead capture</h3><p>Property Finder, Bayut, Dubizzle, the company site, Meta and Google ads all write directly into the leads register, deduplicated on phone and email.</p><span class="flow">Portal webhook / email parse → lead record → dedupe</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 1</span></div></li>
+      <li class="row" data-status="new" data-phase="1"><span class="id">D-02</span><div class="body"><h3>Automatic lead assignment</h3><p>A new lead is assigned the moment it lands — round-robin, by language, by area or by agent tier — and the agent is notified on their phone.</p><span class="flow">Lead created → assignment rule → agent notified</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 1</span></div></li>
+      <li class="row" data-status="new" data-phase="1"><span class="id">D-03</span><div class="body"><h3>First-response SLA timer</h3><p>A clock starts on assignment. No contact logged inside the agreed window and the lead is escalated or reassigned, with the miss recorded against the agent.</p><span class="flow">Assigned → 15 min silence → manager alert → reassign</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 1</span></div></li>
+      <li class="row" data-status="new" data-phase="2"><span class="id">D-04</span><div class="body"><h3>Follow-up sequences</h3><p>Day 1, 3, 7, 14, 30 touches sent as templated WhatsApp and email on the agent's behalf, stopping the moment the client replies.</p><span class="flow">Lead stage → drip sequence → auto-stop on reply</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 2</span></div></li>
+      <li class="row" data-status="half" data-phase="2"><span class="id">D-05</span><div class="body"><h3>Follow-ups due, pushed not pulled</h3><p>The dashboard already computes follow-ups due in seven days. Those should arrive as a morning task list on the agent's phone rather than waiting to be noticed.</p><span class="flow">Computed in <code>insights.py</code> — delivery missing</span></div><div class="meta"><span class="status half">Half-built</span><span class="phase">Phase 2</span></div></li>
+      <li class="row" data-status="new" data-phase="2"><span class="id">D-06</span><div class="body"><h3>Stale lead reclaim</h3><p>A lead untouched for the agreed period returns to the pool and the manager is told — so nothing sits in a personal inbox for six months.</p><span class="flow">No activity <em>N days</em> → unassign → notify manager</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 2</span></div></li>
+      <li class="row" data-status="half" data-phase="2"><span class="id">D-07</span><div class="body"><h3>Duplicate-client and ownership conflict alerts</h3><p>When the same client appears under two agents, both managers are told at once, before it becomes a commission argument.</p><span class="flow">Dispute panel exists — alerting and resolution flow do not</span></div><div class="meta"><span class="status half">Half-built</span><span class="phase">Phase 2</span></div></li>
+      <li class="row" data-status="new" data-phase="2"><span class="id">D-08</span><div class="body"><h3>Viewings that arrange themselves</h3><p>Booked slot syncs to both calendars, confirms to the client, reminds the day before, and sends a feedback form to the agent afterwards that writes straight back to the property and the lead.</p><span class="flow">Booking → calendar + reminders → post-viewing feedback</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 2</span></div></li>
+    </ol>
+  </section>
+
+  <!-- E -->
+  <section class="group">
+    <div class="group-head"><span class="group-key">E</span><h2>Properties &amp; listings</h2></div>
+    <ol class="rows">
+      <li class="row" data-status="new" data-phase="2"><span class="id">E-01</span><div class="body"><h3>Publish to the portals from the register</h3><p>An approved property is pushed to Property Finder, Bayut and the company site through one feed, and pulled the moment it is sold, withdrawn or expired.</p><span class="flow">Status change → XML feed → live / unpublished</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 2</span></div></li>
+      <li class="row" data-status="new" data-phase="2"><span class="id">E-02</span><div class="body"><h3>No permit, no publish</h3><p>A listing cannot go live without a valid Trakheesi permit and an in-date owner authorization — checked automatically rather than trusted.</p><span class="flow">Publish attempt → permit + Form A check → blocked or allowed</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 2</span></div></li>
+      <li class="row" data-status="half" data-phase="1"><span class="id">E-03</span><div class="body"><h3>Owner authorization expiry chases both sides</h3><p>Ninety days out the agent and the owner are both contacted; on expiry the listing comes down on its own.</p><span class="flow">Expiry tracked already — the chase and the takedown are not</span></div><div class="meta"><span class="status half">Half-built</span><span class="phase">Phase 1</span></div></li>
+      <li class="row" data-status="new" data-phase="3"><span class="id">E-04</span><div class="body"><h3>Brochures and signage generated on demand</h3><p>A property record produces its own brochure, window card and QR sign in company styling, always showing the current price.</p><span class="flow">Property record → branded PDF + QR</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 3</span></div></li>
+      <li class="row" data-status="new" data-phase="3"><span class="id">E-05</span><div class="body"><h3>Media quality gate</h3><p>Minimum photo count, floor plan and description length enforced before a listing can be published, so portal quality scores stop depending on who typed it.</p><span class="flow">Publish attempt → media checklist → pass / fail</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 3</span></div></li>
+    </ol>
+  </section>
+
+  <!-- F -->
+  <section class="group">
+    <div class="group-head"><span class="group-key">F</span><h2>Transactions &amp; commissions</h2></div>
+    <ol class="rows">
+      <li class="row" data-status="half" data-phase="1"><span class="id">F-01</span><div class="body"><h3>Stages that advance on evidence</h3><p>A transaction moves from Opened to Docs Complete because the documents are actually present, not because somebody changed a dropdown.</p><span class="flow">Pipeline exists — the document-driven gate does not</span></div><div class="meta"><span class="status half">Half-built</span><span class="phase">Phase 1</span></div></li>
+      <li class="row" data-status="new" data-phase="1"><span class="id">F-02</span><div class="body"><h3>Commission calculated, not argued</h3><p>Splits, referral shares, co-broke and VAT computed from the agreed rules the moment a deal closes, then routed for approval with the workings shown.</p><span class="flow">Deal closed → split rules → approval queue</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 1</span></div></li>
+      <li class="row" data-status="new" data-phase="1"><span class="id">F-03</span><div class="body"><h3>Invoices issued and chased automatically</h3><p>The invoice is generated, emailed and then followed up at 30, 60 and 90 days unpaid without anyone keeping a private spreadsheet of who owes what.</p><span class="flow">Approved commission → invoice → dunning schedule</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 1</span></div></li>
+      <li class="row" data-status="new" data-phase="2"><span class="id">F-04</span><div class="body"><h3>Developer commission tracking</h3><p>Off-plan commissions tracked from booking to payment, with automatic reminders to the developer and a live receivables position for the director.</p><span class="flow">Booking → expected payment date → reminder ladder</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 2</span></div></li>
+      <li class="row" data-status="new" data-phase="2"><span class="id">F-05</span><div class="body"><h3>Payments matched to invoices</h3><p>Bank statement imported, receipts matched, only genuine exceptions surfaced for a human to look at.</p><span class="flow">Statement import → auto-match → exception list</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 2</span></div></li>
+      <li class="row" data-status="new" data-phase="2"><span class="id">F-06</span><div class="body"><h3>Closing blocked on missing compliance</h3><p>A transaction cannot be marked closed while its KYC, signed forms or ID copies are missing — the check happens before the money moves, not in the audit.</p><span class="flow">Close attempt → compliance checklist → blocked with reason</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 2</span></div></li>
+    </ol>
+  </section>
+
+  <!-- G -->
+  <section class="group">
+    <div class="group-head"><span class="group-key">G</span><h2>People &amp; HR</h2></div>
+    <p class="group-note">Attendance punch-in and the lifecycle funnel already exist. What is missing is everything that should follow from a single HR event.</p>
+    <ol class="rows">
+      <li class="row" data-status="new" data-phase="1"><span class="id">G-01</span><div class="body"><h3>Onboarding fires one chain of tasks</h3><p>One new hire produces the contract, the visa checklist, the PRO tasks, the asset assignment, the email account, the induction plan and the probation review date — all dated, all owned.</p><span class="flow">Employee created → task chain across HR, IT, PRO, Finance</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 1</span></div></li>
+      <li class="row" data-status="new" data-phase="1"><span class="id">G-02</span><div class="body"><h3>Offboarding closes every loop</h3><p>Assets returned, portal access revoked, email disabled, visa cancellation started, final settlement and gratuity calculated, exit interview issued.</p><span class="flow">Exit date set → revoke + return + settle</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 1</span></div></li>
+      <li class="row" data-status="half" data-phase="1"><span class="id">G-03</span><div class="body"><h3>Visa, labour card and insurance reminders per employee</h3><p>Each employee document chases its own renewal and opens a PRO task, rather than appearing in a single company-wide list.</p><span class="flow">Expiry tracked — per-person routing and tasking missing</span></div><div class="meta"><span class="status half">Half-built</span><span class="phase">Phase 1</span></div></li>
+      <li class="row" data-status="half" data-phase="1"><span class="id">G-04</span><div class="body"><h3>Leave requests route and settle themselves</h3><p>Request goes to the manager, approval updates the balance, the team calendar shows the absence and payroll receives it — with no email in the middle.</p><span class="flow">Request → approval → balance + calendar + payroll</span></div><div class="meta"><span class="status half">Half-built</span><span class="phase">Phase 1</span></div></li>
+      <li class="row" data-status="half" data-phase="2"><span class="id">G-05</span><div class="body"><h3>Attendance to timesheet</h3><p>Punches become a monthly timesheet on their own, with lateness and absence flagged and a missing punch queried the same day instead of at month end.</p><span class="flow"><code>/attendance/punch-in</code> exists → timesheet + exceptions do not</span></div><div class="meta"><span class="status half">Half-built</span><span class="phase">Phase 2</span></div></li>
+      <li class="row" data-status="new" data-phase="2"><span class="id">G-06</span><div class="body"><h3>Geofenced or QR punch for field staff</h3><p>Agents who start their day at a site can mark attendance from the location itself, which is what makes the attendance data worth having.</p><span class="flow">Mobile punch + location or site QR</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 2</span></div></li>
+      <li class="row" data-status="new" data-phase="2"><span class="id">G-07</span><div class="body"><h3>Probation and appraisal scheduled from the join date</h3><p>The reviews are booked the day someone joins, and the reminders arrive without HR keeping a private calendar.</p><span class="flow">Join date → probation, 6-month, annual reviews</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 2</span></div></li>
+      <li class="row" data-status="new" data-phase="3"><span class="id">G-08</span><div class="body"><h3>Payroll file, including commission</h3><p>Salary, attendance deductions, approved leave and approved commission become a payroll instruction — one export, not one spreadsheet per month.</p><span class="flow">Timesheet + leave + commission → payroll file</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 3</span></div></li>
+      <li class="row" data-status="new" data-phase="3"><span class="id">G-09</span><div class="body"><h3>Training and licence-linked CPD reminders</h3><p>Broker card training, AML refreshers and internal courses tracked per person, with the reminder tied to the licence that requires it.</p><span class="flow">Licence type → required training → per-person schedule</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 3</span></div></li>
+    </ol>
+  </section>
+
+  <!-- H -->
+  <section class="group">
+    <div class="group-head"><span class="group-key">H</span><h2>Finance</h2></div>
+    <ol class="rows">
+      <li class="row" data-status="half" data-phase="1"><span class="id">H-01</span><div class="body"><h3>Expense claims routed by amount</h3><p>Under a threshold the manager approves, above it the director does, and the claim posts to accounts once approved.</p><span class="flow">Approval routes exist at <code>/approvals</code> — thresholds do not</span></div><div class="meta"><span class="status half">Half-built</span><span class="phase">Phase 1</span></div></li>
+      <li class="row" data-status="half" data-phase="2"><span class="id">H-02</span><div class="body"><h3>Petty cash reconciles itself</h3><p>The running balance is already computed; it should also warn when it falls below the float and refuse entries that do not reconcile.</p><span class="flow">Balance computed — alerting and controls missing</span></div><div class="meta"><span class="status half">Half-built</span><span class="phase">Phase 2</span></div></li>
+      <li class="row" data-status="new" data-phase="2"><span class="id">H-03</span><div class="body"><h3>Recurring payables scheduled</h3><p>Rent, portal subscriptions, licence fees and insurance raised on schedule with a reminder before each due date, so nothing is paid late by surprise.</p><span class="flow">Recurring rule → payable raised → reminder</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 2</span></div></li>
+      <li class="row" data-status="new" data-phase="2"><span class="id">H-04</span><div class="body"><h3>VAT and Corporate Tax packs</h3><p>Quarterly figures aggregated from the registers with filing deadlines on the compliance calendar and the working papers attached.</p><span class="flow">Period close → figures + deadline + evidence pack</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 2</span></div></li>
+      <li class="row" data-status="new" data-phase="3"><span class="id">H-05</span><div class="body"><h3>One-way sync to the accounting system</h3><p>Invoices, expenses and payments flow to Zoho Books, QuickBooks or Xero so the same number is never entered twice.</p><span class="flow">Approved finance record → accounting API</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 3</span></div></li>
+      <li class="row" data-status="new" data-phase="3"><span class="id">H-06</span><div class="body"><h3>Receipt capture</h3><p>A photographed receipt becomes an expense line with vendor, amount, VAT and date already read from it.</p><span class="flow">Receipt image → OCR → draft expense claim</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 3</span></div></li>
+    </ol>
+  </section>
+
+  <!-- I -->
+  <section class="group">
+    <div class="group-head"><span class="group-key">I</span><h2>Vendors, assets &amp; IT</h2></div>
+    <ol class="rows">
+      <li class="row" data-status="half" data-phase="2"><span class="id">I-01</span><div class="body"><h3>Vendor contract and due-diligence cycle</h3><p>Contract expiry chases the owner, and the due-diligence re-check is scheduled from the last one rather than remembered.</p><span class="flow">Contract status panel exists — the cycle does not</span></div><div class="meta"><span class="status half">Half-built</span><span class="phase">Phase 2</span></div></li>
+      <li class="row" data-status="new" data-phase="2"><span class="id">I-02</span><div class="body"><h3>Asset issue and return tied to HR</h3><p>Laptops, phones, SIMs and access cards assigned on joining and demanded back on exit, with a signed handover record either way.</p><span class="flow">HR event → asset movement → signed receipt</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 2</span></div></li>
+      <li class="row" data-status="new" data-phase="2"><span class="id">I-03</span><div class="body"><h3>Warranty and AMC alerts</h3><p>Every asset carries its warranty and maintenance dates into the compliance calendar automatically.</p><span class="flow">Asset registered → warranty + AMC dates tracked</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 2</span></div></li>
+      <li class="row" data-status="new" data-phase="3"><span class="id">I-04</span><div class="body"><h3>Access provisioning follows the role</h3><p>Changing someone's role changes what they can reach, in the portal and in connected systems, on the same day — not eventually.</p><span class="flow">Role change → permissions applied + audit entry</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 3</span></div></li>
+      <li class="row" data-status="new" data-phase="3"><span class="id">I-05</span><div class="body"><h3>Security incidents escalate on a clock</h3><p>A logged incident notifies the right people immediately and escalates if it is still open after the agreed time.</p><span class="flow">Incident logged → severity → notify → escalate</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 3</span></div></li>
+    </ol>
+  </section>
+
+  <!-- J -->
+  <section class="group">
+    <div class="group-head"><span class="group-key">J</span><h2>Approvals &amp; sign-off</h2></div>
+    <ol class="rows">
+      <li class="row" data-status="half" data-phase="1"><span class="id">J-01</span><div class="body"><h3>A configurable approval engine for any register</h3><p>One approval mechanism — who approves what, at which value, in how many steps — configured per form instead of coded per case.</p><span class="flow"><code>/approvals/&lt;form&gt;/&lt;id&gt;/&lt;action&gt;</code> exists; the rules are fixed</span></div><div class="meta"><span class="status half">Half-built</span><span class="phase">Phase 1</span></div></li>
+      <li class="row" data-status="new" data-phase="1"><span class="id">J-02</span><div class="body"><h3>Pending approvals chase the approver</h3><p>Anything waiting longer than the agreed hours reminds the approver, then their manager. Approvals stop being a bottleneck nobody can see.</p><span class="flow">Pending <em>N hours</em> → reminder → escalation</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 1</span></div></li>
+      <li class="row" data-status="new" data-phase="2"><span class="id">J-03</span><div class="body"><h3>Delegation and out-of-office</h3><p>When an approver is away, their queue moves to a named deputy for that period automatically, and moves back afterwards.</p><span class="flow">Leave approved → approvals delegated for those dates</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 2</span></div></li>
+      <li class="row" data-status="live" data-phase="1"><span class="id">J-04</span><div class="body"><h3>Every action stamped in the audit trail</h3><p>Already running: who changed which field, from what to what, when, and from where — written automatically and never edited.</p><span class="flow">Audit Trail page + per-record History panel</span></div><div class="meta"><span class="status live">Running</span><span class="phase">Live</span></div></li>
+    </ol>
+  </section>
+
+  <!-- K -->
+  <section class="group">
+    <div class="group-head"><span class="group-key">K</span><h2>Reporting &amp; intelligence</h2></div>
+    <ol class="rows">
+      <li class="row" data-status="live" data-phase="1"><span class="id">K-01</span><div class="body"><h3>Live dashboards computed from the registers</h3><p>Already running: the Control Tower and every department panel recompute from real records as soon as a form is submitted.</p><span class="flow"><code>insights.py</code> — no scheduled refresh needed</span></div><div class="meta"><span class="status live">Running</span><span class="phase">Live</span></div></li>
+      <li class="row" data-status="new" data-phase="1"><span class="id">K-02</span><div class="body"><h3>Scheduled reports to the people who need them</h3><p>Daily operations digest, weekly pipeline to the sales manager, monthly management pack to the director — sent as PDF, on time, without being asked for.</p><span class="flow">Schedule + audience + scope → PDF emailed</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 1</span></div></li>
+      <li class="row" data-status="new" data-phase="2"><span class="id">K-03</span><div class="body"><h3>Agent scorecards</h3><p>Leads, response times, viewings, conversions and commission per agent, computed monthly and issued to the agent and their manager together.</p><span class="flow">Month end → per-agent scorecard</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 2</span></div></li>
+      <li class="row" data-status="new" data-phase="2"><span class="id">K-04</span><div class="body"><h3>Anomaly alerts</h3><p>A growing overdue backlog, a sudden drop in a pipeline stage, unusual deletion activity or a spike in failed sign-ins raises a flag instead of waiting to be noticed.</p><span class="flow">Baseline + deviation → director alert</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 2</span></div></li>
+      <li class="row" data-status="new" data-phase="2"><span class="id">K-05</span><div class="body"><h3>Weekly data-quality sweep</h3><p>Missing mandatory fields, duplicate records, dates in the wrong format and orphaned columns collected into one list somebody can actually clear.</p><span class="flow">Weekly scan → cleanup list with links</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 2</span></div></li>
+    </ol>
+  </section>
+
+  <!-- L -->
+  <section class="group">
+    <div class="group-head"><span class="group-key">L</span><h2>What the client sees</h2></div>
+    <p class="group-note">The half of digitalization that happens outside the office. Every item here removes a phone call.</p>
+    <ol class="rows">
+      <li class="row" data-status="new" data-phase="2"><span class="id">L-01</span><div class="body"><h3>Client self-service link</h3><p>A secure link where a client uploads their own documents and watches their transaction progress — no attachments emailed to an agent's personal inbox.</p><span class="flow">Magic link → upload + status view, scoped to that client</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 2</span></div></li>
+      <li class="row" data-status="new" data-phase="2"><span class="id">L-02</span><div class="body"><h3>Status updates sent at each stage</h3><p>Offer accepted, documents complete, transfer booked, keys handed over — the client hears it as it happens, in their language.</p><span class="flow">Stage change → templated WhatsApp / email</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 2</span></div></li>
+      <li class="row" data-status="new" data-phase="3"><span class="id">L-03</span><div class="body"><h3>Feedback survey after handover</h3><p>Sent automatically at closing, tabulated automatically, and a poor score raised to the manager the same day.</p><span class="flow">Deal closed → survey → score → escalation if low</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 3</span></div></li>
+      <li class="row" data-status="new" data-phase="3"><span class="id">L-04</span><div class="body"><h3>Handover pack generated</h3><p>Keys, warranties, contacts, utility instructions and copies of every signed document assembled into one PDF for the client at closing.</p><span class="flow">Closing → assembled client pack</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 3</span></div></li>
+    </ol>
+  </section>
+
+  <!-- M -->
+  <section class="group">
+    <div class="group-head"><span class="group-key">M</span><h2>Keeping the system itself alive</h2></div>
+    <ol class="rows">
+      <li class="row" data-status="half" data-phase="1"><span class="id">M-01</span><div class="body"><h3>Backups that run, copy off-site, and verify themselves</h3><p>The scripts exist and are good. What is missing is running them server-side, verifying each one automatically, and shouting when a backup does not happen.</p><span class="flow"><code>backup.py create / verify</code> → schedule + off-site + alert</span></div><div class="meta"><span class="status half">Half-built</span><span class="phase">Phase 1</span></div></li>
+      <li class="row" data-status="half" data-phase="1"><span class="id">M-02</span><div class="body"><h3>Uptime monitoring on <code>/healthz</code></h3><p>The health endpoint is built. Point a monitor at it so an outage reaches a phone before it reaches a client.</p><span class="flow"><code>GET /healthz</code> → external monitor → alert</span></div><div class="meta"><span class="status half">Half-built</span><span class="phase">Phase 1</span></div></li>
+      <li class="row" data-status="new" data-phase="1"><span class="id">M-03</span><div class="body"><h3>Error digest to the administrator</h3><p>Yesterday's errors, grouped by reference code with the affected users, sent each morning instead of waiting in a log file nobody opens.</p><span class="flow"><code>instance/logs/errors.log</code> → daily grouped summary</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 1</span></div></li>
+      <li class="row" data-status="half" data-phase="1"><span class="id">M-04</span><div class="body"><h3>Tests and deploy on every push</h3><p>GitHub Actions already runs the 50-check smoketest on both databases. Add automatic backup before deploy, migration on deploy, and a health check after.</p><span class="flow"><code>smoketest.py</code> in CI → backup → migrate → deploy → verify</span></div><div class="meta"><span class="status half">Half-built</span><span class="phase">Phase 1</span></div></li>
+      <li class="row" data-status="new" data-phase="2"><span class="id">M-05</span><div class="body"><h3>Quarterly access review</h3><p>Every account and role sent to the director once a quarter to confirm or revoke, with the review itself recorded — the thing every auditor asks for.</p><span class="flow">Quarterly → user list → confirm / revoke → audit entry</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 2</span></div></li>
+      <li class="row" data-status="new" data-phase="2"><span class="id">M-06</span><div class="body"><h3>Sign-in anomaly alerts</h3><p>Lockouts, sign-ins from an unusual country and out-of-hours director access raise an alert rather than sitting in the audit trail until someone reads it.</p><span class="flow">Login events → pattern check → alert</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 2</span></div></li>
+    </ol>
+  </section>
+
+  <!-- N -->
+  <section class="group">
+    <div class="group-head"><span class="group-key">N</span><h2>The intelligence layer</h2></div>
+    <p class="group-note">Worth doing last, and only on top of clean automated data — but this is where the system stops being a filing cabinet.</p>
+    <ol class="rows">
+      <li class="row" data-status="new" data-phase="3"><span class="id">N-01</span><div class="body"><h3>Ask the registers a question</h3><p>"Which licences expire in Q4?", "Which agents have unactioned leads?" — answered in plain language, scoped to what the person is allowed to see.</p><span class="flow">Natural language → scoped query → answer with links</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 3</span></div></li>
+      <li class="row" data-status="half" data-phase="3"><span class="id">N-02</span><div class="body"><h3>Calls and meetings summarised into records</h3><p>Call logs and meeting notes already live in the portal; they should summarise themselves into the client record with the next action extracted.</p><span class="flow"><code>/calls</code> + <code>/notes</code> exist → summarisation does not</span></div><div class="meta"><span class="status half">Half-built</span><span class="phase">Phase 3</span></div></li>
+      <li class="row" data-status="new" data-phase="3"><span class="id">N-03</span><div class="body"><h3>Arabic / English document translation</h3><p>Contracts, notices and client communications produced in both languages from one source, which in this market is not a luxury.</p><span class="flow">Document → parallel translation → both filed</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 3</span></div></li>
+      <li class="row" data-status="new" data-phase="3"><span class="id">N-04</span><div class="body"><h3>Real entity matching, replacing name matching</h3><p>Cross-record linking works on matching text today, so two people with the same name look like one. Proper client, property and agent identities would make every automation above safe to trust.</p><span class="flow">Replaces <code>LINK_FIELD_NAMES</code> matching with real keys</span></div><div class="meta"><span class="status new">To build</span><span class="phase">Phase 3</span></div></li>
+    </ol>
+  </section>
+
+  <div class="closing">
+    <h2>If you only build four things first</h2>
+    <ol>
+      <li><strong>A-01 and A-02 — the scheduler and the rules engine.</strong> Everything else is a rule on top of these. Without them each automation is another script on somebody's desktop.</li>
+      <li><strong>C-01 — OCR on upload.</strong> This is the single biggest reduction in typing, and it makes every expiry date in the system trustworthy because it came off the document.</li>
+      <li><strong>B-03 — renewals that become tasks.</strong> It turns the strongest feature you already have from a notification into a closed loop.</li>
+      <li><strong>D-01 to D-03 — lead capture, assignment and the response clock.</strong> The only group on this page that increases revenue rather than reducing risk.</li>
+    </ol>
+  </div>
+
+  <footer class="foot">Dharani 360 · automation register · drafted 24 August 2026 · status read from the current codebase (app.py, insights.py, email_digest.py, backup.py, OPERATIONS.md)</footer>
+</div>
+
+<script>
+(function () {
+  var rows = Array.prototype.slice.call(document.querySelectorAll("li.row"));
+  var chips = Array.prototype.slice.call(document.querySelectorAll("button.chip"));
+
+  function count(status) {
+    return rows.filter(function (r) { return r.dataset.status === status; }).length;
+  }
+  document.getElementById("c-total").textContent = rows.length;
+  document.getElementById("c-live").textContent = count("live");
+  document.getElementById("c-half").textContent = count("half");
+  document.getElementById("c-new").textContent = count("new");
+
+  function apply(filter) {
+    rows.forEach(function (r) {
+      var show =
+        filter === "all" ? true :
+        filter === "p1"  ? r.dataset.phase === "1" :
+        r.dataset.status === filter;
+      r.classList.toggle("hidden", !show);
+    });
+    document.querySelectorAll("section.group").forEach(function (g) {
+      var any = Array.prototype.slice.call(g.querySelectorAll("li.row"))
+        .some(function (r) { return !r.classList.contains("hidden"); });
+      g.style.display = any ? "" : "none";
+    });
+  }
+
+  chips.forEach(function (chip) {
+    chip.addEventListener("click", function () {
+      chips.forEach(function (c) { c.setAttribute("aria-pressed", String(c === chip)); });
+      apply(chip.dataset.filter);
+    });
+  });
+})();
+</script>

@@ -1,0 +1,438 @@
+{
+  "name": "Dharani 360 - Lead Assignment & First-Response SLA",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## D-02 / D-03 / D-06  Assignment and the response clock\n\nCalled by flow 02 the moment a lead lands, so assignment happens in seconds rather than whenever somebody opens the portal.\n\n1. Picks the **least-loaded active Agent** (edit `ROUTE` in the *Pick Agent* node to route by language, area or tier instead).\n2. Writes the assignment into SAL-001 and stamps the record's notes - so the portal's audit trail shows it.\n3. Notifies the agent on email + WhatsApp + Slack.\n4. Waits out the SLA, then checks whether **any** follow-up (SAL-006), call (SAL-009) or viewing (SAL-005) was logged for that client.\n5. If not: the manager is told, the miss is written into the record, and the lead goes back to the pool.\n\nSet `sla_minutes` in the **Config** node, and set the same number of minutes on the **Wait Out The SLA** node.",
+        "height": 420,
+        "width": 460
+      },
+      "id": "readme",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "assign-trigger",
+      "name": "Assign Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -640,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a0",
+              "name": "portal_url",
+              "value": "https://dharani360.onrender.com",
+              "type": "string"
+            },
+            {
+              "id": "a1",
+              "name": "sales_manager_email",
+              "value": "sales@dharanis.ae",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "sla_minutes",
+              "value": "15",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "config",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT u.id, u.full_name, u.email, u.role,\n       (SELECT COUNT(*) FROM frm_sal_001 l\n         WHERE lower(COALESCE(l.agent_assigned,'')) = lower(COALESCE(u.full_name,'~none~'))\n           AND COALESCE(l.status,'') IN ('New','Contacted')) AS open_leads\nFROM users u\nWHERE u.active = 1 AND u.role IN ('Agent', 'Sales Manager')\nORDER BY open_leads ASC, u.id ASC;",
+        "options": {}
+      },
+      "id": "agent-workload",
+      "name": "Agent Workload",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        -240,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DHARANI_PG",
+          "name": "Dharani 360 - Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// D-02: least-loaded round robin. Swap the sort for language / area / tier\n// routing by editing ROUTE below - nothing else in the flow changes.\nconst lead = $('Assign Trigger').first().json;\nconst agents = $('Agent Workload').all().map(a => a.json)\n                 .filter(a => a.role === 'Agent');\nif (!agents.length) throw new Error('No active user with role Agent - nobody to assign to.');\n\nconst ROUTE = (list, lead) => list.sort((a, b) => a.open_leads - b.open_leads);\nconst chosen = ROUTE(agents, lead)[0];\n\nconst PORTAL = $('Config').first().json.portal_url;\nconst url = `${PORTAL}/record/SAL-001/${lead.id}`;\nreturn [{ json: {\n  lead_id: lead.id, doc_no: lead.doc_no,\n  client_name: lead.client_name, contact: lead.contact,\n  source: lead.source, property_interest: lead.property_interest,\n  agent_name: chosen.full_name, agent_email: chosen.email,\n  agent_open_leads: chosen.open_leads, record_url: url,\n}}];"
+      },
+      "id": "pick-agent",
+      "name": "Pick Agent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -40,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE frm_sal_001\n   SET agent_assigned = $1,\n       updated_at = to_char(now() AT TIME ZONE 'utc', 'YYYY-MM-DD\"T\"HH24:MI:SS'),\n       notes = COALESCE(notes,'') || E'\\nAuto-assigned to ' || $1 ||\n               ' at ' || to_char(now() AT TIME ZONE 'utc', 'YYYY-MM-DD HH24:MI') || ' UTC by n8n.'\n WHERE id = $2::int\nRETURNING id, doc_no, client_name, contact, agent_assigned, updated_at, status;",
+        "options": {
+          "queryReplacement": "={{ $json.agent_name }},={{ $json.lead_id }}"
+        }
+      },
+      "id": "assign-lead",
+      "name": "Assign Lead",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        160,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DHARANI_PG",
+          "name": "Dharani 360 - Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const p = $('Pick Agent').first().json;\nconst r = $json;\nreturn [{ json: {\n  channel: 'email,whatsapp,slack',\n  to_email: p.agent_email,\n  to_phone: '',\n  slack_channel: 'dharani-leads',\n  subject: `[NEW LEAD] ${p.client_name} - respond within ${$('Config').first().json.sla_minutes} minutes`,\n  message:\n`A new lead has just been assigned to you.\n\nClient   : ${p.client_name}\nPhone    : ${p.contact || '-'}\nSource   : ${p.source}\nInterest : ${p.property_interest || '-'}\nRecord   : ${r.doc_no}\n\nOpen it: ${p.record_url}\n\nLog a call, a follow-up or a viewing against this client inside\n${$('Config').first().json.sla_minutes} minutes. If nothing is logged, the lead\nreturns to the pool and your manager is told.`,\n  _lead_id: r.id, _doc_no: r.doc_no, _client: p.client_name,\n  _agent: p.agent_name, _assigned_at: r.updated_at,\n}}];"
+      },
+      "id": "brief-the-agent",
+      "name": "Brief The Agent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        360,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "DISPATCHER_WORKFLOW_ID",
+          "mode": "id",
+          "cachedResultName": "Dharani 360 - Notification Dispatcher"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {}
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "notify-agent",
+      "name": "Notify Agent",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        560,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 15,
+        "unit": "minutes"
+      },
+      "id": "wait-out-the-sla",
+      "name": "Wait Out The SLA",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        760,
+        300
+      ],
+      "webhookId": "wait-wait-out-the-sla"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  ((SELECT COUNT(*) FROM frm_sal_006\n      WHERE lower(COALESCE(client_name,'')) = lower($1) AND created_at > $2)\n + (SELECT COUNT(*) FROM frm_sal_009\n      WHERE lower(COALESCE(contact_name,'')) = lower($1) AND created_at > $2)\n + (SELECT COUNT(*) FROM frm_sal_005\n      WHERE lower(COALESCE(client_name,'')) = lower($1) AND created_at > $2))::int AS touches,\n  (SELECT COALESCE(status,'') FROM frm_sal_001 WHERE id = $3::int) AS lead_status;",
+        "options": {
+          "queryReplacement": "={{ $('Brief The Agent').item.json._client }},={{ $('Brief The Agent').item.json._assigned_at }},={{ $('Brief The Agent').item.json._lead_id }}"
+        }
+      },
+      "id": "was-it-contacted?",
+      "name": "Was It Contacted?",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        960,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DHARANI_PG",
+          "name": "Dharani 360 - Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.touches }}",
+              "rightValue": "={{ 0 }}",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "responded?",
+      "name": "Responded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1160,
+        300
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "good---nothing-to-do",
+      "name": "Good - Nothing To Do",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1380,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $('Brief The Agent').first().json;\nconst cfg = $('Config').first().json;\nreturn [{ json: {\n  channel: 'email,slack',\n  to_email: cfg.sales_manager_email,\n  slack_channel: 'dharani-leads',\n  subject: `[SLA MISSED] ${b._client} - no contact logged by ${b._agent}`,\n  message:\n`${b._agent} was given lead ${b._doc_no} (${b._client}) and logged nothing\nwithin ${cfg.sla_minutes} minutes.\n\nThe lead has been returned to the pool and is unassigned. Reassign it, or\nlet the next capture pick it up.\n\nRecord: ${cfg.portal_url}/record/SAL-001/${b._lead_id}\n\nThis miss is recorded against ${b._agent} in the record's notes and in the\nportal's audit trail.`,\n  _lead_id: b._lead_id, _agent: b._agent,\n}}];"
+      },
+      "id": "escalate-to-manager",
+      "name": "Escalate To Manager",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1380,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "DISPATCHER_WORKFLOW_ID",
+          "mode": "id",
+          "cachedResultName": "Dharani 360 - Notification Dispatcher"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {}
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "tell-the-manager",
+      "name": "Tell The Manager",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1580,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE frm_sal_001\n   SET agent_assigned = '',\n       updated_at = to_char(now() AT TIME ZONE 'utc', 'YYYY-MM-DD\"T\"HH24:MI:SS'),\n       notes = COALESCE(notes,'') || E'\\nSLA MISSED: ' || $1 ||\n               ' logged no contact inside the response window. Returned to the pool by n8n at '\n               || to_char(now() AT TIME ZONE 'utc', 'YYYY-MM-DD HH24:MI') || ' UTC.'\n WHERE id = $2::int\nRETURNING id, doc_no;",
+        "options": {
+          "queryReplacement": "={{ $json._agent }},={{ $json._lead_id }}"
+        }
+      },
+      "id": "return-lead-to-pool",
+      "name": "Return Lead To Pool",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        1580,
+        580
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DHARANI_PG",
+          "name": "Dharani 360 - Postgres"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Assign Trigger": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Agent Workload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent Workload": {
+      "main": [
+        [
+          {
+            "node": "Pick Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Agent": {
+      "main": [
+        [
+          {
+            "node": "Assign Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assign Lead": {
+      "main": [
+        [
+          {
+            "node": "Brief The Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Brief The Agent": {
+      "main": [
+        [
+          {
+            "node": "Notify Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Agent": {
+      "main": [
+        [
+          {
+            "node": "Wait Out The SLA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Out The SLA": {
+      "main": [
+        [
+          {
+            "node": "Was It Contacted?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Was It Contacted?": {
+      "main": [
+        [
+          {
+            "node": "Good - Nothing To Do",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Escalate To Manager",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escalate To Manager": {
+      "main": [
+        [
+          {
+            "node": "Tell The Manager",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Return Lead To Pool",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "dharani360"
+  }
+}

@@ -1,0 +1,251 @@
+{
+  "name": "Dharani 360 - Pending Approvals Chaser",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## J-02 + H-01  Approvals stop being an invisible bottleneck\n\nEvery 2 hours it sweeps **13 approval registers** at once - commission approval, expense claims, purchase requests, payment approvals, vendor invoices, bank-change requests, leave, vendor due diligence, marketing and advertising budgets, lead transfers and salary advances.\n\n- past `remind_after_hours` (24) it emails the named approver\n- past `escalate_after_hours` (72) it goes over their head to the Director, on email + WhatsApp + Slack\n- anything worth more than `director_threshold_aed` goes to the Director from the first reminder, whoever is named on the record\n\nAll four numbers live in the **Config** node.",
+        "height": 420,
+        "width": 460
+      },
+      "id": "readme",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 2,
+              "triggerAtMinute": 5
+            }
+          ]
+        }
+      },
+      "id": "every-2-hours",
+      "name": "Every 2 hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -560,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a0",
+              "name": "portal_url",
+              "value": "https://dharani360.onrender.com",
+              "type": "string"
+            },
+            {
+              "id": "a1",
+              "name": "remind_after_hours",
+              "value": "24",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "escalate_after_hours",
+              "value": "72",
+              "type": "string"
+            },
+            {
+              "id": "a3",
+              "name": "director_threshold_aed",
+              "value": "5000",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "config",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -360,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, username, full_name, email, role FROM users WHERE active = 1;",
+        "options": {}
+      },
+      "id": "get-users",
+      "name": "Get Users",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        -160,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DHARANI_PG",
+          "name": "Dharani 360 - Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ok: true } }];"
+      },
+      "id": "collapse",
+      "name": "Collapse",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        40,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH pending AS (\n  SELECT 'TXN-004' AS form_code, 'Commission Approval' AS form_title, id, doc_no,\n         COALESCE(status,'') AS status,\n         COALESCE(NULLIF(\"transaction_ref\", ''), doc_no) AS subject_txt,\n         NULL::text AS approver_name,\n         COALESCE(\"net_commission\", 0)::numeric AS amount, created_at\n  FROM frm_txn_004\n  WHERE COALESCE(status,'') IN ('Pending', 'Finance Verified')\n    AND created_at ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'\n  UNION ALL\n  SELECT 'FIN-001' AS form_code, 'Expense Claim' AS form_title, id, doc_no,\n         COALESCE(status,'') AS status,\n         COALESCE(NULLIF(\"employee_name\", ''), doc_no) AS subject_txt,\n         NULLIF(\"approved_by\", '') AS approver_name,\n         COALESCE(\"amount\", 0)::numeric AS amount, created_at\n  FROM frm_fin_001\n  WHERE COALESCE(status,'') IN ('Pending')\n    AND created_at ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'\n  UNION ALL\n  SELECT 'FIN-002' AS form_code, 'Purchase Request' AS form_title, id, doc_no,\n         COALESCE(status,'') AS status,\n         COALESCE(NULLIF(\"item_description\", ''), doc_no) AS subject_txt,\n         NULLIF(\"approved_by\", '') AS approver_name,\n         COALESCE(\"estimated_cost\", 0)::numeric AS amount, created_at\n  FROM frm_fin_002\n  WHERE COALESCE(status,'') IN ('Pending')\n    AND created_at ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'\n  UNION ALL\n  SELECT 'FIN-004' AS form_code, 'Payment Approval' AS form_title, id, doc_no,\n         COALESCE(status,'') AS status,\n         COALESCE(NULLIF(\"payee_name\", ''), doc_no) AS subject_txt,\n         NULLIF(\"approved_by\", '') AS approver_name,\n         COALESCE(\"amount\", 0)::numeric AS amount, created_at\n  FROM frm_fin_004\n  WHERE COALESCE(status,'') IN ('Pending', 'Verified')\n    AND created_at ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'\n  UNION ALL\n  SELECT 'FIN-006' AS form_code, 'Vendor Invoice Verification' AS form_title, id, doc_no,\n         COALESCE(status,'') AS status,\n         COALESCE(NULLIF(\"vendor_name\", ''), doc_no) AS subject_txt,\n         NULLIF(\"verified_by\", '') AS approver_name,\n         COALESCE(\"invoice_amount\", 0)::numeric AS amount, created_at\n  FROM frm_fin_006\n  WHERE COALESCE(status,'') IN ('Pending')\n    AND created_at ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'\n  UNION ALL\n  SELECT 'FIN-007' AS form_code, 'Vendor Bank Change' AS form_title, id, doc_no,\n         COALESCE(status,'') AS status,\n         COALESCE(NULLIF(\"vendor_name\", ''), doc_no) AS subject_txt,\n         NULLIF(\"approved_by\", '') AS approver_name,\n         0::numeric AS amount, created_at\n  FROM frm_fin_007\n  WHERE COALESCE(status,'') IN ('Requested', 'Verified')\n    AND created_at ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'\n  UNION ALL\n  SELECT 'HR-007' AS form_code, 'Leave Request' AS form_title, id, doc_no,\n         COALESCE(status,'') AS status,\n         COALESCE(NULLIF(\"employee_name\", ''), doc_no) AS subject_txt,\n         NULLIF(\"approved_by\", '') AS approver_name,\n         0::numeric AS amount, created_at\n  FROM frm_hr_007\n  WHERE COALESCE(status,'') IN ('Pending')\n    AND created_at ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'\n  UNION ALL\n  SELECT 'VEN-002' AS form_code, 'Vendor Due Diligence' AS form_title, id, doc_no,\n         COALESCE(status,'') AS status,\n         COALESCE(NULLIF(\"vendor_name\", ''), doc_no) AS subject_txt,\n         NULLIF(\"approved_by\", '') AS approver_name,\n         0::numeric AS amount, created_at\n  FROM frm_ven_002\n  WHERE COALESCE(status,'') IN ('Pending')\n    AND created_at ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'\n  UNION ALL\n  SELECT 'MKT-003' AS form_code, 'Campaign Budget Approval' AS form_title, id, doc_no,\n         COALESCE(status,'') AS status,\n         COALESCE(NULLIF(\"campaign_name\", ''), doc_no) AS subject_txt,\n         NULLIF(\"approved_by\", '') AS approver_name,\n         COALESCE(\"requested_amount_aed\", 0)::numeric AS amount, created_at\n  FROM frm_mkt_003\n  WHERE COALESCE(status,'') IN ('Submitted')\n    AND created_at ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'\n  UNION ALL\n  SELECT 'MKT-005' AS form_code, 'Marketing Content Approval' AS form_title, id, doc_no,\n         COALESCE(status,'') AS status,\n         COALESCE(NULLIF(\"content_title\", ''), doc_no) AS subject_txt,\n         NULLIF(\"approved_by\", '') AS approver_name,\n         0::numeric AS amount, created_at\n  FROM frm_mkt_005\n  WHERE COALESCE(status,'') IN ('Submitted')\n    AND created_at ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'\n  UNION ALL\n  SELECT 'MKT-008' AS form_code, 'Advertisement Budget Approval' AS form_title, id, doc_no,\n         COALESCE(status,'') AS status,\n         doc_no AS subject_txt,\n         NULLIF(\"approved_by\", '') AS approver_name,\n         COALESCE(\"requested_amount_aed\", 0)::numeric AS amount, created_at\n  FROM frm_mkt_008\n  WHERE COALESCE(status,'') IN ('Submitted')\n    AND created_at ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'\n  UNION ALL\n  SELECT 'AGT-005' AS form_code, 'Lead Transfer' AS form_title, id, doc_no,\n         COALESCE(status,'') AS status,\n         COALESCE(NULLIF(\"lead_id\", ''), doc_no) AS subject_txt,\n         NULLIF(\"approved_by\", '') AS approver_name,\n         0::numeric AS amount, created_at\n  FROM frm_agt_005\n  WHERE COALESCE(status,'') IN ('Requested')\n    AND created_at ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'\n  UNION ALL\n  SELECT 'PAY-003' AS form_code, 'Salary Advance / Loan Request' AS form_title, id, doc_no,\n         COALESCE(status,'') AS status,\n         COALESCE(NULLIF(\"employee_name\", ''), doc_no) AS subject_txt,\n         NULLIF(\"approved_by\", '') AS approver_name,\n         COALESCE(\"amount\", 0)::numeric AS amount, created_at\n  FROM frm_pay_003\n  WHERE COALESCE(status,'') IN ('Pending')\n    AND created_at ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'\n)\nSELECT form_code, form_title, id, doc_no, status, subject_txt,\n       approver_name, amount, created_at,\n       ROUND(EXTRACT(EPOCH FROM ((now() AT TIME ZONE 'utc')\n             - to_timestamp(substr(created_at, 1, 19),\n                            'YYYY-MM-DD\"T\"HH24:MI:SS'))) / 3600.0, 1)\n       AS hours_pending\nFROM pending\nORDER BY hours_pending DESC;",
+        "options": {}
+      },
+      "id": "pending-approvals",
+      "name": "Pending Approvals",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        240,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DHARANI_PG",
+          "name": "Dharani 360 - Postgres"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// J-02: anything waiting too long reminds the approver, then their manager.\n// H-01: value decides who has to look at it at all.\nconst cfg = $('Config').first().json;\nconst REMIND_AFTER  = Number(cfg.remind_after_hours);    // nudge the approver\nconst ESCALATE_AFTER = Number(cfg.escalate_after_hours); // go over their head\nconst DIRECTOR_THRESHOLD = Number(cfg.director_threshold_aed);\n\nconst users = $('Get Users').all().map(u => u.json);\nconst byName = (name) => {\n  const k = String(name || '').trim().toLowerCase();\n  if (!k) return null;\n  return users.find(u => String(u.full_name || '').toLowerCase() === k ||\n                         String(u.username || '').toLowerCase() === k) || null;\n};\nconst director = users.find(u => /director|owner/i.test(String(u.role || '')));\n\nconst out = [];\nfor (const it of $input.all()) {\n  const r = it.json;\n  const hrs = Number(r.hours_pending);\n  const amt = Number(r.amount || 0);\n  const bigTicket = amt >= DIRECTOR_THRESHOLD;\n\n  let stage = null;\n  if (hrs >= ESCALATE_AFTER) stage = 'escalate';\n  else if (hrs >= REMIND_AFTER) stage = 'remind';\n  if (!stage) continue;\n\n  const approver = byName(r.approver_name);\n  const target = (stage === 'escalate' || bigTicket || !approver)\n      ? director : approver;\n  if (!target) continue;\n\n  const url = `${cfg.portal_url}/record/${r.form_code}/${r.id}`;\n  const head = stage === 'escalate'\n      ? `ESCALATED - waiting ${Math.round(hrs)}h`\n      : `Waiting ${Math.round(hrs)}h for your approval`;\n\n  out.push({ json: {\n    channel: stage === 'escalate' ? 'email,whatsapp,slack' : 'email',\n    to_email: target.email,\n    slack_channel: 'dharani-approvals',\n    subject: `[APPROVAL] ${head} - ${r.subject_txt}`,\n    message:\n`${head}\n\nRegister : ${r.form_title} (${r.form_code})\nDocument : ${r.doc_no}\nSubject  : ${r.subject_txt}\nStatus   : ${r.status}\n${amt > 0 ? 'Value    : AED ' + amt.toLocaleString() + (bigTicket ? '  (above the director threshold)' : '') + '\\n' : ''}Approver : ${r.approver_name || 'nobody named on the record'}\nWaiting  : ${Math.round(hrs)} hours\n\nApprove or reject it here: ${url}\n${stage === 'escalate' ? '\\nThis has now been escalated because it passed ' + ESCALATE_AFTER + ' hours unactioned.' : ''}`,\n  }});\n}\nreturn out;"
+      },
+      "id": "decide-chase-or-escalate",
+      "name": "Decide Chase Or Escalate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "DISPATCHER_WORKFLOW_ID",
+          "mode": "id",
+          "cachedResultName": "Dharani 360 - Notification Dispatcher"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {}
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "chase-them",
+      "name": "Chase Them",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        660,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Every 2 hours": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Get Users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Users": {
+      "main": [
+        [
+          {
+            "node": "Collapse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collapse": {
+      "main": [
+        [
+          {
+            "node": "Pending Approvals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pending Approvals": {
+      "main": [
+        [
+          {
+            "node": "Decide Chase Or Escalate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decide Chase Or Escalate": {
+      "main": [
+        [
+          {
+            "node": "Chase Them",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "dharani360"
+  }
+}

@@ -1,0 +1,364 @@
+{
+  "name": "Dharani 360 - Notification Dispatcher",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## A-03 One notification dispatcher\n\nEvery other Dharani 360 flow calls THIS workflow instead of re-implementing sending.\n\n**Import this one first**, open it, copy its workflow ID out of the browser URL, and paste that ID into the *Notify* node of every other flow (it is pre-filled with `DISPATCHER_WORKFLOW_ID`).\n\n### Input it expects\n```\n{ channel: 'email' | 'whatsapp' | 'slack' | 'all',\n  to_email, to_phone, slack_channel,\n  subject, message, html (optional) }\n```\n\nEdit the **Config** node once - addresses, Meta phone-number ID, portal URL - and every automation inherits it.",
+        "height": 420,
+        "width": 460
+      },
+      "id": "readme",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "when-called",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -320,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a0",
+              "name": "from_email",
+              "value": "no-reply@dharanis.ae",
+              "type": "string"
+            },
+            {
+              "id": "a1",
+              "name": "fallback_email",
+              "value": "admin@dharanis.ae",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "slack_channel",
+              "value": "dharani-alerts",
+              "type": "string"
+            },
+            {
+              "id": "a3",
+              "name": "wa_phone_number_id",
+              "value": "PUT_YOUR_META_PHONE_NUMBER_ID_HERE",
+              "type": "string"
+            },
+            {
+              "id": "a4",
+              "name": "wa_template",
+              "value": "dharani_alert",
+              "type": "string"
+            },
+            {
+              "id": "a5",
+              "name": "portal_url",
+              "value": "https://dharani360.onrender.com",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "config",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -120,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nreturn $input.all().map(item => {\n  const j = item.json || {};\n  const ch = String(j.channel || 'email').toLowerCase();\n  const want = (name) => ch === 'all' || ch.split(',').map(s => s.trim()).includes(name);\n  const msg = String(j.message || '');\n  const phone = String(j.to_phone || '').replace(/[^0-9]/g, '');\n  const email = j.to_email || cfg.fallback_email;\n  return { json: Object.assign({}, cfg, j, {\n    to_email: email,\n    to_phone: phone,\n    slack_channel: j.slack_channel || cfg.slack_channel,\n    subject: j.subject || 'DHARANI 360',\n    message: msg,\n    html: j.html || ('<div style=\"font-family:system-ui,Segoe UI,sans-serif;font-size:15px;line-height:1.6\">'\n        + msg.replace(/\\n/g, '<br>')\n        + '<hr style=\"border:0;border-top:1px solid #e5e7eb;margin:18px 0\">'\n        + '<span style=\"color:#6b7280;font-size:12px\">Sent automatically by DHARANI 360 &middot; '\n        + cfg.portal_url + '</span></div>'),\n    send_email: want('email') && !!email,\n    send_whatsapp: want('whatsapp') && phone.length > 6,\n    send_slack: want('slack'),\n  })};\n});"
+      },
+      "id": "normalize",
+      "name": "Normalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.send_email }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "email?",
+      "name": "Email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        320,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.send_whatsapp }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "whatsapp?",
+      "name": "WhatsApp?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        320,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.send_slack }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "slack?",
+      "name": "Slack?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        320,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $json.from_email }}",
+        "toEmail": "={{ $json.to_email }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "html",
+        "html": "={{ $json.html }}",
+        "options": {}
+      },
+      "id": "send-email",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        560,
+        100
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "DHARANI_SMTP",
+          "name": "Dharani 360 - SMTP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v21.0/{{ $json.wa_phone_number_id }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $json.to_phone }}\",\n  \"type\": \"template\",\n  \"template\": {\n    \"name\": \"{{ $json.wa_template }}\",\n    \"language\": { \"code\": \"en\" },\n    \"components\": [{\n      \"type\": \"body\",\n      \"parameters\": [{ \"type\": \"text\", \"text\": \"{{ $json.message }}\" }]\n    }]\n  }\n}",
+        "options": {}
+      },
+      "id": "send-whatsapp",
+      "name": "Send WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        560,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "DHARANI_WA",
+          "name": "Dharani 360 - WhatsApp (Meta Graph)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $json.slack_channel }}",
+          "mode": "name"
+        },
+        "text": "=*{{ $json.subject }}*\n{{ $json.message }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "id": "post-to-slack",
+      "name": "Post to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        560,
+        500
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "DHARANI_SLACK",
+          "name": "Dharani 360 - Slack"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize": {
+      "main": [
+        [
+          {
+            "node": "Email?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "WhatsApp?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Slack?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email?": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp?": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack?": {
+      "main": [
+        [
+          {
+            "node": "Post to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "dharani360"
+  }
+}

@@ -1,0 +1,239 @@
+{
+  "name": "Dharani 360 - Commission & Invoice Dunning",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## F-03  Invoices that chase themselves\n\nSweeps three registers daily - **TXN-004** commission approvals, **FIN-006** vendor invoices and **MKT-016** marketing vendor invoices - and sends a notice at **7, 30, 60 and 90 days**, then weekly after that.\n\nThe wording escalates with the age: DUE, FIRST, SECOND, FINAL. From 60 days it adds WhatsApp and Slack; at 90 the Director gets a copy of their own.\n\nMoving the record to **Paid** stops it - there is nothing to cancel.",
+        "height": 420,
+        "width": 460
+      },
+      "id": "readme",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 9,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "every-morning-09:00",
+      "name": "Every morning 09:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -560,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a0",
+              "name": "portal_url",
+              "value": "https://dharani360.onrender.com",
+              "type": "string"
+            },
+            {
+              "id": "a1",
+              "name": "finance_email",
+              "value": "finance@dharanis.ae",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "config",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -360,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, username, full_name, email, role FROM users WHERE active = 1;",
+        "options": {}
+      },
+      "id": "get-users",
+      "name": "Get Users",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        -160,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DHARANI_PG",
+          "name": "Dharani 360 - Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ok: true } }];"
+      },
+      "id": "collapse",
+      "name": "Collapse",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        40,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH owed AS (\n  SELECT 'TXN-004' AS form_code, 'Commission Approval' AS form_title,\n         id, doc_no, COALESCE(status,'') AS status,\n         COALESCE(NULLIF(transaction_ref,''), doc_no) AS reference,\n         COALESCE(NULLIF(agent_name,''), '') AS owed_to,\n         COALESCE(net_commission, 0)::numeric AS amount,\n         NULLIF(payment_date,'') AS due_txt, created_at\n  FROM frm_txn_004\n  WHERE COALESCE(status,'') <> 'Paid'\n    AND created_at ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'\n  UNION ALL\n  SELECT 'FIN-006', 'Vendor Invoice Verification',\n         id, doc_no, COALESCE(status,''),\n         COALESCE(NULLIF(invoice_no,''), doc_no),\n         COALESCE(NULLIF(vendor_name,''), ''),\n         COALESCE(invoice_amount, 0)::numeric,\n         NULLIF(verification_date,''), created_at\n  FROM frm_fin_006\n  WHERE COALESCE(status,'') IN ('Pending','Verified','Disputed')\n    AND created_at ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'\n  UNION ALL\n  SELECT 'MKT-016', 'Marketing Vendor Invoice',\n         id, doc_no, COALESCE(status,''),\n         COALESCE(NULLIF(invoice_no,''), doc_no),\n         COALESCE(NULLIF(vendor_name,''), ''),\n         0::numeric, NULL, created_at\n  FROM frm_mkt_016\n  WHERE COALESCE(status,'') IN ('Received','Verified','Approved for Payment','Disputed')\n    AND created_at ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'\n)\nSELECT form_code, form_title, id, doc_no, status, reference, owed_to, amount,\n       due_txt,\n       (CURRENT_DATE - substr(created_at, 1, 10)::date) AS age_days\nFROM owed\nWHERE (CURRENT_DATE - substr(created_at, 1, 10)::date) >= 7\nORDER BY age_days DESC;",
+        "options": {}
+      },
+      "id": "everything-still-owed",
+      "name": "Everything Still Owed",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        240,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DHARANI_PG",
+          "name": "Dharani 360 - Postgres"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// F-03: the invoice chases itself at 7 / 30 / 60 / 90 days instead of living\n// in somebody's private spreadsheet of who owes what.\nconst cfg = $('Config').first().json;\nconst STEPS = [7, 30, 60, 90];\nconst users = $('Get Users').all().map(u => u.json);\nconst director = users.find(u => /director|owner/i.test(String(u.role || '')));\nconst byName = (nm) => {\n  const k = String(nm || '').trim().toLowerCase();\n  return k ? users.find(u => String(u.full_name || '').toLowerCase() === k) : null;\n};\n\nconst out = [];\nfor (const it of $input.all()) {\n  const r = it.json;\n  const age = Number(r.age_days);\n  // chase on the step days, then every 7th day after 90\n  const onStep = STEPS.includes(age) || (age > 90 && (age - 90) % 7 === 0);\n  if (!onStep) continue;\n\n  const severity = age >= 90 ? 'FINAL' : age >= 60 ? 'SECOND' : age >= 30 ? 'FIRST' : 'DUE';\n  const person = byName(r.owed_to);\n  const url = `${cfg.portal_url}/record/${r.form_code}/${r.id}`;\n\n  out.push({ json: {\n    channel: age >= 60 ? 'email,whatsapp,slack' : 'email',\n    to_email: cfg.finance_email,\n    slack_channel: 'dharani-finance',\n    subject: `[${severity} NOTICE - ${age}d] ${r.form_title} ${r.reference}`,\n    message:\n`${r.form_title} ${r.reference} has been outstanding for ${age} days.\n\nDocument : ${r.doc_no}\nStatus   : ${r.status}\nOwed to  : ${r.owed_to || 'not named on the record'}${person ? ' (' + person.email + ')' : ''}\n${Number(r.amount) > 0 ? 'Amount   : AED ' + Number(r.amount).toLocaleString() + '\\n' : ''}Raised   : ${age} days ago\n${r.due_txt ? 'Dated    : ' + r.due_txt + '\\n' : ''}\nOpen it: ${url}\n\n${age >= 90\n  ? 'This is the final automated notice. It now goes to the Director as well and will repeat weekly until the status is Paid.'\n  : 'Move the record to Paid and this stops by itself.'}`,\n  }});\n\n  if (age >= 90 && director) {\n    out.push({ json: {\n      channel: 'email',\n      to_email: director.email,\n      subject: `[90+ DAYS] ${r.form_title} ${r.reference} still unpaid`,\n      message: `${r.reference} (${r.doc_no}) is ${age} days old and still ${r.status}.\\n\\n${url}`,\n    }});\n  }\n}\nreturn out;"
+      },
+      "id": "pick-today's-chases",
+      "name": "Pick Today's Chases",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "DISPATCHER_WORKFLOW_ID",
+          "mode": "id",
+          "cachedResultName": "Dharani 360 - Notification Dispatcher"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {}
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "send-the-notice",
+      "name": "Send The Notice",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        660,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Every morning 09:00": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Get Users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Users": {
+      "main": [
+        [
+          {
+            "node": "Collapse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collapse": {
+      "main": [
+        [
+          {
+            "node": "Everything Still Owed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Everything Still Owed": {
+      "main": [
+        [
+          {
+            "node": "Pick Today's Chases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Today's Chases": {
+      "main": [
+        [
+          {
+            "node": "Send The Notice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "dharani360"
+  }
+}
