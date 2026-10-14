@@ -20,6 +20,16 @@
   src: url("fonts/roboto-latin-600-normal.woff2") format("woff2"), url("fonts/roboto-latin-600-normal.woff") format("woff"); }
 @font-face { font-family: "Roboto"; font-style: normal; font-weight: 700; font-display: swap;
   src: url("fonts/roboto-latin-700-normal.woff2") format("woff2"), url("fonts/roboto-latin-700-normal.woff") format("woff"); }
+@font-face { font-family: "Open Sans"; font-style: normal; font-weight: 400; font-display: swap;
+  src: url("fonts/open-sans-latin-400-normal.woff2") format("woff2"), url("fonts/open-sans-latin-400-normal.woff") format("woff"); }
+@font-face { font-family: "Open Sans"; font-style: normal; font-weight: 500; font-display: swap;
+  src: url("fonts/open-sans-latin-500-normal.woff2") format("woff2"), url("fonts/open-sans-latin-500-normal.woff") format("woff"); }
+@font-face { font-family: "Open Sans"; font-style: normal; font-weight: 600; font-display: swap;
+  src: url("fonts/open-sans-latin-600-normal.woff2") format("woff2"), url("fonts/open-sans-latin-600-normal.woff") format("woff"); }
+@font-face { font-family: "Open Sans"; font-style: normal; font-weight: 700; font-display: swap;
+  src: url("fonts/open-sans-latin-700-normal.woff2") format("woff2"), url("fonts/open-sans-latin-700-normal.woff") format("woff"); }
+@font-face { font-family: "Open Sans"; font-style: normal; font-weight: 800; font-display: swap;
+  src: url("fonts/open-sans-latin-800-normal.woff2") format("woff2"), url("fonts/open-sans-latin-800-normal.woff") format("woff"); }
 
 /* ---------------------------------------------------------------- tokens -- */
 :root {
@@ -102,7 +112,7 @@ html { -webkit-text-size-adjust: 100%; }
 
 body {
   margin: 0;
-  font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 14px;
   line-height: 1.5;
   color: var(--muted);
@@ -111,7 +121,7 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-h1, h2, h3, h4, h5, h6 { color: var(--ink); font-weight: 600; margin: 0; line-height: 1.3; }
+h1, h2, h3, h4, h5, h6 { color: var(--ink); font-family: "Manrope", "Open Sans", sans-serif; font-weight: 700; margin: 0; line-height: 1.2; }
 h1 { font-size: 22px; font-weight: 700; letter-spacing: -.3px; }
 h2 { font-size: 17px; }
 h3 { font-size: 15px; }
@@ -4358,4 +4368,82 @@ body.is-preview .reg-rail { top: calc(var(--topbar-h) + var(--preview-banner-h) 
   .preview-banner { font-size: 12px; padding: 6px 12px; }
   .preview-banner span { display: none; }
   body.is-preview { --preview-banner-h: 28px; }
+}
+
+.dashboard-intro {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin: 4px 0 20px;
+}
+.eyebrow {
+  color: var(--primary);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+.dashboard-heading { margin-top: 5px; font-size: clamp(24px, 3vw, 34px); letter-spacing: -.8px; }
+.dashboard-lede { margin: 7px 0 0; color: var(--muted); font-size: 13px; }
+.standard-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255,255,255,.72);
+  color: var(--ink-2);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.standard-pill-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 4px var(--success-soft); }
+.control-tower-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+.control-tower-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 132px;
+  padding: 16px 17px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.control-tower-card::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: currentColor; opacity: .82; }
+.control-tower-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); text-decoration: none; }
+.control-tower-top { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.control-tower-icon { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 7px; background: currentColor; color: inherit; }
+.control-tower-icon svg { color: #fff; width: 15px; height: 15px; }
+.control-tower-card strong { margin-top: 12px; color: var(--ink); font-family: "Manrope", "Open Sans", sans-serif; font-size: 30px; line-height: 1; }
+.control-tower-card > span:last-child { margin-top: 8px; color: var(--muted); font-size: 11px; line-height: 1.35; }
+.control-tower-red { color: var(--danger); background: linear-gradient(145deg, #fff 0%, var(--danger-soft) 180%); }
+.control-tower-amber { color: var(--warning); background: linear-gradient(145deg, #fff 0%, var(--warning-soft) 180%); }
+.control-tower-blue { color: var(--info); background: linear-gradient(145deg, #fff 0%, var(--info-soft) 180%); }
+.control-tower-green { color: var(--success); background: linear-gradient(145deg, #fff 0%, var(--success-soft) 180%); }
+.standard-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 18px 0;
+  padding: 15px 18px;
+  border: 1px solid rgba(14,116,144,.2);
+  border-radius: 8px;
+  background: linear-gradient(100deg, var(--primary-soft), #fff 72%);
+}
+.standard-card-mark { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; flex: 0 0 40px; border-radius: 10px; color: #fff; background: linear-gradient(135deg, var(--primary), var(--secondary)); font-family: "Manrope", "Open Sans", sans-serif; font-size: 13px; font-weight: 800; letter-spacing: -.04em; }
+.standard-card-title { margin-top: 3px; color: var(--ink); font-family: "Manrope", "Open Sans", sans-serif; font-size: 14px; font-weight: 700; }
+.standard-card .btn { margin-left: auto; flex: none; }
+@media (max-width: 900px) { .control-tower-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 620px) {
+  .dashboard-intro { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .control-tower-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .control-tower-card { min-height: 118px; padding: 13px; }
+  .control-tower-card strong { font-size: 26px; }
+  .standard-card { align-items: flex-start; flex-wrap: wrap; }
+  .standard-card .btn { margin-left: 54px; }
 }

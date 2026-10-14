@@ -623,6 +623,12 @@ def dashboard():
     pipeline_total = db.count_records("REC-002")
     open_tickets = db.count_where_in("HLP-001", "status", ["Open", "In Progress"])
     approvals = db.pending_approvals(depts_allowed=allowed, limit=25)
+    control_tower = [
+        {"label": "Urgent", "tone": "red", "count": len(urgent), "detail": "Expired or due within 30 days", "icon": "alert-triangle"},
+        {"label": "Action required", "tone": "amber", "count": len(upcoming), "detail": "Renewals and follow-ups in motion", "icon": "clock"},
+        {"label": "Waiting", "tone": "blue", "count": len(approvals), "detail": "Pending a person or approval", "icon": "clock"},
+        {"label": "Compliant", "tone": "green", "count": max(total_records - len(urgent) - len(upcoming), 0), "detail": "Records currently within rule", "icon": "shield"},
+    ]
 
     stat_cards = [
         {"label": "Active Employees", "value": active_headcount, "icon": "users", "tone": "blue"},
@@ -675,6 +681,7 @@ def dashboard():
         total_forms=total_forms,
         FORMS_BY_CODE=FORMS_BY_CODE,
         stat_cards=stat_cards,
+        control_tower=control_tower,
         dept_bars=dept_bars,
         status_bars=status_bars,
         attendance_mix=attendance_mix,

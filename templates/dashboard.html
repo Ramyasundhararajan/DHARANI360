@@ -19,6 +19,15 @@
   </div>
 </div>
 
+<div class="dashboard-intro">
+  <div>
+    <div class="eyebrow">Dharani 360 control tower</div>
+    <h2 class="dashboard-heading">The company, at a glance.</h2>
+    <p class="dashboard-lede">One controlled workspace for every record, deadline, approval and operational handoff.</p>
+  </div>
+  <div class="standard-pill"><span class="standard-pill-dot"></span>Single source of truth</div>
+</div>
+
 <div class="welcome-card no-print">
   {% if current_user.photo_path %}
     <img class="welcome-avatar" src="{{ url_for('photo_file', relpath=current_user.photo_path) }}" alt="">
@@ -37,6 +46,16 @@
     <a class="btn btn-sm btn-secondary" href="{{ url_for('calendar') }}">{{ icon('calendar-check') }}Calendar</a>
     <a class="btn btn-sm" href="{{ url_for('todos_page') }}">{{ icon('clipboard-list') }}My To-Do</a>
   </div>
+</div>
+
+<div class="control-tower-grid" aria-label="Control tower status">
+  {% for item in control_tower %}
+  <a class="control-tower-card control-tower-{{ item.tone }}" href="{{ url_for('calendar') if item.label != 'Compliant' else url_for('dashboards_hub') }}">
+    <div class="control-tower-top"><span class="control-tower-icon">{{ icon(item.icon) }}</span><span>{{ item.label }}</span></div>
+    <strong>{{ item.count }}</strong>
+    <span>{{ item.detail }}</span>
+  </a>
+  {% endfor %}
 </div>
 
 {# ---------------------------------------------------------- stat tiles -- #}
@@ -250,6 +269,15 @@
       <div class="field full"><button type="submit" class="btn btn-sm">Schedule Meeting</button></div>
     </form>
   </details>
+</div>
+
+<div class="standard-card no-print">
+  <div class="standard-card-mark">DR</div>
+  <div>
+    <div class="eyebrow">The Dharani standard</div>
+    <div class="standard-card-title">Everything documented. Everything accountable. Everyone responsible.</div>
+  </div>
+  <a class="btn btn-sm btn-secondary" href="{{ url_for('documentation') }}">View operating rules</a>
 </div>
 
 {# --------------------------------------------------------- risk lists --- #}
