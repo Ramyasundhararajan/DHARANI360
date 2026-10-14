@@ -36,3 +36,6 @@ desktop.ini
 _to_delete/
 *.bak
 *.log
+.env.backup
+.env.*
+!.env.example
