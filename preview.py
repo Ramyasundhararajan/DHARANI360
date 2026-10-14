@@ -112,7 +112,8 @@ def main(argv=None):
     import db
     import app as app_module
 
-    port = _free_port(args.port)
+    preferred_port = int(os.environ.get("PORT", args.port))
+    port = _free_port(preferred_port)
     url = "http://127.0.0.1:{}/".format(port)
 
     total = sum(db.all_counts().values())
@@ -128,7 +129,7 @@ def main(argv=None):
     if not args.no_browser:
         threading.Timer(1.5, lambda: webbrowser.open(url)).start()
 
-    app_module.app.run(host="127.0.0.1", port=port, debug=False, use_reloader=False)
+    app_module.app.run(host=os.environ.get("HOST", "0.0.0.0"), port=port, debug=False, use_reloader=False)
     return 0
 
 

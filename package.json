@@ -1,0 +1,9 @@
+{
+  "name": "dharani-360",
+  "private": true,
+  "scripts": {
+    "dev": "PYTHONPATH=.python-deps python3 preview.py --no-browser",
+    "preview": "PYTHONPATH=.python-deps python3 preview.py --no-browser",
+    "start": "PYTHONPATH=.python-deps python3 app.py"
+  }
+}

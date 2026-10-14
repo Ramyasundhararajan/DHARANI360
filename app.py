@@ -2653,4 +2653,4 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     print("\n  DHARANI 360 is running.")
     print("  Open this address in your browser:  http://127.0.0.1:{}\n".format(port))
-    app.run(host="127.0.0.1", port=port, debug=False)
+    app.run(host=os.environ.get("HOST", "0.0.0.0"), port=port, debug=False)
